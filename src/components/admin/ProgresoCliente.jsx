@@ -4123,17 +4123,16 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
             </div>
 
             {/* Main Responsive Grid Container */}
-            <div className="max-w-7xl w-full mx-auto px-0 py-2 pb-28 md:p-8 grid grid-cols-1 lg:grid-cols-12 gap-3 md:gap-6">
+            <div className="max-w-7xl w-full mx-auto px-0 py-0 pb-28 md:p-8 grid grid-cols-1 lg:grid-cols-12 gap-0 md:gap-6">
               {/* Left Column: Protocol & Anthropometric Fields */}
-              <div className="lg:col-span-8 flex flex-col gap-5">
+              <div className="lg:col-span-8 flex flex-col gap-0 md:gap-5">
                 {/* Paso 1: Check-in de Seguimiento */}
-                {/* Paso 1: Check-in de Seguimiento */}
-                <div className="bg-white rounded-none md:rounded-2xl border-y md:border border-blue-100 p-4 sm:p-6 shadow-none md:shadow-sm relative overflow-hidden space-y-5">
-                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[var(--brand-primary)] to-blue-400" />
+                <div className="bg-white rounded-none md:rounded-2xl border-b md:border border-blue-100 p-4 sm:p-6 shadow-none md:shadow-sm relative overflow-hidden space-y-4 sm:space-y-5">
+                  <div className="hidden md:block absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[var(--brand-primary)] to-blue-400" />
                   
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3">
                     <div className="flex items-start sm:items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-xl bg-blue-50 text-[var(--brand-primary)] flex items-center justify-center shrink-0">
+                      <div className="hidden sm:flex w-10 h-10 rounded-xl bg-blue-50 text-[var(--brand-primary)] items-center justify-center shrink-0">
                         <Activity className="w-5 h-5" />
                       </div>
                       <div className="min-w-0">
@@ -4145,7 +4144,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                             Check-in de Seguimiento
                           </h3>
                         </div>
-                        <p className="text-xs text-[#6B7A8D] mt-0.5 leading-relaxed">
+                        <p className="hidden md:block text-xs text-[#6B7A8D] mt-0.5 leading-relaxed">
                           Registra las sensaciones y hábitos del paciente basado en su experiencia reciente (o su día a día habitual si es consulta inicial). Pondera del 1 (lo menor o más desfavorable) al 5 (lo mayor u óptimo).
                         </p>
                       </div>
@@ -4153,7 +4152,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                   </div>
 
                   {/* Panel Unificado de Ponderación (5 Escalas) */}
-                  <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl divide-y divide-[#E2E8F0] overflow-hidden">
+                  <div className="-mx-4 sm:mx-0 bg-white sm:bg-[#F8FAFC] border-t sm:border border-[#E2E8F0] rounded-none sm:rounded-2xl divide-y divide-[#E2E8F0] overflow-hidden">
                     {[
                       {
                         key: "checkin_energia",
@@ -4209,20 +4208,21 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                           className="p-3 sm:p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 hover:bg-white/70 transition-colors"
                         >
                           {/* Izquierda: Icono + Título + Badge de estado + Leyenda descriptiva */}
-                          <div className="flex items-start sm:items-center gap-3 min-w-0">
-                            <div className="w-9 h-9 rounded-xl bg-white border border-[#E2E8F0] shadow-2xs flex items-center justify-center shrink-0">
+                          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                            <div className="hidden sm:flex w-9 h-9 rounded-xl bg-white border border-[#E2E8F0] shadow-2xs items-center justify-center shrink-0">
                               {sc.icon}
                             </div>
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-xs sm:text-sm font-bold text-[#0B1929]">
-                                  {sc.label}
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center justify-between sm:justify-start gap-2 flex-wrap">
+                                <span className="text-xs sm:text-sm font-bold text-[#0B1929] flex items-center gap-1.5">
+                                  <span className="sm:hidden shrink-0">{sc.icon}</span>
+                                  <span>{sc.label}</span>
                                 </span>
                                 <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md border ${sc.badgeColor}`}>
                                   {currentVal}/5 · {statusLabel}
                                 </span>
                               </div>
-                              <p className="text-[11px] text-[#6B7A8D] mt-0.5 flex items-center gap-1.5 flex-wrap">
+                              <p className="hidden sm:flex text-[11px] text-[#6B7A8D] mt-0.5 items-center gap-1.5 flex-wrap">
                                 <span className="text-gray-400 font-medium">Escala:</span>
                                 <span className="font-medium text-gray-600">1 = {sc.minHelp}</span>
                                 <span className="text-gray-300">|</span>
@@ -4232,7 +4232,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                           </div>
 
                           {/* Derecha: Selector de 5 botones (1 al 5) */}
-                          <div className="flex items-center gap-1 self-stretch md:self-auto justify-end shrink-0 bg-white p-1 rounded-xl border border-[#E2E8F0] shadow-2xs">
+                          <div className="flex items-center gap-1 self-stretch md:self-auto justify-end shrink-0 bg-[#F8FAFC] sm:bg-white p-1 rounded-xl border border-[#E2E8F0] shadow-none sm:shadow-2xs">
                             {[1, 2, 3, 4, 5].map((n) => {
                               const isSel = currentVal === n;
                               return (
@@ -4259,8 +4259,8 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                     })}
                   </div>
 
-                  {/* Hábitos de Sueño y Actividad Física (3 Cards) */}
-                  <div className="pt-2 border-t border-blue-100/80 space-y-3">
+                  {/* Hábitos de Sueño y Actividad Física */}
+                  <div className="pt-2 border-t border-blue-100/80 space-y-2.5 sm:space-y-3">
                     <div className="flex items-center gap-1.5">
                       <Clock className="w-4 h-4 text-[var(--brand-primary)]" />
                       <span className="text-xs font-bold text-[#0B1929] uppercase tracking-wider">
@@ -4268,15 +4268,15 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3.5">
                       {/* Horas de Sueño */}
-                      <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 flex flex-col justify-between gap-2">
-                        <div className="space-y-1">
-                          <label className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5">
+                      <div className="flex flex-col justify-between gap-1 sm:gap-2 sm:bg-[#F8FAFC] sm:border sm:border-[#E2E8F0] sm:rounded-xl sm:p-3">
+                        <div className="space-y-0.5">
+                          <label className="text-[11px] sm:text-xs font-bold text-[#6B7A8D] sm:text-[#0B1929] flex items-center gap-1.5">
                             <Moon className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
                             <span>Horas de sueño promedio</span>
                           </label>
-                          <p className="text-[11px] text-[#6B7A8D] leading-snug">
+                          <p className="hidden sm:block text-[11px] text-[#6B7A8D] leading-snug">
                             Promedio de descanso por noche.
                           </p>
                         </div>
@@ -4287,18 +4287,18 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                           value={form.horas_sueno || ""}
                           onChange={(e) => !isReadOnly && updForm("horas_sueno", e.target.value)}
                           placeholder="Ej. 7.5 hrs"
-                          className={`w-full bg-white border border-[#E2E8F0] rounded-lg px-3 py-2 text-xs sm:text-sm placeholder:text-xs text-[#0B1929] shadow-2xs ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-[var(--brand-primary)]"}`}
+                          className={`w-full bg-[#F8FAFC] sm:bg-white border border-[#E2E8F0] rounded-xl sm:rounded-lg px-3 py-2 text-xs sm:text-sm placeholder:text-xs text-[#0B1929] shadow-none sm:shadow-2xs ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-[var(--brand-primary)] focus:bg-white"}`}
                         />
                       </div>
 
                       {/* Días de Ejercicio Actuales */}
-                      <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 flex flex-col justify-between gap-2">
-                        <div className="space-y-1">
-                          <label className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5">
+                      <div className="flex flex-col justify-between gap-1 sm:gap-2 sm:bg-[#F8FAFC] sm:border sm:border-[#E2E8F0] sm:rounded-xl sm:p-3">
+                        <div className="space-y-0.5">
+                          <label className="text-[11px] sm:text-xs font-bold text-[#6B7A8D] sm:text-[#0B1929] flex items-center gap-1.5">
                             <Dumbbell className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                             <span>Días de ejercicio actuales</span>
                           </label>
-                          <p className="text-[11px] text-[#6B7A8D] leading-snug">
+                          <p className="hidden sm:block text-[11px] text-[#6B7A8D] leading-snug">
                             Promedio semanal de entrenamiento.
                           </p>
                         </div>
@@ -4310,18 +4310,18 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                           value={form.dias_ejercicio_actual || ""}
                           onChange={(e) => !isReadOnly && updForm("dias_ejercicio_actual", e.target.value)}
                           placeholder="Ej. 3 o 4 días por semana"
-                          className={`w-full bg-white border border-[#E2E8F0] rounded-lg px-3 py-2 text-xs sm:text-sm placeholder:text-xs text-[#0B1929] shadow-2xs ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-[var(--brand-primary)]"}`}
+                          className={`w-full bg-[#F8FAFC] sm:bg-white border border-[#E2E8F0] rounded-xl sm:rounded-lg px-3 py-2 text-xs sm:text-sm placeholder:text-xs text-[#0B1929] shadow-none sm:shadow-2xs ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-[var(--brand-primary)] focus:bg-white"}`}
                         />
                       </div>
 
                       {/* Horario Disponible para Entrenar */}
-                      <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 flex flex-col justify-between gap-2">
-                        <div className="space-y-1">
-                          <label className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5">
+                      <div className="flex flex-col justify-between gap-1 sm:gap-2 sm:bg-[#F8FAFC] sm:border sm:border-[#E2E8F0] sm:rounded-xl sm:p-3">
+                        <div className="space-y-0.5">
+                          <label className="text-[11px] sm:text-xs font-bold text-[#6B7A8D] sm:text-[#0B1929] flex items-center gap-1.5">
                             <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                             <span>Horario habitual de entreno</span>
                           </label>
-                          <p className="text-[11px] text-[#6B7A8D] leading-snug">
+                          <p className="hidden sm:block text-[11px] text-[#6B7A8D] leading-snug">
                             Hora de entrenamiento diaria.
                           </p>
                         </div>
@@ -4330,9 +4330,9 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                           readOnly={isReadOnly}
                           value={form.horario_ejercicio || ""}
                           onChange={(e) => !isReadOnly && updForm("horario_ejercicio", e.target.value)}
-                          placeholder={prevEvalHorario ? `Última consulta: ${prevEvalHorario}` : ""}
+                          placeholder={prevEvalHorario ? `Última consulta: ${prevEvalHorario}` : "Ej. 7:00 am"}
                           title={prevEvalHorario ? `En la última consulta se comentó: ${prevEvalHorario}` : undefined}
-                          className={`w-full bg-white border border-[#E2E8F0] rounded-lg px-3 py-2 text-xs sm:text-sm placeholder:text-xs text-[#0B1929] shadow-2xs ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-[var(--brand-primary)]"}`}
+                          className={`w-full bg-[#F8FAFC] sm:bg-white border border-[#E2E8F0] rounded-xl sm:rounded-lg px-3 py-2 text-xs sm:text-sm placeholder:text-xs text-[#0B1929] shadow-none sm:shadow-2xs ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-[var(--brand-primary)] focus:bg-white"}`}
                         />
                       </div>
                     </div>
@@ -4342,14 +4342,14 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                   {!isFirstEvaluationEver && (
                     <div className="pt-2 border-t border-blue-100/80 space-y-3">
                       {loadingAdherenceSnapshot && (
-                        <div className="p-3 rounded-xl bg-blue-50/50 border border-blue-200/60 text-xs text-blue-800 flex items-center gap-2">
+                        <div className="py-2 text-xs text-blue-800 flex items-center gap-2">
                           <Loader2 className="w-4 h-4 animate-spin text-[var(--brand-primary)] shrink-0" />
                           <span>Consultando histórico de entrenamiento en la app...</span>
                         </div>
                       )}
 
                       {!loadingAdherenceSnapshot && adherenceSnapshot && (
-                        <div className="rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] p-3.5 space-y-2.5">
+                        <div className="pt-2 sm:rounded-xl sm:bg-[#F8FAFC] sm:border sm:border-[#E2E8F0] sm:p-3.5 space-y-2.5">
                           <div className="flex items-center justify-between gap-2 flex-wrap text-[11px]">
                             <span className="font-bold text-[#0B1929] flex items-center gap-1.5">
                               <BarChart2 className="w-3.5 h-3.5 text-[var(--brand-primary)]" />
@@ -4444,10 +4444,10 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                 </div>
 
                 {/* Paso 2: Preferencias Alimentarias (16 Grupos SMAE en 3 Estados: Favoritos, Neutro, Disgusto) */}
-                <div className="bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] p-4 sm:p-6 shadow-none md:shadow-sm space-y-4">
+                <div className="bg-white rounded-none md:rounded-2xl border-b md:border border-[#E2E8F0] p-4 sm:p-6 shadow-none md:shadow-sm space-y-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start sm:items-center gap-2.5 min-w-0">
-                      <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
+                      <div className="hidden sm:flex w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 items-center justify-center shrink-0">
                         <Utensils className="w-5 h-5" />
                       </div>
                       <div className="min-w-0">
@@ -4459,7 +4459,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                             Preferencias Alimentarias
                           </h3>
                         </div>
-                        <p className="text-xs text-[#6B7A8D] mt-0.5 leading-relaxed">
+                        <p className="hidden md:block text-xs text-[#6B7A8D] mt-0.5 leading-relaxed">
                           Clasifica los 16 grupos del SMAE según las preferencias del paciente para priorizar o advertir en la prescripción y armado de dietas. Por defecto todos están en <strong>Neutro</strong>. Puedes arrastrarlos o usar los botones rápidos.
                         </p>
                       </div>
@@ -4496,7 +4496,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                       const disCount = SMAE_GROUPS.filter((g) => form.smae_gustos?.[g.id] === "disgusto").length;
                       const neuCount = SMAE_GROUPS.length - favCount - disCount;
                       return (
-                        <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="pt-2.5 border-t border-[#F0F4FA] sm:bg-[#F8FAFC] sm:border sm:border-[#E2E8F0] sm:rounded-xl sm:p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3">
                           <div className="space-y-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap text-xs">
                               <span className="font-bold text-[#0B1929]">Heredado del ciclo anterior:</span>
@@ -4725,9 +4725,9 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                   })()}
 
                   {/* EXCEPCIONES ESPECÍFICAS DE ALIMENTOS O PLATILLOS (NOTAS PUNTUALES) */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 border-t border-[#E2E8F0]">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-[#E2E8F0]">
                     {/* Favoritos puntuales */}
-                    <div className="bg-emerald-50/30 border border-emerald-200/70 rounded-xl p-3 space-y-1.5">
+                    <div className="space-y-1.5 sm:bg-emerald-50/30 sm:border sm:border-emerald-200/70 sm:rounded-xl sm:p-3">
                       <label className="text-[11px] font-bold text-emerald-900 uppercase tracking-wider flex items-center gap-1.5">
                         <Heart className="w-3.5 h-3.5 text-emerald-600 fill-emerald-600/30" />
                         <span>Comentarios o platillos favoritos específicos</span>
@@ -4738,12 +4738,12 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                         value={form.preferencias_alimentos || ""}
                         onChange={(e) => !isReadOnly && updForm("preferencias_alimentos", e.target.value)}
                         placeholder="Ej. Le encanta la avena con canela, claras con espinaca, café negro..."
-                        className={`w-full bg-white border border-emerald-200 rounded-lg px-3 py-1.5 text-xs text-[#0B1929] shadow-2xs resize-none ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-emerald-500"}`}
+                        className={`w-full bg-[#F8FAFC] sm:bg-white border border-emerald-200 rounded-xl sm:rounded-lg px-3 py-1.5 text-xs text-[#0B1929] shadow-none sm:shadow-2xs resize-none ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-emerald-500 focus:bg-white"}`}
                       />
                     </div>
 
                     {/* Aversiones puntuales */}
-                    <div className="bg-rose-50/30 border border-rose-200/70 rounded-xl p-3 space-y-1.5">
+                    <div className="space-y-1.5 sm:bg-rose-50/30 sm:border sm:border-rose-200/70 sm:rounded-xl sm:p-3">
                       <label className="text-[11px] font-bold text-rose-900 uppercase tracking-wider flex items-center gap-1.5">
                         <Ban className="w-3.5 h-3.5 text-rose-600" />
                         <span>Aversiones o ingredientes específicos a evitar</span>
@@ -4754,7 +4754,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                         value={form.aversiones_alimentos || ""}
                         onChange={(e) => !isReadOnly && updForm("aversiones_alimentos", e.target.value)}
                         placeholder="Ej. No le gusta la cebolla cruda, pescado blanco, mayonesa..."
-                        className={`w-full bg-white border border-rose-200 rounded-lg px-3 py-1.5 text-xs text-[#0B1929] shadow-2xs resize-none ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-rose-500"}`}
+                        className={`w-full bg-[#F8FAFC] sm:bg-white border border-rose-200 rounded-xl sm:rounded-lg px-3 py-1.5 text-xs text-[#0B1929] shadow-none sm:shadow-2xs resize-none ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-rose-500 focus:bg-white"}`}
                       />
                     </div>
                   </div>
@@ -4769,10 +4769,10 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                   );
                   const showFollowUpView = !isFirstEvaluationEver && !showFullR24hInFollowUp && !hasR24hFilled;
                   return (
-                    <div className="bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] p-4 sm:p-6 shadow-none md:shadow-sm space-y-4">
+                    <div className="bg-white rounded-none md:rounded-2xl border-b md:border border-[#E2E8F0] p-4 sm:p-6 shadow-none md:shadow-sm space-y-4">
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-start sm:items-center gap-2.5 min-w-0">
-                          <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
+                          <div className="hidden sm:flex w-9 h-9 rounded-xl bg-purple-50 text-purple-600 items-center justify-center shrink-0">
                             <Clock className="w-5 h-5" />
                           </div>
                           <div className="min-w-0">
@@ -4784,7 +4784,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                 {showFollowUpView ? "Adherencia y Desviaciones del Plan" : "Alimentación Diaria Habitual (R24H)"}
                               </h3>
                             </div>
-                            <p className="text-xs text-[#6B7A8D] mt-0.5 leading-relaxed">
+                            <p className="hidden md:block text-xs text-[#6B7A8D] mt-0.5 leading-relaxed">
                               {showFollowUpView
                                 ? "En consultas de seguimiento ya conocemos el menú asignado. Registra únicamente desviaciones frecuentes o comidas fuera del plan."
                                 : "Comprende qué suele desayunar, comer y cenar el paciente habitualmente a lo largo del día para adaptar el nuevo plan a sus horarios y rutinas reales."}
@@ -4806,14 +4806,14 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                       {!isFirstEvaluationEver && (
                         <>
                           {loadingAdherenceSnapshot && (
-                            <div className="p-3 rounded-xl bg-purple-50/50 border border-purple-200/60 text-xs text-purple-900 flex items-center gap-2">
+                            <div className="py-2 text-xs text-purple-900 flex items-center gap-2">
                               <Loader2 className="w-4 h-4 animate-spin text-purple-600 shrink-0" />
                               <span>Consultando histórico nutricional en la app...</span>
                             </div>
                           )}
 
                           {!loadingAdherenceSnapshot && adherenceSnapshot && (
-                            <div className="rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] p-3.5 space-y-2.5">
+                            <div className="pt-2 sm:rounded-xl sm:bg-[#F8FAFC] sm:border sm:border-[#E2E8F0] sm:p-3.5 space-y-2.5">
                               <div className="flex items-center justify-between gap-2 flex-wrap text-[11px]">
                                 <span className="font-bold text-[#0B1929] flex items-center gap-1.5">
                                   <BarChart2 className="w-3.5 h-3.5 text-purple-600" />
@@ -5003,10 +5003,10 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                 })()}
 
                 {/* Paso 4: Mediciones Corporales y Antropometría */}
-                <div className="bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] p-4 sm:p-6 shadow-none md:shadow-sm space-y-4">
+                <div className="bg-white rounded-none md:rounded-2xl border-b md:border border-[#E2E8F0] p-4 sm:p-6 shadow-none md:shadow-sm space-y-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start sm:items-center gap-2.5 min-w-0 flex-1">
-                      <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
+                      <div className="hidden sm:flex w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 items-center justify-center shrink-0">
                         <Ruler className="w-5 h-5" />
                       </div>
                       <div className="min-w-0 flex-1">
@@ -5017,7 +5017,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                         <h3 className="text-sm sm:text-base font-bold text-[#0B1929] mt-1 sm:mt-0.5">
                           Mediciones Corporales y Antropometría
                         </h3>
-                        <p className="text-xs text-[#6B7A8D] mt-0.5 leading-relaxed">
+                        <p className="hidden md:block text-xs text-[#6B7A8D] mt-0.5 leading-relaxed">
                           Selecciona el protocolo de medición (Básico, Plicometría o Bioimpedancia) e ingresa las medidas corporales del paciente.
                         </p>
                       </div>
@@ -5221,7 +5221,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
 
                 {/* Card 2: Grupos de Campos Antropométricos */}
                 {activeGroups.map(group => (
-                  <div key={group.label} className="bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] p-4 sm:p-6 shadow-none md:shadow-sm">
+                  <div key={group.label} className="bg-white rounded-none md:rounded-2xl border-b md:border border-[#E2E8F0] p-4 sm:p-6 shadow-none md:shadow-sm">
                     <div className="text-xs text-[#0B1929] font-bold mb-4 uppercase tracking-wider flex items-center gap-2 border-b border-[#F0F4FA] pb-2.5">
                       <span className="text-[var(--brand-primary)]">{group.icon}</span>
                       <span>{group.label}</span>
@@ -5246,7 +5246,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                 ))}
 
                 {/* Card 3: Notas y Fotografías de Progreso */}
-                <div className="bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] p-4 sm:p-6 shadow-none md:shadow-sm space-y-5">
+                <div className="bg-white rounded-none md:rounded-2xl border-b md:border border-[#E2E8F0] p-4 sm:p-6 shadow-none md:shadow-sm space-y-5">
                   <div className="flex flex-col gap-1.5">
                     <label className="text-xs font-bold text-[#0B1929] uppercase tracking-wider">Notas y Observaciones Clínicas</label>
                     <textarea
@@ -5296,10 +5296,10 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                 </div>
 
                 {/* Paso 5: Enfoque y Prescripción del Ciclo */}
-                <div className="bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] p-4 sm:p-6 shadow-none md:shadow-sm space-y-4">
+                <div className="bg-white rounded-none md:rounded-2xl border-b md:border border-[#E2E8F0] p-4 sm:p-6 shadow-none md:shadow-sm space-y-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start sm:items-center gap-2.5 min-w-0">
-                      <div className="w-9 h-9 rounded-xl bg-blue-50 text-[var(--brand-primary)] flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
+                      <div className="hidden sm:flex w-9 h-9 rounded-xl bg-blue-50 text-[var(--brand-primary)] items-center justify-center shrink-0">
                         <Target className="w-5 h-5" />
                       </div>
                       <div className="min-w-0">
@@ -5311,7 +5311,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                             Enfoque y Prescripción del Ciclo
                           </h3>
                         </div>
-                        <p className="text-xs text-[#6B7A8D] mt-0.5 leading-relaxed">
+                        <p className="hidden md:block text-xs text-[#6B7A8D] mt-0.5 leading-relaxed">
                           Parámetros dinámicos exclusivos del plan actual para fijar el programa calórico y de macronutrientes de acuerdo a los objetivos generales del paciente.
                         </p>
                       </div>
@@ -5576,8 +5576,8 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
               </div>
 
               {/* Right Column: Sticky Live Clinical Summary & AI Macro Prescription */}
-              <div className="lg:col-span-4 lg:sticky lg:top-20 lg:self-start flex flex-col gap-4">
-                <div className="bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] p-4 sm:p-5 shadow-none md:shadow-sm">
+              <div className="lg:col-span-4 lg:sticky lg:top-20 lg:self-start flex flex-col gap-0 md:gap-4">
+                <div className="bg-white rounded-none md:rounded-2xl border-b md:border border-[#E2E8F0] p-4 sm:p-5 shadow-none md:shadow-sm">
                   <div className="flex items-center gap-2 mb-3 pb-2.5 border-b border-[#F0F4FA]">
                     <Activity className="w-4 h-4 text-[var(--brand-primary)]" />
                     <h3 className="text-xs font-bold text-[#0B1929] uppercase tracking-wider">
@@ -5657,8 +5657,8 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                 </div>
 
                 {/* Prescripción de Macros: Matemático, Sugerido IA o Manual */}
-                <div className="bg-white rounded-none md:rounded-2xl border-y md:border border-indigo-100 p-4 sm:p-5 shadow-none md:shadow-sm relative space-y-3.5">
-                  <div className="absolute top-0 left-0 right-0 h-1 md:rounded-t-2xl bg-gradient-to-r from-[var(--brand-primary)] via-indigo-500 to-emerald-500" />
+                <div className="bg-white rounded-none md:rounded-2xl border-b md:border border-indigo-100 p-4 sm:p-5 shadow-none md:shadow-sm relative space-y-3.5">
+                  <div className="hidden md:block absolute top-0 left-0 right-0 h-1 md:rounded-t-2xl bg-gradient-to-r from-[var(--brand-primary)] via-indigo-500 to-emerald-500" />
                   
                   {/* Cabecera */}
                   <div className="flex items-center justify-between gap-2 pb-2 border-b border-[#F0F4FA]">
@@ -5918,7 +5918,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
 
                       {/* Bloque de Sustento y Comparador Integrado de Ecuaciones TMB (Debajo de los Macros, sin taparlos jamás) */}
                       {(prescriptionMode === "matematico" || showFormulaPopover) && !isAuditingAi && (
-                        <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3.5 space-y-2.5">
+                        <div className="pt-3 border-t border-[#E2E8F0] sm:bg-[#F8FAFC] sm:border sm:rounded-xl sm:p-3.5 space-y-2.5">
                           <div className="flex items-center gap-1.5 min-w-0">
                             <Calculator className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
                             <span className="text-xs font-extrabold text-[#0B1929]">
@@ -6082,7 +6082,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
 
                       {/* Bloque de Auditoría Clínica con FLUX IA (Solo visible cuando está activo Auditado IA o cargando) */}
                       {(prescriptionMode === "ia" || isAuditingAi) && (
-                        <div className="bg-gradient-to-br from-indigo-50/60 to-blue-50/30 border border-indigo-100 rounded-xl p-3.5 space-y-3">
+                        <div className="pt-3 border-t border-indigo-100 sm:bg-gradient-to-br sm:from-indigo-50/60 sm:to-blue-50/30 sm:border sm:border-indigo-100 sm:rounded-xl sm:p-3.5 space-y-3">
                           <div className="flex items-center justify-between gap-2 flex-wrap">
                             <div className="flex items-center gap-1.5">
                               <Sparkles className="w-4 h-4 text-indigo-600" />
@@ -6189,7 +6189,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
 
                       {/* Bloque de Prescripción Dinámica / Simulador (Modo Manual) */}
                       {prescriptionMode === "manual" && (
-                        <div className="bg-gradient-to-br from-amber-50/50 via-white to-amber-50/30 border border-amber-200/80 rounded-2xl p-3.5 space-y-2.5 shadow-xs">
+                        <div className="pt-3 border-t border-amber-200/70 sm:bg-gradient-to-br sm:from-amber-50/50 sm:via-white sm:to-amber-50/30 sm:border sm:border-amber-200/80 sm:rounded-2xl sm:p-3.5 space-y-2.5 sm:shadow-xs">
                           {/* Cabecera del Simulador Inline en una sola línea sin la píldora Ajuste Fino */}
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-1.5 min-w-0">
@@ -6574,7 +6574,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                           : "Matemático";
 
                         return (
-                          <div className="bg-emerald-50/50 border border-emerald-200/80 rounded-2xl p-3.5 space-y-2.5 shadow-2xs">
+                          <div className="pt-3 border-t border-emerald-200/80 sm:bg-emerald-50/50 sm:border sm:border-emerald-200/80 sm:rounded-2xl sm:p-3.5 space-y-2.5 sm:shadow-2xs">
                             {/* Fila 1: Título y Acciones */}
                             <div className="flex items-center justify-between gap-2">
                               <div className="flex items-center gap-1.5 min-w-0 flex-1 flex-wrap">
