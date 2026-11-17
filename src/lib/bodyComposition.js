@@ -1146,45 +1146,53 @@ export function getTmbCalculationDetails({
   if (formula === "valencia" && p > 0) {
     let slope = 13.08;
     let intercept = 693;
+    let rangeLbl = "30–59 años";
     if (s === "M") {
-      if (e < 30) { slope = 13.37; intercept = 747; }
-      else if (e <= 60) { slope = 13.08; intercept = 693; }
-      else { slope = 14.21; intercept = 429; }
+      if (e < 30) { slope = 13.37; intercept = 747; rangeLbl = "18–29 años"; }
+      else if (e <= 60) { slope = 13.08; intercept = 693; rangeLbl = "30–59 años"; }
+      else { slope = 14.21; intercept = 429; rangeLbl = "≥60 años"; }
     } else {
-      if (e < 30) { slope = 11.02; intercept = 679; }
-      else if (e <= 60) { slope = 10.92; intercept = 677; }
-      else { slope = 10.98; intercept = 580; }
+      if (e < 30) { slope = 11.02; intercept = 679; rangeLbl = "18–29 años"; }
+      else if (e <= 60) { slope = 10.92; intercept = 677; rangeLbl = "30–59 años"; }
+      else { slope = 10.98; intercept = 580; rangeLbl = "≥60 años"; }
     }
     const tmb = Math.round(slope * p + intercept);
-    return { tmb, substitutedEquation: `(${slope} × ${p} kg) + ${intercept} = ${tmb} kcal` };
+    return {
+      tmb,
+      substitutedEquation: `(${slope} × ${p} kg) + ${intercept} = ${tmb} kcal [${s === "M" ? "H" : "M"}, ${e} años → rango ${rangeLbl}]`,
+    };
   }
   if (formula === "owen" && p > 0) {
     const intercept = s === "M" ? 879 : 795;
     const slope = s === "M" ? 10.2 : 7.18;
     const tmb = Math.round(intercept + slope * p);
-    return { tmb, substitutedEquation: `${intercept} + (${slope} × ${p} kg) = ${tmb} kcal` };
+    return { tmb, substitutedEquation: `${intercept} + (${slope} × ${p} kg) = ${tmb} kcal [${s === "M" ? "H" : "M"}]` };
   }
   if (formula === "fao" && p > 0) {
     let slope = 15.0;
     let intercept = 692;
+    let rangeLbl = "18–29 años";
     if (s === "M") {
-      if (e < 3) { slope = 60.9; intercept = -54; }
-      else if (e < 10) { slope = 22.7; intercept = 495; }
-      else if (e < 18) { slope = 17.5; intercept = 651; }
-      else if (e < 30) { slope = 15.0; intercept = 692; }
-      else if (e <= 60) { slope = 11.4; intercept = 873; }
-      else { slope = 11.7; intercept = 587; }
+      if (e < 3) { slope = 60.9; intercept = -54; rangeLbl = "<3 años"; }
+      else if (e < 10) { slope = 22.7; intercept = 495; rangeLbl = "3–9 años"; }
+      else if (e < 18) { slope = 17.5; intercept = 651; rangeLbl = "10–17 años"; }
+      else if (e < 30) { slope = 15.0; intercept = 692; rangeLbl = "18–29 años"; }
+      else if (e <= 60) { slope = 11.4; intercept = 873; rangeLbl = "30–59 años"; }
+      else { slope = 11.7; intercept = 587; rangeLbl = "≥60 años"; }
     } else {
-      if (e < 3) { slope = 61.0; intercept = -51; }
-      else if (e < 10) { slope = 22.5; intercept = 499; }
-      else if (e < 18) { slope = 12.2; intercept = 746; }
-      else if (e < 30) { slope = 14.7; intercept = 496; }
-      else if (e <= 60) { slope = 8.7; intercept = 829; }
-      else { slope = 9.0; intercept = 658; }
+      if (e < 3) { slope = 61.0; intercept = -51; rangeLbl = "<3 años"; }
+      else if (e < 10) { slope = 22.5; intercept = 499; rangeLbl = "3–9 años"; }
+      else if (e < 18) { slope = 12.2; intercept = 746; rangeLbl = "10–17 años"; }
+      else if (e < 30) { slope = 14.7; intercept = 496; rangeLbl = "18–29 años"; }
+      else if (e <= 60) { slope = 8.7; intercept = 829; rangeLbl = "30–59 años"; }
+      else { slope = 9.0; intercept = 658; rangeLbl = "≥60 años"; }
     }
     const tmb = Math.round(slope * p + intercept);
     const signStr = intercept >= 0 ? `+ ${intercept}` : `− ${Math.abs(intercept)}`;
-    return { tmb, substitutedEquation: `(${slope} × ${p} kg) ${signStr} = ${tmb} kcal` };
+    return {
+      tmb,
+      substitutedEquation: `(${slope} × ${p} kg) ${signStr} = ${tmb} kcal [${s === "M" ? "H" : "M"}, ${e} años → rango ${rangeLbl}]`,
+    };
   }
 
   if (p <= 0 || h <= 0) return { tmb: 0, substitutedEquation: "Ingresa peso y estatura para calcular." };
@@ -1444,11 +1452,16 @@ export function generateSmartMacroPrescription({
   const enrichedPrev = prevMetrica ? enrichMetrica(prevMetrica) : null;
 
   const sexo = normalizeSexo(
-    cliente?.genero || cliente?.sexo || anamnesis?.genero || enriched?.sexo || "M"
+    cliente?.genero ||
+      cliente?.sexo ||
+      anamnesis?.sexo ||
+      anamnesis?.genero ||
+      enriched?.sexo ||
+      "M"
   );
   const edad = calcEdadFromBirthdate(
     cliente?.fecha_nacimiento || anamnesis?.fecha_nacimiento,
-    Number(enriched?.edad) || 25
+    Number(enriched?.edad) || Number(cliente?.edad) || Number(anamnesis?.edad) || 25
   );
 
   const peso =

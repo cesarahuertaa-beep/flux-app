@@ -627,8 +627,19 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
   const [showModal,    setShowModal]    = useState(false);
   const [showExpediente, setShowExpediente] = useState(false);
   const [clinicalRec,  setClinicalRec]  = useState(() => peekClinicalRecord(selected?.id));
-  const [evalSexo,     setEvalSexo]     = useState(() => normalizeSexo(selected?.genero || selected?.sexo || peekClinicalRecord(selected?.id)?.anamnesis?.genero));
-  const [evalEdad,     setEvalEdad]     = useState(() => calcEdadFromBirthdate(selected?.fecha_nacimiento || peekClinicalRecord(selected?.id)?.anamnesis?.fecha_nacimiento, 25));
+  const [evalSexo,     setEvalSexo]     = useState(() => {
+    const clin = peekClinicalRecord(selected?.id);
+    return normalizeSexo(
+      selected?.genero || selected?.sexo || clin?.anamnesis?.sexo || clin?.anamnesis?.genero
+    );
+  });
+  const [evalEdad,     setEvalEdad]     = useState(() => {
+    const clin = peekClinicalRecord(selected?.id);
+    return calcEdadFromBirthdate(
+      selected?.fecha_nacimiento || clin?.anamnesis?.fecha_nacimiento,
+      Number(selected?.edad) || Number(clin?.anamnesis?.edad) || 25
+    );
+  });
   const [form,         setForm]         = useState(emptyForm());
   const [autoSyncMacros, setAutoSyncMacros] = useState(true);
   const [prescriptionMode, setPrescriptionMode] = useState("matematico"); // "matematico" | "ia" | "manual"
@@ -1403,9 +1414,32 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
   useEffect(() => {
     const clin = peekClinicalRecord(selected?.id);
     setClinicalRec(clin);
-    setEvalSexo(normalizeSexo(selected?.genero || selected?.sexo || clin?.anamnesis?.genero));
-    setEvalEdad(calcEdadFromBirthdate(selected?.fecha_nacimiento || clin?.anamnesis?.fecha_nacimiento, 25));
-  }, [selected, clinicalRec?.anamnesis?.genero, clinicalRec?.anamnesis?.fecha_nacimiento]);
+  }, [selected?.id]);
+
+  useEffect(() => {
+    const anam = clinicalRec?.anamnesis || peekClinicalRecord(selected?.id)?.anamnesis || {};
+    setEvalSexo(
+      normalizeSexo(
+        anam?.sexo || anam?.genero || selected?.genero || selected?.sexo
+      )
+    );
+    setEvalEdad(
+      calcEdadFromBirthdate(
+        anam?.fecha_nacimiento || selected?.fecha_nacimiento,
+        Number(selected?.edad) || Number(anam?.edad) || 25
+      )
+    );
+  }, [
+    selected?.id,
+    selected?.genero,
+    selected?.sexo,
+    selected?.fecha_nacimiento,
+    selected?.edad,
+    clinicalRec?.anamnesis?.sexo,
+    clinicalRec?.anamnesis?.genero,
+    clinicalRec?.anamnesis?.fecha_nacimiento,
+    clinicalRec?.anamnesis?.edad,
+  ]);
 
   useEffect(() => {
     const onExpedienteUpdated = (e) => {
