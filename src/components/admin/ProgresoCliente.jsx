@@ -18,6 +18,7 @@ import {
   evaluateWeightGoalPlan,
   TMB_FORMULAS,
   BIA_FORMULA_INFO,
+  getTmbFormulaInfo,
 } from "../../lib/bodyComposition";
 import {
   fetchCloudSteps,
@@ -1657,6 +1658,15 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
   }, [selected?.id, loadCicloData, setMsg]);
 
   const updForm = (key, val) => {
+    if (
+      (key === "eval_tmb_formula" || key === "eval_faf" || key === "eval_objetivo") &&
+      String(form[key] || "") !== String(val || "")
+    ) {
+      setAiAuditResult(null);
+      if (prescriptionMode === "ia") {
+        setPrescriptionMode("matematico");
+      }
+    }
     setForm(p => {
       const next = { ...p, [key]: val };
       if ((key === "peso" || key === "estatura") && next.peso && next.estatura) {
@@ -2094,6 +2104,10 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
           targetKcal: activePrescription.targetKcal,
           tmb: activePrescription.tmb,
           get: activePrescription.get,
+          formula: liveSmartMacros?.formula || null,
+          formulaShort: liveSmartMacros?.formulaShort || null,
+          formulaLabel: liveSmartMacros?.formulaLabel || null,
+          formulaMode: liveSmartMacros?.formulaMode || "auto",
           proteinG: activePrescription.proteinG,
           carbsG: activePrescription.carbsG,
           fatsG: activePrescription.fatsG,
@@ -2797,7 +2811,17 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                     {(m.prescribed_macros?.targetKcal || m.ai_audit_result?.targetKcal) && (() => {
                       const mode = m.prescription_mode || (m.ai_audit_result ? "ia" : "matematico");
                       const kcal = m.prescribed_macros?.targetKcal || m.ai_audit_result?.targetKcal;
-                      const label = m.prescribed_macros?.modeLabel || (mode === "ia" ? "Auditado IA" : mode === "manual" ? "Manual" : "Matemático");
+                      const formulaShort =
+                        m.prescribed_macros?.formulaShort ||
+                        (m.eval_tmb_formula && m.eval_tmb_formula !== "auto"
+                          ? getTmbFormulaInfo(m.eval_tmb_formula)?.shortLabel
+                          : null);
+                      const baseLabel =
+                        mode === "ia" ? "Auditado IA" : mode === "manual" ? "Manual" : "Matemático";
+                      const label =
+                        mode === "matematico" && formulaShort
+                          ? `${baseLabel} · ${formulaShort}`
+                          : m.prescribed_macros?.modeLabel || baseLabel;
                       return (
                         <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md font-bold whitespace-nowrap border ${
                           mode === "ia"

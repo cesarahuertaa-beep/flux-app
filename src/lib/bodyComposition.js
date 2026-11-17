@@ -1270,7 +1270,7 @@ export function recommendTMBFormula({
       if (isObesityOrHighFat) {
         return {
           formula: "mifflin",
-          reason: `Bioimpedancia sin TMB Basal del ticket y con adiposidad elevada (${grasaPct > 0 ? `${grasaPct}% grasa` : `IMC ${imc.toFixed(1)}`}): se recomienda Mifflin-St Jeor para evitar sesgos de hidratación/MLG. Puedes cambiar a Katch-McArdle en el selector.`,
+          reason: `Bioimpedancia sin TMB Basal del ticket y con adiposidad elevada (${grasaPct > 0 ? `${grasaPct}% grasa` : `IMC ${imc.toFixed(1)}`}): se recomienda Mifflin-St Jeor para evitar sesgos de hidratación/MLG.${!(estatura > 0) ? " Ingresa la estatura en el Paso 4 o elige una ecuación de solo peso (Valencia, Owen)." : " Puedes cambiar a Katch-McArdle en el selector."}`,
         };
       }
       return {
@@ -1280,7 +1280,7 @@ export function recommendTMBFormula({
     }
     return {
       formula: "mifflin",
-      reason: "Falta capturar % de grasa o TMB Basal del ticket de Bioimpedancia; se respalda temporalmente con Mifflin-St Jeor.",
+      reason: `Falta capturar % de grasa o TMB Basal del ticket de Bioimpedancia; se respalda temporalmente con Mifflin-St Jeor${!(estatura > 0) ? " (ingresa también la estatura en el Paso 4 o elige una ecuación de solo peso)" : ""}.`,
     };
   }
 
@@ -1297,7 +1297,7 @@ export function recommendTMBFormula({
       const missingMsg = missing.length > 0 ? ` (faltan: ${missing.join(", ")})` : "";
       return {
         formula: "mifflin",
-        reason: `Medición de ${protoLabel} incompleta${missingMsg} para obtener % grasa y MLG; mientras tanto se respalda con Mifflin-St Jeor.`,
+        reason: `Medición de ${protoLabel} incompleta${missingMsg} para obtener % grasa y MLG; mientras tanto se respalda con Mifflin-St Jeor${!(estatura > 0) ? " (ingresa también la estatura en el Paso 4 o elige una ecuación de solo peso)" : ""}.`,
       };
     }
     if (isObesityOrHighFat) {
@@ -1437,6 +1437,7 @@ export function generateSmartMacroPrescription({
   prevMetrica = null,
   clinicalRec = null,
   ciclo = null,
+  cicloNombre = "",
 }) {
   const anamnesis = clinicalRec?.anamnesis || {};
   const enriched = metrica ? enrichMetrica(metrica) : null;
@@ -1536,7 +1537,7 @@ export function generateSmartMacroPrescription({
   });
 
   // 3. Objetivo Energético de la etapa actual
-  const cycleParts = String(ciclo?.nombre || "").split("|");
+  const cycleParts = String(ciclo?.nombre || cicloNombre || "").split("|");
   const cycleEnfoque = cycleParts[4] || ciclo?.enfoque || "";
   const rawGoalId =
     enriched?.eval_objetivo ||

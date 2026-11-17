@@ -7,6 +7,7 @@ import {
   getMetodoLabel,
   getGoalPresetInfo,
   getActivityFactorInfo,
+  getTmbFormulaInfo,
   classifyIMC,
   classifyICC,
   normalizeSexo,
@@ -872,6 +873,15 @@ export const generateProgresoPDF = (cliente, rawMetricas = [], brand = {}) => {
   const targetKcal = prescMacros?.targetKcal || aiAudit?.targetKcal || manualMacros?.targetKcal || latest?.targetKcal || null;
   const targetTmb = prescMacros?.tmb || latest?.tmb || null;
   const targetGet = prescMacros?.get || latest?.get || null;
+  const tmbFormulaShort =
+    prescMacros?.formulaShort ||
+    (latest?.eval_tmb_formula && latest.eval_tmb_formula !== "auto"
+      ? getTmbFormulaInfo(latest.eval_tmb_formula)?.shortLabel
+      : Number(latest?.inbody_bmr) > 0 && (latest?.metodo_evaluacion === "inbody" || latest?.metodo === "inbody")
+      ? "InBody (BIA)"
+      : Number(latest?.masa_libre_grasa) > 0
+      ? "Katch-McArdle"
+      : "Mifflin-St Jeor");
   const fafVal = latest?.eval_faf || prescMacros?.faf || null;
   const fafInfo = getActivityFactorInfo(fafVal);
   const goalPreset = getGoalPresetInfo(latest?.eval_objetivo);
@@ -1199,7 +1209,7 @@ export const generateProgresoPDF = (cliente, rawMetricas = [], brand = {}) => {
       <span>Prescripción Energética y Macronutrientes</span>
       <span>
         <span class="badge ${prescMode === "ia" ? "badge-ia" : prescMode === "manual" ? "badge-manual" : "badge-math"}">
-          ${prescMode === "ia" ? "✨ Auditado por IA Clínica" : prescMode === "manual" ? "✏️ Prescripción Manual" : "🔢 Fórmula Matemática"}
+          ${prescMode === "ia" ? "✨ Auditado por IA Clínica" : prescMode === "manual" ? "✏️ Prescripción Manual" : `🔢 Fórmula Matemática${tmbFormulaShort ? ` (${escapeHtml(tmbFormulaShort)})` : ""}`}
         </span>
         ${goalPreset ? `<span class="badge badge-goal">${goalPreset.title} (${goalPreset.pct > 0 ? `+${goalPreset.pct}%` : `${goalPreset.pct}%`})</span>` : ""}
         ${fafInfo ? `<span class="badge badge-faf">FAF ${fafInfo.value} (${fafInfo.label})</span>` : ""}
@@ -1211,7 +1221,7 @@ export const generateProgresoPDF = (cliente, rawMetricas = [], brand = {}) => {
       <div class="metric-card">
         <div class="metric-val">${targetTmb ? `${targetTmb}` : "—"} <span style="font-size:10px;font-weight:normal">kcal</span></div>
         <div class="metric-lbl">TMB (Tasa Basal)</div>
-        <div class="metric-sub">Metabolismo en reposo</div>
+        <div class="metric-sub">${targetTmb && tmbFormulaShort ? escapeHtml(tmbFormulaShort) : "Metabolismo en reposo"}</div>
       </div>
       <div class="metric-card">
         <div class="metric-val">${targetGet ? `${targetGet}` : "—"} <span style="font-size:10px;font-weight:normal">kcal</span></div>

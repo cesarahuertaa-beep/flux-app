@@ -2182,6 +2182,7 @@ export function computeDualSummarySourceHash({
     // Paso 4: Enfoque, FAF y Notas de actividad física y disponibilidad
     String(metrica?.eval_objetivo || smartPrescription?.goalId || "").trim(),
     String(metrica?.eval_faf || smartPrescription?.faf || "").trim(),
+    String(metrica?.eval_tmb_formula || smartPrescription?.formula || "").trim(),
     String(metrica?.eval_faf_notas || smartPrescription?.fafNotas || smartTrainingPrescription?.fafNotas || "").trim(),
     // Paso 5: Antropometría y Prescripción
     String(metrica?.peso || smartPrescription?.peso || "").trim(),
