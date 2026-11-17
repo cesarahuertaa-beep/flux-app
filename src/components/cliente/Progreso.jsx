@@ -811,21 +811,21 @@ export default function Progreso({ cliente, isSelfManaged, isActive = true }) {
         </div>
       </div>
 
-      <div className="px-0 md:px-8 py-3 md:py-8 pb-28 md:pb-8 max-w-5xl w-full mx-auto space-y-4 md:space-y-8">
+      <div className="px-0 md:px-8 py-0 md:py-8 pb-28 md:pb-8 max-w-5xl w-full mx-auto space-y-0 md:space-y-8">
         {view === 'metricas' && (
           <>
           {/* ── RESUMEN DE TRANSFORMACIÓN TOTAL ACUMULADA ── */}
           {kpiStats && (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 md:gap-3 px-3 md:px-0">
+            <div className="grid grid-cols-2 lg:grid-cols-4 bg-white md:bg-transparent border-b md:border-0 border-[#E2E8F0] md:gap-3 px-0 md:px-0">
               {/* Peso Total */}
-              <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 shadow-sm">
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-xs font-bold text-[#6B7A8D] uppercase tracking-wider flex items-center gap-1.5">
+              <div className="bg-white md:rounded-2xl border-r border-b lg:border-b md:border border-[#E2E8F0] p-3.5 md:p-4 shadow-none md:shadow-sm">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] md:text-xs font-bold text-[#6B7A8D] uppercase tracking-wider flex items-center gap-1.5">
                     <Scale className="w-3.5 h-3.5 text-[var(--brand-primary)]" /> Peso Corporal
                   </span>
                   {kpiStats.weightDelta !== null && (
                     <span
-                      className={`text-xs font-bold px-2 py-0.5 rounded-full flex items-center gap-0.5 ${
+                      className={`text-[10px] md:text-xs font-bold px-1.5 md:px-2 py-0.5 rounded-full flex items-center gap-0.5 ${
                         kpiStats.weightDelta < 0
                           ? "bg-emerald-50 text-emerald-700"
                           : "bg-blue-50 text-[var(--brand-primary)]"
@@ -850,14 +850,14 @@ export default function Progreso({ cliente, isSelfManaged, isActive = true }) {
               </div>
 
               {/* % Grasa Total */}
-              <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 shadow-sm">
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-xs font-bold text-[#6B7A8D] uppercase tracking-wider flex items-center gap-1.5">
+              <div className="bg-white md:rounded-2xl border-b lg:border-b md:border border-[#E2E8F0] p-3.5 md:p-4 shadow-none md:shadow-sm">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] md:text-xs font-bold text-[#6B7A8D] uppercase tracking-wider flex items-center gap-1.5">
                     <Activity className="w-3.5 h-3.5 text-amber-500" /> % Grasa
                   </span>
                   {kpiStats.fatDelta !== null && (
                     <span
-                      className={`text-xs font-bold px-2 py-0.5 rounded-full flex items-center gap-0.5 ${
+                      className={`text-[10px] md:text-xs font-bold px-1.5 md:px-2 py-0.5 rounded-full flex items-center gap-0.5 ${
                         kpiStats.fatDelta < 0
                           ? "bg-emerald-50 text-emerald-700"
                           : "bg-amber-50 text-amber-700"
@@ -882,14 +882,14 @@ export default function Progreso({ cliente, isSelfManaged, isActive = true }) {
               </div>
 
               {/* Masa Magra Total */}
-              <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 shadow-sm">
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-xs font-bold text-[#6B7A8D] uppercase tracking-wider flex items-center gap-1.5">
+              <div className="bg-white md:rounded-2xl border-r md:border border-[#E2E8F0] p-3.5 md:p-4 shadow-none md:shadow-sm">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] md:text-xs font-bold text-[#6B7A8D] uppercase tracking-wider flex items-center gap-1.5">
                     <BicepsFlexed className="w-3.5 h-3.5 text-emerald-600" /> Masa Magra
                   </span>
                   {kpiStats.lbmDelta !== null && (
                     <span
-                      className={`text-xs font-bold px-2 py-0.5 rounded-full flex items-center gap-0.5 ${
+                      className={`text-[10px] md:text-xs font-bold px-1.5 md:px-2 py-0.5 rounded-full flex items-center gap-0.5 ${
                         kpiStats.lbmDelta > 0
                           ? "bg-emerald-50 text-emerald-700"
                           : "bg-slate-100 text-[#6B7A8D]"
@@ -914,9 +914,9 @@ export default function Progreso({ cliente, isSelfManaged, isActive = true }) {
               </div>
 
               {/* Planes y Evaluaciones */}
-              <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 shadow-sm">
-                <span className="text-xs font-bold text-[#6B7A8D] uppercase tracking-wider flex items-center gap-1.5 mb-1.5">
-                  <Layers className="w-3.5 h-3.5 text-purple-600" /> Etapas del Proceso
+              <div className="bg-white md:rounded-2xl border-0 md:border border-[#E2E8F0] p-3.5 md:p-4 shadow-none md:shadow-sm">
+                <span className="text-[10px] md:text-xs font-bold text-[#6B7A8D] uppercase tracking-wider flex items-center gap-1.5 mb-1">
+                  <Layers className="w-3.5 h-3.5 text-purple-600" /> Etapas
                 </span>
                 <div className="text-xl sm:text-2xl font-black text-[#0B1929] font-['Rajdhani']">
                   {kpiStats.totalPlanes}{" "}
@@ -934,8 +934,8 @@ export default function Progreso({ cliente, isSelfManaged, isActive = true }) {
           {COMP_KEYS.length > 0 ? (
             <>
               {/* ── TOP 4 MÉTRICAS DESTACADAS ── */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 md:gap-3 px-3 md:px-0">
-                {primaryKeys.map(k => {
+              <div className="grid grid-cols-2 lg:grid-cols-4 bg-white md:bg-transparent border-b md:border-0 border-[#E2E8F0] md:gap-3 px-0 md:px-0">
+                {primaryKeys.map((k, kIdx) => {
                   const val = current[k.key];
                   const hasPrev = metricas.length > 1;
                   const d = (!isEstandar && hasPrev) ? delta(current, prev, k.key) : null;
@@ -950,10 +950,15 @@ export default function Progreso({ cliente, isSelfManaged, isActive = true }) {
                     sign = d > 0 ? "+" : "";
                   }
 
+                  const mobileBorders = [
+                    kIdx % 2 === 0 ? "border-r" : "",
+                    kIdx < 2 ? "border-b" : "",
+                  ].filter(Boolean).join(" ");
+
                   return (
                     <div 
                       key={k.key} 
-                      className="bg-white rounded-2xl p-4 md:p-5 shadow-sm border border-[#E2E8F0] flex flex-col justify-between hover:border-[#CBD5E1] transition-all"
+                      className={`bg-white md:rounded-2xl p-3.5 md:p-5 shadow-none md:shadow-sm ${mobileBorders} md:border border-[#E2E8F0] flex flex-col justify-between hover:border-[#CBD5E1] transition-all`}
                     >
                       <div className="flex items-center justify-between gap-1 mb-1.5">
                         <p className="text-[10px] md:text-[11px] font-bold text-[#6B7A8D] tracking-wider uppercase truncate">
@@ -1002,14 +1007,14 @@ export default function Progreso({ cliente, isSelfManaged, isActive = true }) {
 
               {/* ── ACORDEÓN DESPLEGABLE: MEDIDAS ADICIONALES ── */}
               {secondaryKeys.length > 0 && (
-                <div className="bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] shadow-none md:shadow-sm overflow-hidden transition-all">
+                <div className="bg-white rounded-none md:rounded-2xl border-b md:border border-[#E2E8F0] shadow-none md:shadow-sm overflow-hidden transition-all">
                   <button
                     type="button"
                     onClick={() => setShowAllMetrics(prev => !prev)}
-                    className="w-full px-5 py-3.5 flex items-center justify-between text-left hover:bg-gray-50/80 transition-colors cursor-pointer"
+                    className="w-full px-4 md:px-5 py-3.5 flex items-center justify-between text-left hover:bg-gray-50/80 transition-colors cursor-pointer"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="w-7 h-7 rounded-lg bg-[#F0F4FA] flex items-center justify-center text-[var(--brand-primary)]">
+                    <div className="flex items-center gap-2.5 sm:gap-3">
+                      <div className="hidden sm:flex w-7 h-7 rounded-lg bg-[#F0F4FA] items-center justify-center text-[var(--brand-primary)]">
                         <Layers className="w-4 h-4" />
                       </div>
                       <div>
@@ -1017,7 +1022,7 @@ export default function Progreso({ cliente, isSelfManaged, isActive = true }) {
                           {showAllMetrics ? "Ocultar medidas complementarias" : "Ver más medidas y composición"}
                         </span>
                         <span className="text-[11px] text-[#6B7A8D] ml-2 font-normal">
-                          ({secondaryKeys.length} {secondaryKeys.length === 1 ? "métrica adicional" : "métricas adicionales"})
+                          ({secondaryKeys.length} {secondaryKeys.length === 1 ? "métrica" : "métricas"})
                         </span>
                       </div>
                     </div>
@@ -1027,8 +1032,8 @@ export default function Progreso({ cliente, isSelfManaged, isActive = true }) {
                   </button>
 
                   {showAllMetrics && (
-                    <div className="p-4 pt-2 border-t border-[#F0F4FA] bg-[#F8FAFC]">
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 pt-2">
+                    <div className="px-4 py-3 md:p-4 md:pt-2 border-t border-[#F0F4FA] bg-[#F8FAFC]/60 md:bg-[#F8FAFC]">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 md:gap-2.5 pt-1 md:pt-2">
                         {secondaryKeys.map(k => {
                           const val = current[k.key];
                           const hasPrev = metricas.length > 1;
@@ -1047,7 +1052,7 @@ export default function Progreso({ cliente, isSelfManaged, isActive = true }) {
                           return (
                             <div 
                               key={k.key} 
-                              className="bg-white rounded-xl p-3 border border-[#E2E8F0] shadow-2xs text-center flex flex-col justify-between"
+                              className="bg-white/80 md:bg-white rounded-xl p-2.5 md:p-3 border-0 md:border md:border-[#E2E8F0] shadow-none md:shadow-2xs text-center flex flex-col justify-between"
                             >
                               <p className="text-[10px] font-bold text-[#6B7A8D] tracking-wide uppercase truncate mb-1">
                                 {k.label}
@@ -1082,27 +1087,27 @@ export default function Progreso({ cliente, isSelfManaged, isActive = true }) {
 
             {/* ── DESGLOSE HISTÓRICO PLAN A PLAN ── */}
             {ciclos.length > 0 && (
-              <div className="bg-white rounded-none md:rounded-3xl px-4 py-5 md:p-7 border-y md:border border-[#E2E8F0] shadow-none md:shadow-sm space-y-5">
-                <div className="flex items-center justify-between gap-3 border-b border-[#F0F4FA] pb-3.5">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <div className="bg-white rounded-none md:rounded-3xl px-4 py-4 md:p-7 border-b md:border border-[#E2E8F0] shadow-none md:shadow-sm space-y-3 md:space-y-5">
+                <div className="flex items-center justify-between gap-3 md:border-b md:border-[#F0F4FA] md:pb-3.5">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="hidden sm:flex w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 items-center justify-center shrink-0">
                       <Layers className="w-4 h-4" />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <h3 className="text-sm sm:text-base font-bold text-[#0B1929]">
-                        Evolución Histórica Plan a Plan
+                        Evolución Plan a Plan
                       </h3>
-                      <p className="text-xs text-[#6B7A8D]">
+                      <p className="hidden md:block text-xs text-[#6B7A8D]">
                         Detalle de las evaluaciones registradas en cada plan de entrenamiento y nutrición
                       </p>
                     </div>
                   </div>
-                  <span className="text-xs font-bold text-[#6B7A8D] bg-gray-50 border border-[#E2E8F0] px-3 py-1 rounded-xl">
-                    {ciclos.length} Planes registrados
+                  <span className="text-[11px] md:text-xs font-bold text-[#6B7A8D] bg-gray-50 border border-[#E2E8F0] px-2.5 md:px-3 py-1 rounded-xl shrink-0">
+                    {ciclos.length} {ciclos.length === 1 ? "plan" : "planes"}
                   </span>
                 </div>
 
-                <div className="space-y-4">
+                <div className="divide-y divide-[#E2E8F0] md:divide-y-0 md:space-y-4">
                   {ciclos.map((c, cIdx) => {
                     const planEvals = allLinkedMetricas.filter(
                       (m) => String(m.ciclo_id) === String(c.id)
@@ -1118,16 +1123,16 @@ export default function Progreso({ cliente, isSelfManaged, isActive = true }) {
                     return (
                       <div
                         key={c.id}
-                        className={`rounded-2xl border p-4 sm:p-5 transition-all ${
+                        className={`pt-3.5 pb-3.5 first:pt-1 last:pb-0 md:rounded-2xl md:border md:p-5 transition-all ${
                           isCurrent
-                            ? "border-[var(--brand-primary)]/40 bg-blue-50/20 shadow-xs"
-                            : "border-[#E2E8F0] bg-white hover:border-gray-300"
+                            ? "md:border-[var(--brand-primary)]/40 md:bg-blue-50/20 md:shadow-xs"
+                            : "md:border-[#E2E8F0] md:bg-white md:hover:border-gray-300"
                         }`}
                       >
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-3.5">
-                          <div className="flex items-center gap-2.5 flex-wrap">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2.5 md:mb-3.5">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span
-                              className={`px-3 py-0.5 rounded-full text-xs font-bold ${
+                              className={`px-2.5 py-0.5 rounded-full text-[10px] md:text-xs font-bold ${
                                 isCurrent
                                   ? "bg-[var(--brand-primary)] text-white shadow-2xs"
                                   : "bg-gray-100 text-[#6B7A8D]"
@@ -1135,11 +1140,11 @@ export default function Progreso({ cliente, isSelfManaged, isActive = true }) {
                             >
                               {isCurrent ? "Plan Activo" : `Plan #${ciclos.length - cIdx}`}
                             </span>
-                            <h4 className="text-sm sm:text-base font-bold text-[#0B1929]">
+                            <h4 className="text-xs sm:text-base font-bold text-[#0B1929]">
                               {c.nombre?.split("|")[0]}
                             </h4>
                             {c.created_at && (
-                              <span className="text-xs text-[#6B7A8D] flex items-center gap-1">
+                              <span className="hidden sm:flex text-xs text-[#6B7A8D] items-center gap-1">
                                 <Calendar className="w-3 h-3 text-[#94A3B8]" />
                                 {fmtDate(c.created_at)}
                               </span>
@@ -1152,7 +1157,7 @@ export default function Progreso({ cliente, isSelfManaged, isActive = true }) {
                             </span>
                             {weightDelta !== null && (
                               <span
-                                className={`font-bold px-2.5 py-0.5 rounded-md ${
+                                className={`font-bold px-2 py-0.5 rounded-md ${
                                   Number(weightDelta) < 0
                                     ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                                     : "bg-blue-50 text-[var(--brand-primary)] border border-blue-200"
@@ -1166,15 +1171,15 @@ export default function Progreso({ cliente, isSelfManaged, isActive = true }) {
 
                         {/* Evaluaciones de este plan */}
                         {planEvals.length === 0 ? (
-                          <div className="text-xs text-[#94A3B8] italic py-3 bg-white/60 rounded-xl px-4 border border-dashed border-[#E2E8F0]">
+                          <div className="text-xs text-[#94A3B8] italic py-2 md:py-3 md:bg-white/60 md:rounded-xl md:px-4 md:border md:border-dashed md:border-[#E2E8F0]">
                             Sin evaluaciones corporales registradas durante este plan.
                           </div>
                         ) : (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-2 border-t border-[#F0F4FA]">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 divide-y divide-[#F0F4FA] md:divide-y-0 md:gap-3 pt-1.5 md:pt-2 md:border-t md:border-[#F0F4FA]">
                             {planEvals.map((ev) => (
                               <div
                                 key={ev.id}
-                                className="bg-white border border-[#E2E8F0] rounded-xl p-3.5 flex flex-col justify-between gap-2.5 hover:shadow-xs transition-shadow"
+                                className="py-2.5 first:pt-1 last:pb-0 md:bg-white md:border md:border-[#E2E8F0] md:rounded-xl md:p-3.5 flex flex-col justify-between gap-2 md:gap-2.5 md:hover:shadow-xs transition-shadow"
                               >
                                 <div className="flex items-center justify-between gap-2 flex-wrap">
                                   <span className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5">
@@ -1198,7 +1203,7 @@ export default function Progreso({ cliente, isSelfManaged, isActive = true }) {
                                   </div>
                                 </div>
 
-                                <div className="grid grid-cols-3 gap-2 text-center py-1.5 bg-[#F8FAFC] rounded-lg border border-[#E2E8F0]/60">
+                                <div className="grid grid-cols-3 gap-2 text-center py-1 bg-[#F8FAFC] rounded-lg border-0 md:border md:border-[#E2E8F0]/60">
                                   <div>
                                     <span className="text-[10px] text-[#6B7A8D] block">Peso</span>
                                     <span className="text-xs font-bold text-[#0B1929]">
@@ -1225,7 +1230,7 @@ export default function Progreso({ cliente, isSelfManaged, isActive = true }) {
                                     ev.checkin_saciedad ||
                                     ev.checkin_observaciones
                                 ) && (
-                                  <div className="text-[11px] text-[#6B7A8D] bg-blue-50/50 rounded-lg p-2 border border-blue-100/60 space-y-1">
+                                  <div className="text-[11px] text-[#6B7A8D] pt-1 md:bg-blue-50/50 md:rounded-lg md:p-2 md:border md:border-blue-100/60 space-y-1">
                                     <div className="flex items-center justify-between font-bold text-[#0B1929]">
                                       <span>Check-in consulta</span>
                                       <span className="flex items-center gap-2">
@@ -1263,7 +1268,7 @@ export default function Progreso({ cliente, isSelfManaged, isActive = true }) {
 
           </>
         ) : (
-          <div className="bg-white rounded-none md:rounded-3xl p-8 text-center shadow-none md:shadow-sm border-y md:border border-[#E2E8F0]">
+          <div className="bg-white rounded-none md:rounded-3xl p-8 text-center shadow-none md:shadow-sm border-b md:border border-[#E2E8F0]">
             <Scale className="w-12 h-12 text-[#9BA5B0] mx-auto mb-4" />
             <h3 className="text-lg font-bold text-[#0B1929] mb-2">Sin métricas de composición</h3>
             <p className="text-sm text-[#6B7A8D]">{isSelfManaged ? "Aún no has registrado ninguna evaluación física." : "Tu nutriólogo aún no ha registrado evaluaciones físicas."}</p>
@@ -1275,7 +1280,7 @@ export default function Progreso({ cliente, isSelfManaged, isActive = true }) {
           {isEstandar && (
             <div
               onClick={() => openPaywall("metricas")}
-              className="absolute inset-0 z-50 backdrop-blur-md bg-white/85 rounded-none md:rounded-3xl flex flex-col items-center justify-center p-6 text-center border border-[#E2E8F0] shadow-sm animate-in fade-in cursor-pointer hover:bg-white/95 transition-all active:scale-[0.99]"
+              className="absolute inset-0 z-50 backdrop-blur-md bg-white/85 rounded-none md:rounded-3xl flex flex-col items-center justify-center p-6 text-center border-b md:border border-[#E2E8F0] shadow-none md:shadow-sm animate-in fade-in cursor-pointer hover:bg-white/95 transition-all active:scale-[0.99]"
             >
               <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200/80 flex items-center justify-center mb-3 shadow-xs">
                 <Lock size={28} className="text-amber-600" />
@@ -1289,12 +1294,12 @@ export default function Progreso({ cliente, isSelfManaged, isActive = true }) {
               </span>
             </div>
           )}
-          <div className={`bg-white rounded-none md:rounded-3xl px-4 py-6 md:p-8 shadow-none md:shadow-sm border-y md:border border-[#E2E8F0] overflow-hidden relative ${isEstandar ? 'pointer-events-none select-none opacity-40 blur-sm' : ''}`}>
+          <div className={`bg-white rounded-none md:rounded-3xl px-4 py-5 md:p-8 shadow-none md:shadow-sm border-b md:border border-[#E2E8F0] overflow-hidden relative ${isEstandar ? 'pointer-events-none select-none opacity-40 blur-sm' : ''}`}>
           
-          <h2 className="text-lg font-bold text-[#0B1929] mb-2 relative z-10">Desarrollo Muscular</h2>
-          <p className="text-sm text-[#9BA5B0] mb-8 relative z-10">Progreso de fuerza estimado según tu historial de entrenamiento.</p>
+          <h2 className="text-base md:text-lg font-bold text-[#0B1929] mb-4 md:mb-2 relative z-10">Desarrollo Muscular</h2>
+          <p className="hidden md:block text-sm text-[#9BA5B0] mb-8 relative z-10">Progreso de fuerza estimado según tu historial de entrenamiento.</p>
           
-          <div className="flex flex-col lg:flex-row items-center justify-between gap-8 lg:gap-10 relative z-10">
+          <div className="flex flex-col lg:flex-row items-center justify-between gap-6 lg:gap-10 relative z-10">
             <div className="flex flex-row justify-center drop-shadow-[0_0_15px_rgba(59,130,246,0.25)] w-full lg:w-[340px] shrink-0">
               <div className="flex justify-center gap-2 md:gap-4 w-full max-w-[340px] mx-auto">
                   <div className="w-1/2 flex justify-center">
@@ -1320,18 +1325,18 @@ export default function Progreso({ cliente, isSelfManaged, isActive = true }) {
                 </div>
             </div>
 
-            <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-4 md:p-5 w-full flex-1">
-              <div className="flex items-center justify-between mb-3.5">
+            <div className="md:bg-[#F8FAFC] md:border md:border-[#E2E8F0] md:rounded-2xl p-0 md:p-5 w-full flex-1">
+              <div className="flex items-center justify-between mb-3">
                 <p className="text-[11px] font-bold text-[#6B7A8D] tracking-widest uppercase">RANGOS ALCANZADOS</p>
-                <span className="text-[10px] font-semibold text-[#9BA5B0]">Segun tu rutina activa</span>
+                <span className="hidden sm:inline text-[10px] font-semibold text-[#9BA5B0]">Según tu rutina activa</span>
               </div>
               {Object.keys(groupAvg).length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-2.5">
                   {Object.entries(groupAvg).sort((a,b)=>b[1]-a[1]).map(([g, pct]) => {
                     const rank = getRank(pct);
                     const label = GROUP_LABELS[g] || g.replace(/_/g, " ");
                     return (
-                      <div key={g} className="bg-white border border-[#E2E8F0] rounded-xl px-3.5 py-2.5 flex items-center justify-between gap-2 shadow-[0_1px_2px_rgba(11,25,41,0.02)]">
+                      <div key={g} className="bg-[#F8FAFC] md:bg-white border-0 md:border md:border-[#E2E8F0] rounded-xl px-3.5 py-2.5 flex items-center justify-between gap-2 shadow-none md:shadow-[0_1px_2px_rgba(11,25,41,0.02)]">
                         <div className="flex items-center gap-2.5 min-w-0">
                           <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: rank.color }} />
                           <span className="text-xs md:text-sm font-semibold text-[#0B1929] truncate capitalize">{label}</span>
@@ -1351,11 +1356,11 @@ export default function Progreso({ cliente, isSelfManaged, isActive = true }) {
           </div>
 
           {/* Leyenda de rangos */}
-          <div className="mt-8 pt-6 border-t border-[#E2E8F0]">
-            <p className="text-[10px] font-bold text-[#6B7A8D] tracking-widest text-center mb-4">ESCALA DE EVOLUCIÓN</p>
-            <div className="flex flex-wrap justify-center gap-3">
+          <div className="mt-6 md:mt-8 pt-5 md:pt-6 border-t border-[#E2E8F0]">
+            <p className="text-[10px] font-bold text-[#6B7A8D] tracking-widest text-center mb-3 md:mb-4">ESCALA DE EVOLUCIÓN</p>
+            <div className="flex flex-wrap justify-center gap-2 md:gap-3">
               {[...RANKS].slice(1).reverse().map(r => (
-                <div key={r.name} className="flex items-center gap-1.5 bg-[#F8FAFC] px-3 py-1.5 rounded-full border border-[#E2E8F0]">
+                <div key={r.name} className="flex items-center gap-1.5 bg-[#F8FAFC] px-2.5 md:px-3 py-1 md:py-1.5 rounded-full border-0 md:border md:border-[#E2E8F0]">
                   <div className="w-2 h-2 rounded-full" style={{ background: r.color }} />
                   <span className="text-[10px] font-bold text-[#0B1929] uppercase">{r.name}</span>
                   <span className="text-[10px] font-semibold text-[#9BA5B0]">{r.min} XP</span>
@@ -1363,12 +1368,12 @@ export default function Progreso({ cliente, isSelfManaged, isActive = true }) {
               ))}
             </div>
             
-            <div className="mt-6 bg-blue-50 border border-blue-100 rounded-xl p-4 md:p-5 flex gap-3 text-left max-w-2xl mx-auto">
-              <div className="text-[var(--brand-primary)] shrink-0">
+            <div className="mt-5 pt-4 border-t border-[#F0F4FA] md:mt-6 md:bg-blue-50 md:border md:border-blue-100 md:rounded-xl md:p-5 flex gap-3 text-left max-w-2xl mx-auto">
+              <div className="hidden sm:block text-[var(--brand-primary)] shrink-0">
                 <TrendingUp size={20} />
               </div>
               <div>
-                <h4 className="text-sm font-bold text-[#0B1929] mb-1">¿Cómo ganar puntos de experiencia (XP)?</h4>
+                <h4 className="text-xs md:text-sm font-bold text-[#0B1929] mb-1">¿Cómo ganar puntos de experiencia (XP)?</h4>
                 <p className="text-xs text-[#6B7A8D] leading-relaxed">
                   Tu XP sube de dos maneras:<br/>
                   <strong className="text-[#0B1929]">1. Consistencia:</strong> Ganas <strong>+10 XP</strong> por cada semana que entrenes un músculo.<br/>
@@ -1384,9 +1389,9 @@ export default function Progreso({ cliente, isSelfManaged, isActive = true }) {
         )}
 
         {view === 'galeria' && (
-          <div className="space-y-6">
+          <div className="space-y-3 md:space-y-6">
             {/* ── BARRA DE HERRAMIENTAS Y FILTROS ESTILO INSTAGRAM ── */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 sm:p-4 rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] shadow-none md:shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 sm:p-4 rounded-none md:rounded-2xl border-b md:border border-[#E2E8F0] shadow-none md:shadow-xs">
               {/* Filtros por pestaña/píldora */}
               <div className="flex items-center gap-1.5 overflow-x-auto scroll-hide">
                 <button

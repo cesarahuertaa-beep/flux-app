@@ -167,16 +167,16 @@ export function EvolutionCharts({ metricas = [], isLocked = false, brandColor, o
       : null;
 
   return (
-    <div className="space-y-3 md:space-y-6 my-3 md:my-6">
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 md:gap-6">
+    <div className="space-y-0 md:space-y-6 my-0 md:my-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-0 md:gap-6">
         {/* ── 1. CURVA DE EVOLUCIÓN CORPORAL ── */}
         <div
-          className="relative bg-white rounded-none md:rounded-3xl px-4 py-5 md:p-7 shadow-none md:shadow-sm border-y md:border border-[#E2E8F0] overflow-hidden lg:col-span-7"
+          className="relative bg-white rounded-none md:rounded-3xl px-4 py-4 md:p-7 shadow-none md:shadow-sm border-b md:border border-[#E2E8F0] overflow-hidden lg:col-span-7"
         >
           {isLocked && (
             <div
               onClick={onUnlock}
-              className={`absolute inset-0 z-30 backdrop-blur-md bg-white/85 rounded-none md:rounded-3xl flex flex-col items-center justify-center p-6 text-center border border-[#E2E8F0] shadow-sm ${onUnlock ? "cursor-pointer hover:bg-white/95 transition-all active:scale-[0.99]" : ""}`}
+              className={`absolute inset-0 z-30 backdrop-blur-md bg-white/85 rounded-none md:rounded-3xl flex flex-col items-center justify-center p-6 text-center border-b md:border border-[#E2E8F0] shadow-none md:shadow-sm ${onUnlock ? "cursor-pointer hover:bg-white/95 transition-all active:scale-[0.99]" : ""}`}
             >
               <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200/80 flex items-center justify-center mb-2.5 shadow-xs">
                 <Lock size={24} className="text-amber-600" />
@@ -192,17 +192,17 @@ export function EvolutionCharts({ metricas = [], isLocked = false, brandColor, o
           )}
 
           <div className={isLocked ? "blur-sm pointer-events-none select-none opacity-50" : ""}>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 mb-4 md:mb-5">
               <div>
                 <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-[#F0F4FA] flex items-center justify-center text-[var(--brand-primary)]">
+                  <div className="hidden sm:flex w-7 h-7 rounded-lg bg-[#F0F4FA] items-center justify-center text-[var(--brand-primary)]">
                     <Activity className="w-4 h-4" />
                   </div>
-                  <h3 className="text-base md:text-lg font-bold text-[#0B1929]">
+                  <h3 className="text-sm md:text-lg font-bold text-[#0B1929]">
                     Curva de Evolución
                   </h3>
                 </div>
-                <p className="text-xs text-[#6B7A8D] mt-0.5">
+                <p className="hidden md:block text-xs text-[#6B7A8D] mt-0.5">
                   Tendencia histórica a través de {chartData.length}{" "}
                   {chartData.length === 1 ? "evaluación" : "evaluaciones"}
                 </p>
@@ -210,7 +210,7 @@ export function EvolutionCharts({ metricas = [], isLocked = false, brandColor, o
 
               {/* Resumen Inicial -> Actual */}
               {chartData.length > 0 && (
-                <div className="flex items-center gap-3 bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl px-3.5 py-2 self-start sm:self-auto">
+                <div className="flex items-center gap-3 md:bg-[#F8FAFC] md:border md:border-[#E2E8F0] md:rounded-2xl md:px-3.5 md:py-2 self-start sm:self-auto">
                   {chartData.length > 1 && (
                     <>
                       <div className="text-left">
@@ -355,11 +355,11 @@ export function EvolutionCharts({ metricas = [], isLocked = false, brandColor, o
         </div>
 
         {/* ── 2. SOMATOCARTA DE HEATH-CARTER ── */}
-        <div className="relative bg-white rounded-none md:rounded-3xl px-4 py-5 md:p-7 shadow-none md:shadow-sm border-y md:border border-[#E2E8F0] overflow-hidden lg:col-span-5 flex flex-col justify-between">
+        <div className="relative bg-white rounded-none md:rounded-3xl px-4 py-4 md:p-7 shadow-none md:shadow-sm border-b md:border border-[#E2E8F0] overflow-hidden lg:col-span-5 flex flex-col justify-between">
           {isLocked && (
             <div
               onClick={onUnlock}
-              className={`absolute inset-0 z-30 backdrop-blur-md bg-white/85 rounded-none md:rounded-3xl flex flex-col items-center justify-center p-6 text-center border border-[#E2E8F0] shadow-sm ${onUnlock ? "cursor-pointer hover:bg-white/95 transition-all active:scale-[0.99]" : ""}`}
+              className={`absolute inset-0 z-30 backdrop-blur-md bg-white/85 rounded-none md:rounded-3xl flex flex-col items-center justify-center p-6 text-center border-b md:border border-[#E2E8F0] shadow-none md:shadow-sm ${onUnlock ? "cursor-pointer hover:bg-white/95 transition-all active:scale-[0.99]" : ""}`}
             >
               <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200/80 flex items-center justify-center mb-2 shadow-xs">
                 <Lock size={20} className="text-amber-600" />
@@ -380,14 +380,14 @@ export function EvolutionCharts({ metricas = [], isLocked = false, brandColor, o
             <div className="flex items-start justify-between gap-2 mb-3">
               <div>
                 <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+                  <div className="hidden sm:flex w-7 h-7 rounded-lg bg-emerald-50 items-center justify-center text-emerald-600">
                     <Target className="w-4 h-4" />
                   </div>
-                  <h3 className="text-base md:text-lg font-bold text-[#0B1929]">
+                  <h3 className="text-sm md:text-lg font-bold text-[#0B1929]">
                     Somatocarta
                   </h3>
                 </div>
-                <p className="text-xs text-[#6B7A8D] mt-0.5">
+                <p className="hidden md:block text-xs text-[#6B7A8D] mt-0.5">
                   Biotipo de Heath-Carter y trayectoria
                 </p>
               </div>
@@ -560,7 +560,7 @@ export function EvolutionCharts({ metricas = [], isLocked = false, brandColor, o
 
               {/* Pie de datos del punto seleccionado o estado informativo */}
               {activeSomato ? (
-                <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-3 flex items-center justify-between text-xs mt-2">
+                <div className="pt-2.5 border-t border-[#F0F4FA] md:bg-[#F8FAFC] md:border md:border-[#E2E8F0] md:rounded-2xl md:p-3 flex items-center justify-between text-xs mt-2">
                   <div>
                     <p className="text-[10px] font-bold text-[#6B7A8D] uppercase">
                       Evaluación: {activeSomato.fullDate}
@@ -592,7 +592,7 @@ export function EvolutionCharts({ metricas = [], isLocked = false, brandColor, o
                   )}
                 </div>
               ) : (
-                <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-2.5 text-center mt-2">
+                <div className="hidden md:block bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-2.5 text-center mt-2">
                   <p className="text-[11px] font-bold text-[#0B1929]">
                     Mapeo de Biotipo Corporal
                   </p>

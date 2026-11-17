@@ -289,14 +289,14 @@ export function BeforeAfterComparator({
   const timeDiff = getDaysDiff(beforeItem?.fecha, afterItem?.fecha);
 
   return (
-    <div className="bg-white rounded-none md:rounded-3xl px-4 py-5 md:p-7 shadow-none md:shadow-sm border-y md:border border-[#E2E8F0] my-3 md:my-6 transition-all">
+    <div className="bg-white rounded-none md:rounded-3xl px-4 py-4 md:p-7 shadow-none md:shadow-sm border-b md:border border-[#E2E8F0] my-0 md:my-6 transition-all">
       {/* ── TOP HEADER ── */}
       <div className="flex items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-8 h-8 rounded-xl bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] flex items-center justify-center shrink-0">
+          <div className="hidden sm:flex w-8 h-8 rounded-xl bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] items-center justify-center shrink-0">
             <Sparkles size={17} />
           </div>
-          <h3 className="text-base font-bold text-[#0B1929] truncate">
+          <h3 className="text-sm sm:text-base font-bold text-[#0B1929] truncate">
             Comparador de Progreso
           </h3>
         </div>
@@ -368,7 +368,7 @@ export function BeforeAfterComparator({
       </div>
 
       {/* ── PHOTO SELECTION CONTROLLER SLOTS ── */}
-      <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-3.5 mb-6">
+      <div className="md:bg-[#F8FAFC] md:border md:border-[#E2E8F0] md:rounded-2xl md:p-3.5 mb-4 md:mb-6">
         <div className="flex flex-col md:flex-row items-center justify-between gap-3">
           {/* SLOT ANTES */}
           <div
