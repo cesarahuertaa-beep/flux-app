@@ -1504,7 +1504,7 @@ export function generateSmartMacroPrescription({
   let formulaMode = "auto";
   let formulaFallbackWarning = null;
 
-  if (requestedFormula !== "auto") {
+  if (requestedFormula !== "auto" && requestedFormula !== recommended.formula) {
     const reqInfo = getTmbFormulaInfo(requestedFormula);
     if (reqInfo?.requiresInBody && !(biaBmr > 0)) {
       formulaFallbackWarning = `Elegiste ${reqInfo.shortLabel}, pero requiere método Bioimpedancia con TMB Basal capturado; usando temporalmente ${getTmbFormulaInfo(recommended.formula).shortLabel}.`;
@@ -1522,6 +1522,30 @@ export function generateSmartMacroPrescription({
 
   const activeFormulaInfo = getTmbFormulaInfo(formula);
   const recommendedFormulaInfo = getTmbFormulaInfo(recommended.formula);
+  let manualComparisonNote = null;
+  if (formulaMode === "manual" && formula !== recommended.formula) {
+    const recShort = recommendedFormulaInfo?.shortLabel || "la fórmula automática";
+    const actShort = activeFormulaInfo?.shortLabel || "esta fórmula";
+    if (activeFormulaInfo?.requiresMLG && !recommendedFormulaInfo?.requiresMLG) {
+      manualComparisonNote = `Elegiste ${actShort} (Manual) sobre ${recShort} (Auto): calcula a partir de la Masa Libre de Grasa (${mlg} kg MLG)${
+        grasaPct >= 28 ? ", aunque con adiposidad elevada puede sobrestimar el gasto basal frente a Mifflin-St Jeor" : ""
+      }.`;
+    } else if (!activeFormulaInfo?.requiresMLG && (recommendedFormulaInfo?.requiresMLG || recommendedFormulaInfo?.requiresInBody)) {
+      manualComparisonNote = `Elegiste ${actShort} (Manual) en lugar de ${recShort} (Auto): calcula con peso total (${peso} kg) sin usar la Masa Libre de Grasa medida (${mlg} kg MLG / ${grasaPct}% grasa). Útil si prefieres una referencia poblacional general o desconfías del pliegue/BIA.`;
+    } else if (activeFormulaInfo?.requiresMLG && recommendedFormulaInfo?.requiresMLG) {
+      manualComparisonNote = `Elegiste ${actShort} (Manual) en lugar de ${recShort} (Auto): variante deportiva sobre MLG (${mlg} kg) que estima un gasto basal superior para atletas de fuerza o alto rendimiento.`;
+    } else if (formula === "valencia") {
+      manualComparisonNote = `Elegiste Valencia (Manual) en lugar de ${recShort} (Auto): ecuación calibrada en población mexicana adulta (suele estimar ~5-8% menos kcal que Mifflin-St Jeor para evitar sobreestimación).`;
+    } else if (formula === "harris") {
+      manualComparisonNote = `Elegiste Harris-Benedict (Manual) en lugar de ${recShort} (Auto): ecuación histórica clásica (tiende a estimar entre +5% y +15% más kcal que Mifflin-St Jeor).`;
+    } else if (formula === "owen") {
+      manualComparisonNote = `Elegiste Owen (Manual) en lugar de ${recShort} (Auto): ecuación conservadora basada únicamente en peso corporal total.`;
+    } else if (formula === "fao") {
+      manualComparisonNote = `Elegiste FAO/OMS/UNU (Manual) en lugar de ${recShort} (Auto): ecuación institucional por rangos de edad basada en peso corporal.`;
+    } else {
+      manualComparisonNote = `Elegiste ${actShort} manualmente como veredicto clínico (la sugerencia automática para estos datos es ${recShort}).`;
+    }
+  }
   const formulaLabel =
     formula === "katch" || formula === "cunningham" || formula === "tinsley_mlg" || formula === "ten_haaf_mlg"
       ? `${activeFormulaInfo.shortLabel} (${mlg} kg MLG)`
@@ -1759,6 +1783,7 @@ export function generateSmartMacroPrescription({
     recommendedFormula: recommended.formula,
     recommendedFormulaInfo,
     recommendationReason: recommended.reason,
+    manualComparisonNote,
     formulaFallbackWarning,
     tmbSubstituted: tmbDetails.substitutedEquation,
     compositionDiagnostics: compDiagnostics,
