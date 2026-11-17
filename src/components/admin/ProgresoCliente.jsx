@@ -32,7 +32,7 @@ import { dbPeek, dbGet, dbGetFresh, updateQueryCache, invalidateCache, dbPost, d
 import { useBrand } from "../BrandContext";
 import { useBackButton } from "../../lib/backButtonHandler";
 import { generateProgresoPDF } from "../../utils/pdf";
-import { parseFotos, getSemanasConFecha, getCurrentCycleWeekInfo, compressImageIfNeeded } from "../../utils/helpers";
+import { parseFotos, parseLocalDateNoon, getSemanasConFecha, getCurrentCycleWeekInfo, compressImageIfNeeded } from "../../utils/helpers";
 import {
   Scale, Microscope, Ruler, Stethoscope, BarChart2, Dumbbell,
   Calendar, Edit2, Eye, Camera, FileText, Activity, BicepsFlexed, Plus, Trash2, Heart, ArrowUp, ArrowDown, X, AlertCircle, CheckCircle2, Target, Lock,
