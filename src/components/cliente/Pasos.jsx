@@ -22,14 +22,11 @@ import {
   classifySteps,
   averageSteps,
   computeStreak,
-  getLocalStepGoal,
-  setLocalStepGoal,
   toDateKey,
   addDays,
 } from "../../lib/steps";
 
 const DAY_LABELS = ["DOM", "LUN", "MAR", "MIE", "JUE", "VIE", "SAB"];
-const GOAL_CHIPS = [5000, 7500, 8000, 10000, 12000];
 const fmt = (n) => Math.round(Number(n) || 0).toLocaleString("es-MX");
 
 function StepRing({ steps, goal }) {
@@ -99,15 +96,7 @@ export default function Pasos({ cliente, isActive = true, ultimoPeso = null, met
   const pollRef = useRef(null);
 
   const hasSpecialist = Boolean(cliente?.nutriologo_id);
-  const goalLockedBySpecialist = hasSpecialist && Number(metaPasos) > 0;
-  const [goal, setGoal] = useState(() => {
-    if (goalLockedBySpecialist) return Number(metaPasos);
-    return getLocalStepGoal(clienteId) || (Number(metaPasos) > 0 ? Number(metaPasos) : DEFAULT_STEP_GOAL);
-  });
-
-  useEffect(() => {
-    if (goalLockedBySpecialist) setGoal(Number(metaPasos));
-  }, [goalLockedBySpecialist, metaPasos]);
+  const goal = Number(metaPasos) > 0 ? Number(metaPasos) : DEFAULT_STEP_GOAL;
 
   const history = useMemo(() => mergeStepHistories(cloudHistory, nativeHistory), [cloudHistory, nativeHistory]);
 
@@ -212,13 +201,6 @@ export default function Pasos({ cliente, isActive = true, ultimoPeso = null, met
     }, 1000);
   }, [permissionBlocked]);
 
-  const handleSetGoal = (value) => {
-    const v = Math.max(1000, Math.min(50000, Math.round(Number(value) || 0)));
-    if (!v) return;
-    setGoal(v);
-    setLocalStepGoal(clienteId, v);
-  };
-
   // ── Datos derivados ──
   const todayKey = toDateKey();
   const todaySteps = history[todayKey] || 0;
@@ -283,9 +265,9 @@ export default function Pasos({ cliente, isActive = true, ultimoPeso = null, met
               Pasos y Actividad
             </h1>
             <p className="hidden md:block text-sm text-[#6B7A8D] mt-1">
-              {goalLockedBySpecialist
-                ? `Meta diaria asignada por tu especialista: ${fmt(goal)} pasos`
-                : `Meta diaria: ${fmt(goal)} pasos · Tu movimiento cotidiano suma a tu gasto energético`}
+              {hasSpecialist
+                ? `Meta diaria sugerida por tu especialista: ${fmt(goal)} pasos · Cualquier paso extra sigue sumando`
+                : `Meta diaria sugerida: ${fmt(goal)} pasos · Tu movimiento cotidiano suma a tu gasto energético`}
             </p>
           </div>
 
@@ -402,46 +384,14 @@ export default function Pasos({ cliente, isActive = true, ultimoPeso = null, met
                   <StatTile icon={<Flame className="w-3 h-3" />} label="Activas" value={fmt(metrics.kcal)} unit="kcal" />
                   <StatTile icon={<Clock className="w-3 h-3" />} label="Tiempo" value={metrics.minutes} unit="min activos" />
                 </div>
-                {goalLockedBySpecialist ? (
-                  <div className="pt-2 border-t border-[#F0F4FA] flex items-center justify-center sm:justify-start gap-1.5 text-[11px] font-semibold text-[#6B7A8D]">
-                    <Target className="w-3.5 h-3.5 text-[var(--brand-primary)]" />
-                    <span>Meta diaria fijada por tu especialista ({fmt(goal)} pasos)</span>
-                  </div>
-                ) : (
-                  <div className="pt-2.5 border-t border-[#F0F4FA]">
-                    <div className="text-[10px] font-bold uppercase tracking-wider text-[#6B7A8D] mb-1.5">Meta diaria de pasos</div>
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      {GOAL_CHIPS.map((g) => (
-                        <button
-                          key={g}
-                          type="button"
-                          onClick={() => handleSetGoal(g)}
-                          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-colors cursor-pointer ${
-                            goal === g
-                              ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)]"
-                              : "bg-white text-[#6B7A8D] border-[#E2E8F0] hover:border-[var(--brand-primary)]/50"
-                          }`}
-                        >
-                          {fmt(g)}
-                        </button>
-                      ))}
-                      <input
-                        type="number"
-                        min="1000"
-                        max="50000"
-                        step="500"
-                        defaultValue={goal}
-                        key={goal}
-                        onBlur={(e) => handleSetGoal(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") e.currentTarget.blur();
-                        }}
-                        className="w-20 px-2 py-1 rounded-lg border border-[#E2E8F0] bg-white text-[11px] font-bold text-center text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                        aria-label="Meta personalizada de pasos"
-                      />
-                    </div>
-                  </div>
-                )}
+                <div className="pt-2 border-t border-[#F0F4FA] flex items-center justify-center sm:justify-start gap-1.5 text-[11px] font-semibold text-[#6B7A8D]">
+                  <Target className="w-3.5 h-3.5 text-[var(--brand-primary)] shrink-0" />
+                  <span>
+                    {hasSpecialist
+                      ? `Meta diaria sugerida por tu especialista: ${fmt(goal)} pasos`
+                      : `Meta diaria sugerida: ${fmt(goal)} pasos`}
+                  </span>
+                </div>
               </div>
             </div>
           </div>

@@ -174,14 +174,25 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
   const [syncStatus, setSyncStatus] = useState("synced");
   const [nutriologoBloqueado, setNutriologoBloqueado] = useState(false);
   const [ultimoPeso, setUltimoPeso] = useState(() => {
-    const met = cliente?.id ? dbPeek(`metricas_progreso?cliente_id=eq.${cliente.id}&order=fecha.desc&limit=1`) : null;
-    return Array.isArray(met) && met.length > 0 && met[0].peso ? parseFloat(met[0].peso) : null;
+    const met = cliente?.id
+      ? dbPeek(`metricas_progreso?cliente_id=eq.${cliente.id}&order=fecha.desc,created_at.desc&limit=5`) ||
+        dbPeek(`metricas_progreso?cliente_id=eq.${cliente.id}&order=fecha.desc&limit=1`) ||
+        dbPeek(`metricas_progreso?cliente_id=eq.${cliente.id}&order=fecha.desc`)
+      : null;
+    const withPeso = Array.isArray(met) ? met.find((m) => parseFloat(m?.peso) > 0) : null;
+    return withPeso ? parseFloat(withPeso.peso) : null;
   });
   const [metaPasos, setMetaPasos] = useState(() => {
-    const met = cliente?.id ? dbPeek(`metricas_progreso?cliente_id=eq.${cliente.id}&order=fecha.desc&limit=1`) : null;
-    if (Array.isArray(met) && met.length > 0) {
-      const v = Number(enrichMetrica(met[0])?.eval_meta_pasos);
-      return v > 0 ? v : null;
+    const met = cliente?.id
+      ? dbPeek(`metricas_progreso?cliente_id=eq.${cliente.id}&order=fecha.desc,created_at.desc&limit=5`) ||
+        dbPeek(`metricas_progreso?cliente_id=eq.${cliente.id}&order=fecha.desc&limit=1`) ||
+        dbPeek(`metricas_progreso?cliente_id=eq.${cliente.id}&order=fecha.desc`)
+      : null;
+    if (Array.isArray(met)) {
+      for (const m of met) {
+        const v = Number(enrichMetrica(m)?.eval_meta_pasos);
+        if (v > 0) return v;
+      }
     }
     return null;
   });
@@ -213,20 +224,27 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
       // Consultas paralelas iniciales
       const [cs, met, npRows] = await Promise.all([
         fetcher(`ciclos?cliente_id=eq.${cliente.id}&order=created_at.desc`).catch(() => []),
-        fetcher(`metricas_progreso?cliente_id=eq.${cliente.id}&order=fecha.desc&limit=1`).catch(() => []),
+        fetcher(`metricas_progreso?cliente_id=eq.${cliente.id}&order=fecha.desc,created_at.desc&limit=5`).catch(() => []),
         fetcher(`nutricion_progreso?cliente_id=eq.${cliente.id}&limit=1000`).catch(() => [])
       ]);
 
       const ciclo = (cs || []).find(c => c.activo) || (cs || [])[0] || null;
       setCicloActivo(ciclo);
 
-      if (met && met.length > 0 && met[0].peso) {
-        setUltimoPeso(parseFloat(met[0].peso));
+      const metList = Array.isArray(met) ? met : [];
+      const latestWithPeso = metList.find((m) => parseFloat(m?.peso) > 0);
+      if (latestWithPeso?.peso) {
+        setUltimoPeso(parseFloat(latestWithPeso.peso));
       }
-      if (met && met.length > 0) {
-        const metaV = Number(enrichMetrica(met[0])?.eval_meta_pasos);
-        setMetaPasos(metaV > 0 ? metaV : null);
+      let resolvedMetaPasos = null;
+      for (const m of metList) {
+        const v = Number(enrichMetrica(m)?.eval_meta_pasos);
+        if (v > 0) {
+          resolvedMetaPasos = v;
+          break;
+        }
       }
+      setMetaPasos(resolvedMetaPasos);
 
       if (Array.isArray(npRows)) {
         const npMap = {};
@@ -351,6 +369,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
     window.addEventListener("flux:cache-updated", onCacheUpdated);
     window.addEventListener("flux:synced", onCacheUpdated);
     window.addEventListener("flux:plan-updated", onPlanUpdated);
+    window.addEventListener("flux:metricas-updated", onPlanUpdated);
     window.addEventListener("flux:expediente-updated", onExpedienteUpdated);
     
     return () => {
@@ -360,16 +379,17 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
       window.removeEventListener("flux:cache-updated", onCacheUpdated);
       window.removeEventListener("flux:synced", onCacheUpdated);
       window.removeEventListener("flux:plan-updated", onPlanUpdated);
+      window.removeEventListener("flux:metricas-updated", onPlanUpdated);
       window.removeEventListener("flux:expediente-updated", onExpedienteUpdated);
     };
   }, [cliente?.id]);
 
   // Si está embebido en el panel de Admin (nutriólogo o atleta con Mi Plan)
-  // o el cliente navega a Nutrición, Entrenamiento o Progreso, mantener sincronizados los datos con la caché inteligente
+  // o el cliente navega a Nutrición, Entrenamiento, Pasos o Progreso, mantener sincronizados los datos con la caché inteligente
   useEffect(() => {
     if (
-      (isEmbedded && (embeddedTab === "nutricion" || embeddedTab === "deporte" || embeddedTab === "progreso")) ||
-      (!isEmbedded && (tab === "nutricion" || tab === "deporte" || tab === "progreso"))
+      (isEmbedded && (embeddedTab === "nutricion" || embeddedTab === "deporte" || embeddedTab === "pasos" || embeddedTab === "progreso")) ||
+      (!isEmbedded && (tab === "nutricion" || tab === "deporte" || tab === "pasos" || tab === "progreso"))
     ) {
       loadData({ silent: true, forceFresh: false });
     }
