@@ -886,14 +886,14 @@ export default function Training({
 
         {/* Aviso de Sesión Finalizada (bloqueo seguro contra ediciones accidentales) */}
         {isSessionFinalized && !isLocked && (
-          <div className="bg-emerald-50 border-b md:border border-emerald-200 rounded-none md:rounded-xl px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+          <div className="bg-[var(--brand-secondary)] border-b md:border border-[var(--brand-primary)]/30 rounded-none md:rounded-xl px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+              <div className="w-7 h-7 rounded-lg bg-[var(--brand-primary)] text-white flex items-center justify-center shrink-0">
                 <CheckCircle2 size={16} />
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-bold text-emerald-950">Sesión finalizada y bloqueada</p>
-                <p className="text-[11px] text-emerald-800">
+                <p className="text-xs font-bold text-[#0B1929]">Sesión finalizada y bloqueada</p>
+                <p className="text-[11px] text-[#475569]">
                   Tus marcas están protegidas contra toques accidentales durante esta semana.
                 </p>
               </div>
@@ -902,7 +902,7 @@ export default function Training({
               <button
                 type="button"
                 onClick={() => setConfirmReopenSession(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-emerald-300 text-emerald-900 hover:bg-emerald-100 text-[11px] font-bold transition-colors cursor-pointer shrink-0"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-[var(--brand-primary)]/40 text-[var(--brand-primary)] hover:bg-[var(--brand-primary)] hover:text-white text-[11px] font-bold transition-colors cursor-pointer shrink-0"
               >
                 <Unlock size={12} />
                 <span>Desbloquear para editar</span>
@@ -1496,7 +1496,7 @@ export default function Training({
                       setFinalizingSession(false);
                     }
                   }}
-                  className="w-full py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white text-sm font-bold transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+                  className="w-full py-3.5 rounded-xl bg-[var(--brand-primary)] hover:opacity-90 disabled:opacity-60 text-white text-sm font-bold transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <Lock size={16} />
                   <span>{finalizingSession ? "Guardando y cerrando..." : "Finalizar sesión y sellar día"}</span>

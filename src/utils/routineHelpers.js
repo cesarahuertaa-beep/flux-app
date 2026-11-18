@@ -9,7 +9,8 @@ export function normalizeExerciseName(name) {
     .trim()
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ");
 }
 
 export function calcEpley1RM(pesoKg, reps) {
@@ -131,18 +132,8 @@ export function getSeriesSuggestion(exObj, serieIdx) {
   return { reps, peso };
 }
 
-/**
- * Extrae las últimas marcas reales alcanzadas en un `ejercicio_id` + `variante_id`
- * a partir de filas de `progreso`, ignorando registros "Falta" o vacíos.
- */
-export function extractLatestMarksFromRows(rows, numSeries, fallbackReps = 10, fallbackPesoKg = null) {
-  if (!Array.isArray(rows) || rows.length === 0) return null;
-  const count = Math.max(1, parseInt(numSeries, 10) || 4);
-
-  // Agrupar por semana y serie: { [sem]: { [serie]: { reps, peso } } }
+function groupProgressRowsByWeek(rows) {
   const byWeek = new Map();
-  let maxWeek = -1;
-
   for (const r of rows) {
     const w = parseInt(r.semana, 10);
     const s = parseInt(r.serie, 10);
@@ -162,17 +153,167 @@ export function extractLatestMarksFromRows(rows, numSeries, fallbackReps = 10, f
       const kg = parseRawWeightToKg(r.valor);
       if (kg !== null && kg >= 0) cell.peso = kg;
     }
-    if (w > maxWeek) maxWeek = w;
+  }
+  return byWeek;
+}
+
+function scoreSessionSummary(w, wMap) {
+  let peak1RM = 0;
+  let maxWeightKg = null;
+  let peakReps = 0;
+  let totalVolumeKg = 0;
+  let totalReps = 0;
+  let repWeightKg = null;
+  let repReps = null;
+  let repBest1RM = -1;
+  let validSetsCount = 0;
+
+  for (const cell of wMap.values()) {
+    const reps = cell?.reps != null && cell.reps > 0 ? cell.reps : 0;
+    const peso = cell?.peso != null && cell.peso >= 0 ? cell.peso : null;
+    if (reps === 0 && (peso === null || peso <= 0)) continue;
+
+    validSetsCount++;
+    if (reps > peakReps) peakReps = reps;
+    totalReps += reps;
+    if (peso !== null && (maxWeightKg === null || peso > maxWeightKg)) {
+      maxWeightKg = peso;
+    }
+    const e1rm = peso != null && peso > 0 && reps > 0 ? calcEpley1RM(peso, reps) : 0;
+    if (e1rm > peak1RM) peak1RM = e1rm;
+    if (peso !== null && peso > 0 && reps > 0) totalVolumeKg += peso * reps;
+
+    const isBetterSet =
+      e1rm - repBest1RM > 0.01 ||
+      (Math.abs(e1rm - repBest1RM) <= 0.01 &&
+        ((peso ?? -1) > (repWeightKg ?? -1) ||
+          ((peso ?? -1) === (repWeightKg ?? -1) && reps > (repReps ?? 0))));
+    if (isBetterSet) {
+      repBest1RM = e1rm;
+      repWeightKg = peso;
+      repReps = reps || null;
+    }
   }
 
-  if (maxWeek < 0) return null;
-  const sortedWeeks = Array.from(byWeek.keys()).sort((a, b) => b - a);
+  return {
+    w,
+    wMap,
+    validSetsCount,
+    peak1RM,
+    maxWeightKg,
+    peakReps,
+    totalVolumeKg,
+    totalReps,
+    repWeightKg,
+    repReps,
+  };
+}
 
+export function isBetterExerciseMark(candidate, current) {
+  if (!candidate) return false;
+  if (!current) return true;
+  const cand1RM = candidate.best1RM || 0;
+  const cur1RM = current.best1RM || 0;
+  if (Math.abs(cand1RM - cur1RM) > 0.01) return cand1RM > cur1RM;
+
+  const candW = candidate.bestWeightKg ?? -1;
+  const curW = current.bestWeightKg ?? -1;
+  if (Math.abs(candW - curW) > 0.05) return candW > curW;
+
+  const candVol = candidate.totalVolumeKg || 0;
+  const curVol = current.totalVolumeKg || 0;
+  if (Math.abs(candVol - curVol) > 0.1) return candVol > curVol;
+
+  const candReps = candidate.bestReps || 0;
+  const curReps = current.bestReps || 0;
+  if (candReps !== curReps) return candReps > curReps;
+
+  return (candidate.totalReps || 0) > (current.totalReps || 0);
+}
+
+function finalizeExtractedMarks(seriesMarks, meta, fallbackReps, fallbackPesoKg) {
+  const firstReps = seriesMarks[0]?.reps ?? (parseInt(fallbackReps, 10) || 10);
+  const summaryReps = meta.bestReps ?? firstReps;
+  const summaryPeso = meta.bestWeightKg ?? meta.maxWeightKg ?? seriesMarks[0]?.peso ?? parseRawWeightToKg(fallbackPesoKg);
+  const customDetalle = hasCustomSeriesBreakdown(seriesMarks, summaryReps, summaryPeso) ? seriesMarks : [];
+
+  return {
+    reps_sugeridas: summaryReps,
+    peso_sugerido: summaryPeso,
+    series_detalle: customDetalle,
+    allSeriesMarks: seriesMarks,
+    best1RM: meta.best1RM || 0,
+    totalVolumeKg: meta.totalVolumeKg || 0,
+    totalReps: meta.totalReps || 0,
+    lastWeightKg: meta.bestWeightKg ?? meta.maxWeightKg ?? null,
+    lastReps: summaryReps,
+    bestWeightKg: meta.bestWeightKg ?? meta.maxWeightKg ?? null,
+    bestReps: summaryReps,
+    maxWeightKg: meta.maxWeightKg ?? null,
+  };
+}
+
+function extractMarksFromRowsByMode(rows, numSeries, fallbackReps = 10, fallbackPesoKg = null, mode = "latest") {
+  if (!Array.isArray(rows) || rows.length === 0) return null;
+  const count = Math.max(1, parseInt(numSeries, 10) || 4);
+  const byWeek = groupProgressRowsByWeek(rows);
+  if (byWeek.size === 0) return null;
+
+  if (mode === "best") {
+    const sessions = [];
+    for (const [w, wMap] of byWeek.entries()) {
+      const scored = scoreSessionSummary(w, wMap);
+      if (scored.validSetsCount > 0) sessions.push(scored);
+    }
+    if (sessions.length === 0) return null;
+
+    sessions.sort((a, b) => {
+      if (Math.abs(a.peak1RM - b.peak1RM) > 0.01) return b.peak1RM - a.peak1RM;
+      if (Math.abs((a.maxWeightKg ?? -1) - (b.maxWeightKg ?? -1)) > 0.05) return (b.maxWeightKg ?? -1) - (a.maxWeightKg ?? -1);
+      if (Math.abs(a.totalVolumeKg - b.totalVolumeKg) > 0.1) return b.totalVolumeKg - a.totalVolumeKg;
+      if (a.peakReps !== b.peakReps) return b.peakReps - a.peakReps;
+      if (a.totalReps !== b.totalReps) return b.totalReps - a.totalReps;
+      return b.w - a.w;
+    });
+
+    const bestSession = sessions[0];
+    const fallbackKg = parseRawWeightToKg(fallbackPesoKg);
+    let lastValidSet = null;
+    const seriesMarks = [];
+
+    for (let si = 0; si < count; si++) {
+      const cell = bestSession.wMap.get(si);
+      const hasCell = cell && (cell.reps != null || cell.peso != null);
+      const finalReps = hasCell && cell.reps != null ? cell.reps : (lastValidSet?.reps ?? (parseInt(fallbackReps, 10) || 10));
+      const finalPeso = hasCell && cell.peso != null ? cell.peso : (lastValidSet ? lastValidSet.peso : fallbackKg);
+      const entry = { reps: finalReps, peso: finalPeso };
+      if (hasCell && (cell.reps > 0 || (cell.peso != null && cell.peso >= 0))) lastValidSet = entry;
+      seriesMarks.push(entry);
+    }
+
+    return finalizeExtractedMarks(
+      seriesMarks,
+      {
+        best1RM: bestSession.peak1RM,
+        bestWeightKg: bestSession.repWeightKg,
+        bestReps: bestSession.repReps,
+        maxWeightKg: bestSession.maxWeightKg,
+        totalVolumeKg: bestSession.totalVolumeKg,
+        totalReps: bestSession.totalReps,
+      },
+      fallbackReps,
+      fallbackPesoKg
+    );
+  }
+
+  const sortedWeeks = Array.from(byWeek.keys()).sort((a, b) => b - a);
   const seriesMarks = [];
   let anyFound = false;
   let maxWeightKg = null;
   let bestReps = null;
   let best1RM = 0;
+  let totalVolumeKg = 0;
+  let totalReps = 0;
 
   for (let si = 0; si < count; si++) {
     let foundReps = null;
@@ -187,7 +328,6 @@ export function extractLatestMarksFromRows(rows, numSeries, fallbackReps = 10, f
         break;
       }
     }
-    // Si encontró reps pero esa semana puntual no tenía peso, buscar peso previo más reciente de esa misma serie
     if (foundPeso === null) {
       for (const w of sortedWeeks) {
         const cell = byWeek.get(w)?.get(si);
@@ -203,7 +343,8 @@ export function extractLatestMarksFromRows(rows, numSeries, fallbackReps = 10, f
     const finalPeso = foundPeso ?? parseRawWeightToKg(fallbackPesoKg);
 
     seriesMarks.push({ reps: finalReps, peso: finalPeso });
-
+    totalReps += finalReps;
+    if (finalPeso != null && finalPeso > 0) totalVolumeKg += finalPeso * finalReps;
     if (finalPeso != null && (maxWeightKg === null || finalPeso > maxWeightKg)) {
       maxWeightKg = finalPeso;
     }
@@ -216,40 +357,42 @@ export function extractLatestMarksFromRows(rows, numSeries, fallbackReps = 10, f
 
   if (!anyFound) return null;
 
-  const firstReps = seriesMarks[0]?.reps ?? (parseInt(fallbackReps, 10) || 10);
-  const summaryReps = bestReps ?? firstReps;
-  const summaryPeso = maxWeightKg ?? seriesMarks[0]?.peso ?? parseRawWeightToKg(fallbackPesoKg);
-  const customDetalle = hasCustomSeriesBreakdown(seriesMarks, summaryReps, summaryPeso) ? seriesMarks : [];
+  return finalizeExtractedMarks(
+    seriesMarks,
+    { best1RM, bestWeightKg: maxWeightKg, bestReps, maxWeightKg, totalVolumeKg, totalReps },
+    fallbackReps,
+    fallbackPesoKg
+  );
+}
 
-  return {
-    reps_sugeridas: summaryReps,
-    peso_sugerido: summaryPeso,
-    series_detalle: customDetalle,
-    allSeriesMarks: seriesMarks,
-    best1RM,
-    lastWeightKg: maxWeightKg,
-    lastReps: summaryReps,
-  };
+/** Extrae las últimas marcas reales alcanzadas a partir de filas de `progreso` (ignora "Falta" y vacíos). */
+export function extractLatestMarksFromRows(rows, numSeries, fallbackReps = 10, fallbackPesoKg = null) {
+  return extractMarksFromRowsByMode(rows, numSeries, fallbackReps, fallbackPesoKg, "latest");
+}
+
+/** Extrae la mejor sesión/marca histórica alcanzada en `progreso` (por 1RM, carga, volumen y reps). */
+export function extractBestMarksFromRows(rows, numSeries, fallbackReps = 10, fallbackPesoKg = null) {
+  return extractMarksFromRowsByMode(rows, numSeries, fallbackReps, fallbackPesoKg, "best");
 }
 
 /**
  * Construye índices históricos para un paciente:
  * - latestByKey: últimas marcas por `biblioteca_id` y por nombre normalizado
+ * - bestByKey: mejores marcas reales históricas entre todos los ciclos/rutinas
  * - best1RMByKey: mejor 1RM histórico en ciclos previos al actual (`excludeCicloId`)
  */
 export function buildPatientExerciseHistory(pastRutinas, allProgresoRows, excludeCicloId = null) {
   const latestByKey = {};
+  const bestByKey = {};
   const best1RMByKey = {};
   if (!Array.isArray(pastRutinas) || !Array.isArray(allProgresoRows) || allProgresoRows.length === 0) {
-    return { latestByKey, best1RMByKey };
+    return { latestByKey, bestByKey, best1RMByKey };
   }
 
-  // Indexar progreso por `${ejercicio_id}:${variante_id}`
   const progByEjVar = new Map();
   const best1RMByEjId = new Map();
-
-  // Primero armar parejas peso+reps por (ejercicio_id, variante_id, semana, serie) para 1RM histórico
   const setPairs = new Map();
+
   for (const r of allProgresoRows) {
     const vid = r.variante_id || "original";
     const k = `${r.ejercicio_id}:${vid}`;
@@ -274,7 +417,6 @@ export function buildPatientExerciseHistory(pastRutinas, allProgresoRows, exclud
     }
   }
 
-  // pastRutinas ya viene ordenado por created_at DESC o fecha: el primero con marcas gana para latestByKey
   for (const r of pastRutinas) {
     const isExcludedCycle = excludeCicloId && String(r.ciclo_id || "") === String(excludeCicloId);
     for (const ej of r.ejercicios || []) {
@@ -300,16 +442,22 @@ export function buildPatientExerciseHistory(pastRutinas, allProgresoRows, exclud
         const rows = progByEjVar.get(`${ej.id}:${vid}`);
         if (!rows || rows.length === 0) continue;
 
-        const extracted = extractLatestMarksFromRows(rows, nSeries, obj.reps_sugeridas, obj.peso_sugerido);
-        if (!extracted) continue;
+        const latestExtracted = extractLatestMarksFromRows(rows, nSeries, obj.reps_sugeridas, obj.peso_sugerido);
+        if (latestExtracted) {
+          if (bibKey && !latestByKey[bibKey]) latestByKey[bibKey] = latestExtracted;
+          if (nameKey && !latestByKey[nameKey]) latestByKey[nameKey] = latestExtracted;
+        }
 
-        if (bibKey && !latestByKey[bibKey]) latestByKey[bibKey] = extracted;
-        if (nameKey && !latestByKey[nameKey]) latestByKey[nameKey] = extracted;
+        const bestExtracted = extractBestMarksFromRows(rows, nSeries, obj.reps_sugeridas, obj.peso_sugerido);
+        if (bestExtracted) {
+          if (bibKey && isBetterExerciseMark(bestExtracted, bestByKey[bibKey])) bestByKey[bibKey] = bestExtracted;
+          if (nameKey && isBetterExerciseMark(bestExtracted, bestByKey[nameKey])) bestByKey[nameKey] = bestExtracted;
+        }
       }
     }
   }
 
-  return { latestByKey, best1RMByKey };
+  return { latestByKey, bestByKey, best1RMByKey };
 }
 
 export function lookupExerciseHistory(map, obj) {
@@ -324,15 +472,15 @@ export function lookupExerciseHistory(map, obj) {
   return null;
 }
 
-/** Aplica migración real de marcas sobre un ejercicio clonado (principal + alternativas). */
+/** Aplica migración de mejores marcas reales sobre un ejercicio clonado (principal + alternativas). */
 export function migrateClonedExerciseWithProgress(oldEj, progRowsByEjVar) {
   const nSeries = parseInt(oldEj.num_series || oldEj.series, 10) || 4;
   const origRows = progRowsByEjVar.get(`${oldEj.id}:original`) || [];
-  const origMigrated = extractLatestMarksFromRows(origRows, nSeries, oldEj.reps_sugeridas, oldEj.peso_sugerido);
+  const origMigrated = extractBestMarksFromRows(origRows, nSeries, oldEj.reps_sugeridas, oldEj.peso_sugerido);
 
   const migratedAlts = (oldEj.alternativas || []).map((alt, idx) => {
     const altRows = progRowsByEjVar.get(`${oldEj.id}:alt_${idx}`) || [];
-    const altMigrated = extractLatestMarksFromRows(altRows, nSeries, alt.reps_sugeridas ?? oldEj.reps_sugeridas, alt.peso_sugerido ?? oldEj.peso_sugerido);
+    const altMigrated = extractBestMarksFromRows(altRows, nSeries, alt.reps_sugeridas ?? oldEj.reps_sugeridas, alt.peso_sugerido ?? oldEj.peso_sugerido);
     if (!altMigrated) {
       return {
         ...alt,

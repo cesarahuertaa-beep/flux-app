@@ -17,7 +17,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { SortableItem } from "../SortableItem";
-import { RefreshCw, ChevronDown, Trash2, Calendar, Activity, CheckCircle2, AlertCircle, ShieldAlert, AlertTriangle, Save, Edit2, Plus, Search, FileText, Download, Lock, X, Utensils, Dumbbell, BarChart2, Camera, Image as ImageIcon, Bookmark, Calculator, ArrowLeft, ArrowUp, User, Check, ClipboardList, RotateCcw, MessageCircle, Copy, TrendingUp, Sparkles, Flame, Target, Droplets, Pill, Clock, Loader2, ListOrdered } from "lucide-react";
+import { RefreshCw, ChevronDown, Trash2, Calendar, Activity, CheckCircle2, AlertCircle, ShieldAlert, AlertTriangle, Save, Edit2, Plus, Search, FileText, Download, Lock, X, Utensils, Dumbbell, BarChart2, Camera, Image as ImageIcon, Bookmark, Calculator, ArrowLeft, ArrowUp, User, Check, ClipboardList, RotateCcw, MessageCircle, Copy, TrendingUp, Sparkles, Flame, Target, Droplets, Pill, Clock, Loader2, ListOrdered, Trophy } from "lucide-react";
 import { EjercicioSelector } from "./EjercicioSelector";
 import { GRUPO_LABELS, normalizeMuscleGroup } from "../../lib/constants";
 import { ConfirmModal } from "../ui/ConfirmModal";
@@ -216,6 +216,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     };
   });
   const [patientHistoryMarks, setPatientHistoryMarks] = useState({});
+  const [loadingPatientHistory, setLoadingPatientHistory] = useState(false);
   const loadedHistoryClientRef = useRef(null);
   const [autoOpenCheckinTrigger, setAutoOpenCheckinTrigger] = useState(0);
   const [nutriView, setNutriView] = useState("programar"); // "programar" | "tracking"
@@ -1076,23 +1077,70 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     historialLoadedRef.current = false;
   }, [activeSpecialistId]);
 
+  const fetchPagedProgreso = useCallback(async (clientId, extraFilter = "", force = false) => {
+    if (!clientId) return [];
+    const PAGE = 1000;
+    const all = [];
+    let useOrder = true;
+    const getter = force ? dbGetFresh : dbGet;
+    const filterPart = extraFilter ? `&${extraFilter}` : "";
+
+    for (let offset = 0; offset < 6000; offset += PAGE) {
+      const orderPart = useOrder ? "&order=updated_at.desc.nullslast" : "";
+      let chunk = null;
+      try {
+        chunk = await getter(
+          `progreso?cliente_id=eq.${clientId}${filterPart}&select=ejercicio_id,variante_id,semana,serie,tipo,valor${orderPart}&limit=${PAGE}&offset=${offset}`
+        );
+      } catch {
+        if (useOrder) {
+          useOrder = false;
+          chunk = await getter(
+            `progreso?cliente_id=eq.${clientId}${filterPart}&select=ejercicio_id,variante_id,semana,serie,tipo,valor&limit=${PAGE}&offset=${offset}`
+          ).catch(() => []);
+        } else {
+          chunk = [];
+        }
+      }
+      if (!Array.isArray(chunk) || chunk.length === 0) break;
+      all.push(...chunk);
+      if (chunk.length < PAGE) break;
+    }
+    return all;
+  }, []);
+
+  const loadPatientExerciseHistory = useCallback(async (clientId, { force = false } = {}) => {
+    if (!clientId) return;
+    if (!force && loadedHistoryClientRef.current === clientId) return;
+    setLoadingPatientHistory(true);
+    try {
+      const getter = force ? dbGetFresh : dbGet;
+      const [pastRuts, progRows] = await Promise.all([
+        getter(
+          `rutinas?cliente_id=eq.${clientId}&select=id,ciclo_id,created_at,ejercicios(id,biblioteca_id,nombre,num_series,reps_sugeridas,peso_sugerido,alternativas)&order=created_at.desc`
+        ).catch(() => []),
+        fetchPagedProgreso(clientId, "", force).catch(() => []),
+      ]);
+      const { bestByKey } = buildPatientExerciseHistory(pastRuts, progRows, null);
+      setPatientHistoryMarks(bestByKey);
+      if (Array.isArray(pastRuts)) {
+        loadedHistoryClientRef.current = clientId;
+      }
+    } catch {
+      loadedHistoryClientRef.current = null;
+    } finally {
+      setLoadingPatientHistory(false);
+    }
+  }, [fetchPagedProgreso]);
+
   useEffect(() => {
     setPatientHistoryMarks({});
     loadedHistoryClientRef.current = null;
-  }, [selected?.id]);
-
-  const loadPatientExerciseHistory = useCallback(async (clientId) => {
-    if (!clientId || loadedHistoryClientRef.current === clientId) return;
-    loadedHistoryClientRef.current = clientId;
-    try {
-      const [pastRuts, progRows] = await Promise.all([
-        dbGet(`rutinas?cliente_id=eq.${clientId}&select=id,ciclo_id,created_at,ejercicios(id,biblioteca_id,nombre,num_series,reps_sugeridas,peso_sugerido,series_detalle,alternativas)&order=created_at.desc`).catch(() => []),
-        dbGet(`progreso?cliente_id=eq.${clientId}&limit=3000`).catch(() => []),
-      ]);
-      const { latestByKey } = buildPatientExerciseHistory(pastRuts, progRows, null);
-      setPatientHistoryMarks(latestByKey);
-    } catch {}
-  }, []);
+    setLoadingPatientHistory(false);
+    if (selected?.id) {
+      loadPatientExerciseHistory(selected.id);
+    }
+  }, [selected?.id, loadPatientExerciseHistory]);
 
   /** Persiste ejercicios con series_detalle, haciendo fallback si la columna aún no existe en BD. */
   const persistEjerciciosSafe = async (rows, { upsert = false } = {}) => {
@@ -1955,7 +2003,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
               if (planForm.migrarMarcas) {
                 const oldEjIds = oldRuts.flatMap((r) => (r.ejercicios || []).map((ej) => ej.id)).filter(Boolean);
                 if (oldEjIds.length > 0) {
-                  const progRows = await dbGetFresh(`progreso?cliente_id=eq.${selected.id}&ejercicio_id=in.(${oldEjIds.join(",")})&limit=3000`).catch(() => []);
+                  const progRows = await fetchPagedProgreso(selected.id, `ejercicio_id=in.(${oldEjIds.join(",")})`, true).catch(() => []);
                   (Array.isArray(progRows) ? progRows : []).forEach((pr) => {
                     const mapKey = `${pr.ejercicio_id}:${pr.variante_id || "original"}`;
                     if (!progByEjVar.has(mapKey)) progByEjVar.set(mapKey, []);
@@ -3389,14 +3437,14 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     if (interceptNoPlan()) return; 
     if (isEstandarLimit(rutinas.length, "rutinas")) return;
     loadHistorial();
-    if (selected?.id) loadPatientExerciseHistory(selected.id);
+    if (selected?.id) loadPatientExerciseHistory(selected.id, { force: true });
     setEditRutina(null); 
     setActiveAltSlot(null);
     setRutinaForm({ diasSeleccionados:[], tituloPersonalizado:"", ejercicios:[] }); 
     setShowRutinaModal(true); 
   };
   const openEditRutina = (r) => { 
-    if (selected?.id) loadPatientExerciseHistory(selected.id);
+    if (selected?.id) loadPatientExerciseHistory(selected.id, { force: true });
     const parts = (r.nombre ||"").split('|');
     let dSel = [];
     let tPers = r.nombre ||"";
@@ -3737,7 +3785,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
   const updEj = (i, f, v) => setRutinaForm(p => {
     const es = [...p.ejercicios];
-    const cur = { ...es[i], [f]: v };
+    const cur = { ...es[i], [f]: v, ...(f !== "unidad" ? { _historyApplied: false } : {}) };
     if (f === "num_series" && Array.isArray(cur.seriesForm) && cur.seriesForm.length > 0) {
       const nextCount = Math.max(1, Math.min(12, parseInt(v, 10) || 1));
       const prevRows = cur.seriesForm;
@@ -3776,7 +3824,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
   const updSerieField = (i, si, field, val) => setRutinaForm(p => {
     const es = [...p.ejercicios];
-    const cur = { ...es[i] };
+    const cur = { ...es[i], _historyApplied: false };
     const nextSeries = (cur.seriesForm || []).map((s, idx) => (idx === si ? { ...s, [field]: val } : s));
     cur.seriesForm = nextSeries;
     if (si === 0 && field === "reps" && val !== "") cur.reps_sugeridas = val;
@@ -3791,10 +3839,12 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     const numSeries = Math.max(1, parseInt(exObj.num_series, 10) || 4);
     const repsStr = String(mark.reps_sugeridas || exObj.reps_sugeridas || 10);
     const pesoStr = mark.peso_sugerido != null ? convertWeightToInput(mark.peso_sugerido, unit) : (exObj.peso_sugerido || "");
+    const keepPerSeriesOpen = Array.isArray(exObj.seriesForm) && exObj.seriesForm.length > 0;
     const hasVaryingSeries = Array.isArray(mark.series_detalle) && mark.series_detalle.length > 0;
-    const nextSeriesForm = hasVaryingSeries
-      ? seriesDetalleToForm(mark.allSeriesMarks, numSeries, repsStr, pesoStr, unit)
-      : [];
+    const nextSeriesForm =
+      hasVaryingSeries || keepPerSeriesOpen
+        ? seriesDetalleToForm(mark.allSeriesMarks || mark.series_detalle, numSeries, repsStr, pesoStr, unit)
+        : [];
     return {
       ...exObj,
       reps_sugeridas: repsStr,
@@ -3805,24 +3855,33 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     };
   };
 
+  const applyBestMarksWithAlts = (cur, historyMap) => {
+    const mark = lookupExerciseHistory(historyMap, cur);
+    const nextAlts = (cur.alternativas || []).map((alt) => {
+      const altMark = lookupExerciseHistory(historyMap, alt);
+      if (!altMark) return alt;
+      const altUnit = alt.unidad || cur.unidad || "kg";
+      return {
+        ...alt,
+        reps_sugeridas: String(altMark.reps_sugeridas || alt.reps_sugeridas || 10),
+        peso_sugerido: altMark.peso_sugerido != null ? convertWeightToInput(altMark.peso_sugerido, altUnit) : (alt.peso_sugerido || ""),
+        series_detalle: Array.isArray(altMark.series_detalle) ? altMark.series_detalle : [],
+      };
+    });
+    const updatedMain = mark ? applyMarkToExerciseObject(cur, mark) : cur;
+    const anyApplied = Boolean(mark) || nextAlts.some((a, idx) => a !== (cur.alternativas || [])[idx]);
+    return {
+      updated: { ...updatedMain, alternativas: nextAlts },
+      applied: anyApplied,
+    };
+  };
+
   const applyHistoryMarksToExercise = (i) => {
     setRutinaForm(p => {
       const es = [...p.ejercicios];
       const cur = es[i];
       if (!cur) return p;
-      const mark = lookupExerciseHistory(patientHistoryMarks, cur);
-      const nextAlts = (cur.alternativas || []).map((alt) => {
-        const altMark = lookupExerciseHistory(patientHistoryMarks, alt);
-        if (!altMark) return alt;
-        const altUnit = alt.unidad || cur.unidad || "kg";
-        return {
-          ...alt,
-          reps_sugeridas: String(altMark.reps_sugeridas || alt.reps_sugeridas || 10),
-          peso_sugerido: altMark.peso_sugerido != null ? convertWeightToInput(altMark.peso_sugerido, altUnit) : (alt.peso_sugerido || ""),
-          series_detalle: Array.isArray(altMark.series_detalle) ? altMark.series_detalle : [],
-        };
-      });
-      es[i] = { ...(mark ? applyMarkToExerciseObject(cur, mark) : cur), alternativas: nextAlts };
+      es[i] = applyBestMarksWithAlts(cur, patientHistoryMarks).updated;
       return { ...p, ejercicios: es };
     });
   };
@@ -3831,28 +3890,17 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     let appliedCount = 0;
     setRutinaForm(p => {
       const es = p.ejercicios.map((cur) => {
-        const mark = lookupExerciseHistory(patientHistoryMarks, cur);
-        if (mark) appliedCount++;
-        const nextAlts = (cur.alternativas || []).map((alt) => {
-          const altMark = lookupExerciseHistory(patientHistoryMarks, alt);
-          if (!altMark) return alt;
-          const altUnit = alt.unidad || cur.unidad || "kg";
-          return {
-            ...alt,
-            reps_sugeridas: String(altMark.reps_sugeridas || alt.reps_sugeridas || 10),
-            peso_sugerido: altMark.peso_sugerido != null ? convertWeightToInput(altMark.peso_sugerido, altUnit) : (alt.peso_sugerido || ""),
-            series_detalle: Array.isArray(altMark.series_detalle) ? altMark.series_detalle : [],
-          };
-        });
-        return { ...(mark ? applyMarkToExerciseObject(cur, mark) : cur), alternativas: nextAlts };
+        const res = applyBestMarksWithAlts(cur, patientHistoryMarks);
+        if (res.applied) appliedCount++;
+        return res.updated;
       });
       return { ...p, ejercicios: es };
     });
     if (appliedCount > 0) {
       setMsg?.(
         <div className="flex items-center gap-1.5">
-          <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-          Se importaron marcas previas en {appliedCount} ejercicio{appliedCount === 1 ? "" : "s"}
+          <CheckCircle2 className="w-4 h-4 text-[var(--brand-primary)]" />
+          Se importaron mejores marcas en {appliedCount} ejercicio{appliedCount === 1 ? "" : "s"}
         </div>
       );
     }
@@ -5444,13 +5492,13 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                     onClick={() => setPlanForm(p => ({ ...p, clonarAnterior: !p.clonarAnterior }))}
                     className={`p-3.5 rounded-xl border flex items-start gap-3 cursor-pointer transition-all ${
                       planForm.clonarAnterior
-                        ? "bg-indigo-50/50 border-indigo-200 text-indigo-950 shadow-2xs"
+                        ? "bg-[var(--brand-secondary)] border-[var(--brand-primary)]/40 text-[#0B1929] shadow-2xs"
                         : "bg-gray-50/60 border-[#E2E8F0] text-[#6B7A8D]"
                     }`}
                   >
                     <div className={`w-4 h-4 rounded-md mt-0.5 flex items-center justify-center border shrink-0 ${
                       planForm.clonarAnterior
-                        ? "bg-indigo-600 border-indigo-600 text-white"
+                        ? "bg-[var(--brand-primary)] border-[var(--brand-primary)] text-white"
                         : "border-gray-300 bg-white"
                     }`}>
                       {planForm.clonarAnterior && <Check className="w-3 h-3 stroke-[3]" />}
@@ -5470,23 +5518,23 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                       onClick={() => setPlanForm(p => ({ ...p, migrarMarcas: !p.migrarMarcas }))}
                       className={`ml-3 p-3 rounded-xl border flex items-start gap-2.5 cursor-pointer transition-all ${
                         planForm.migrarMarcas
-                          ? "bg-emerald-50/60 border-emerald-200 text-emerald-950"
+                          ? "bg-[var(--brand-secondary)]/70 border-[var(--brand-primary)]/35 text-[#0B1929]"
                           : "bg-white border-[#E2E8F0] text-[#6B7A8D]"
                       }`}
                     >
                       <div className={`w-4 h-4 rounded-md mt-0.5 flex items-center justify-center border shrink-0 ${
                         planForm.migrarMarcas
-                          ? "bg-emerald-600 border-emerald-600 text-white"
+                          ? "bg-[var(--brand-primary)] border-[var(--brand-primary)] text-white"
                           : "border-gray-300 bg-white"
                       }`}>
                         {planForm.migrarMarcas && <Check className="w-3 h-3 stroke-[3]" />}
                       </div>
                       <div className="min-w-0">
                         <span className="text-xs font-bold block text-[#0B1929]">
-                          Migrar últimas marcas reales alcanzadas (peso y reps por serie)
+                          Migrar mejores marcas reales alcanzadas (peso y reps por serie)
                         </span>
                         <span className="text-[11px] text-[#6B7A8D] leading-tight block mt-0.5">
-                          Toma los últimos pesos y repeticiones reales del ciclo previo para continuar desde tu nivel actual en vez de volver a las cargas iniciales.
+                          Toma los mejores pesos y repeticiones reales logrados en el ciclo previo para continuar desde tu nivel actual en vez de volver a las cargas iniciales.
                         </span>
                       </div>
                     </div>
@@ -7720,8 +7768,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                   )}
                 </div>
                 {activeAltSlot !== null && rutinaForm.ejercicios[activeAltSlot] ? (
-                  <div className="mb-3 p-2.5 rounded-xl bg-blue-50 border border-blue-200 text-xs font-semibold text-blue-800 flex items-center justify-between gap-2">
-                    <span>Elige del catálogo la alternativa para: <strong>{rutinaForm.ejercicios[activeAltSlot].nombre}</strong></span>
+                  <div className="mb-3 p-2.5 rounded-xl bg-[var(--brand-secondary)] border border-[var(--brand-primary)]/30 text-xs font-semibold text-[#0B1929] flex items-center justify-between gap-2">
+                    <span>Elige del catálogo la alternativa para: <strong className="text-[var(--brand-primary)]">{rutinaForm.ejercicios[activeAltSlot].nombre}</strong></span>
                   </div>
                 ) : (
                   <p className="text-xs text-[#6B7A8D] mb-3.5">Haz clic en un ejercicio para añadirlo a la rutina</p>
@@ -7732,25 +7780,36 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
             {/* Right Column: Ejercicios Programados & Alternativas */}
             <div className="lg:col-span-7 bg-white rounded-none md:rounded-2xl border-0 md:border border-[#E2E8F0] p-4 sm:p-6 shadow-none md:shadow-sm">
-              <div className="flex items-center justify-between gap-2 flex-wrap mb-4">
-                <div>
-                  <h3 className="text-sm font-bold text-[#0B1929] uppercase tracking-wider">
-                    Ejercicios Asignados ({rutinaForm.ejercicios.length})
-                  </h3>
-                  <p className="text-xs text-[#6B7A8D] mt-0.5">Arrastra para reordenar, abre &ldquo;Por serie&rdquo; si varía cada serie o pulsa (+) para alternativas</p>
-                </div>
-                {rutinaForm.ejercicios.some((ejItem) => Boolean(lookupExerciseHistory(patientHistoryMarks, ejItem))) && (
-                  <button
-                    type="button"
-                    onClick={applyAllHistoryMarksToRoutine}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 text-xs font-bold transition-colors cursor-pointer shrink-0"
-                    title="Rellenar peso y repeticiones con las últimas marcas registradas del paciente"
-                  >
-                    <TrendingUp className="w-3.5 h-3.5" />
-                    <span>Importar últimas marcas</span>
-                  </button>
-                )}
-              </div>
+              {(() => {
+                const matchedHistoryCount = rutinaForm.ejercicios.filter((ejItem) => Boolean(lookupExerciseHistory(patientHistoryMarks, ejItem))).length;
+                return (
+                  <div className="flex items-center justify-between gap-2 flex-wrap mb-4">
+                    <div>
+                      <h3 className="text-sm font-bold text-[#0B1929] uppercase tracking-wider">
+                        Ejercicios Asignados ({rutinaForm.ejercicios.length})
+                      </h3>
+                      <p className="text-xs text-[#6B7A8D] mt-0.5">Arrastra para reordenar, abre &ldquo;Por serie&rdquo; si varía cada serie o pulsa (+) para alternativas</p>
+                    </div>
+                    {loadingPatientHistory && matchedHistoryCount === 0 && (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[var(--brand-secondary)]/70 border border-[var(--brand-primary)]/20 text-[var(--brand-primary)] text-[11px] font-semibold">
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        <span>Buscando mejores marcas...</span>
+                      </span>
+                    )}
+                    {matchedHistoryCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={applyAllHistoryMarksToRoutine}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--brand-secondary)] hover:bg-[var(--brand-primary)] border border-[var(--brand-primary)]/40 text-[var(--brand-primary)] hover:text-white text-xs font-bold transition-colors cursor-pointer shrink-0 shadow-2xs"
+                        title="Rellenar peso y repeticiones con las mejores marcas históricas registradas por este paciente"
+                      >
+                        <Trophy className="w-3.5 h-3.5 shrink-0" />
+                        <span>Importar mejores marcas ({matchedHistoryCount})</span>
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
 
               {rutinaForm.ejercicios.length === 0 ? (
                 <div className="text-center py-12 border-2 border-dashed border-[#E2E8F0] rounded-2xl bg-gray-50/50">
@@ -7760,7 +7819,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                 </div>
               ) : (
                 <div className="mt-3">
-                  <div className="hidden sm:grid grid-cols-[24px_40px_1fr_65px_65px_80px_70px] gap-1.5 mb-2 items-center px-1">
+                  <div className="hidden sm:grid grid-cols-[24px_40px_1fr_56px_56px_76px_100px] gap-1.5 mb-2 items-center px-1">
                     <span/><span/><span className="text-[11px] text-[#6B7A8D] font-bold uppercase tracking-wider">EJERCICIO</span>
                     <span className="text-[11px] text-[#6B7A8D] font-bold uppercase tracking-wider text-center">SERIES</span>
                     <span className="text-[11px] text-[#6B7A8D] font-bold uppercase tracking-wider text-center">REPS</span>
@@ -7769,12 +7828,20 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                   </div>
                     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndEjercicios}>
                       <SortableContext items={rutinaForm.ejercicios.map(e => String(e._dndId))} strategy={verticalListSortingStrategy}>
-                        {rutinaForm.ejercicios.map((e, i) => (
+                        {rutinaForm.ejercicios.map((e, i) => {
+                          const hMark = lookupExerciseHistory(patientHistoryMarks, e);
+                          const u = e.unidad || "kg";
+                          const wLbl = hMark?.bestWeightKg != null && hMark.bestWeightKg > 0 ? `${convertWeightToInput(hMark.bestWeightKg, u)} ${u}` : null;
+                          const rLbl = hMark?.bestReps != null ? `${hMark.bestReps} reps` : null;
+                          const markSummaryLabel = [wLbl, rLbl].filter(Boolean).join(" × ");
+                          const isPerSeriesOpen = Array.isArray(e.seriesForm) && e.seriesForm.length > 0;
+
+                          return (
                           <SortableItem key={e._dndId} id={e._dndId}>
                             {({ dragHandle, isDragging }) => (
                               <div className={`mb-2.5 sm:mb-2 p-2.5 sm:p-2 bg-[#F8FAFC] sm:bg-transparent rounded-xl sm:rounded-lg border sm:border-b sm:border-t-0 sm:border-x-0 ${isDragging ? 'bg-white shadow-md border-[#E2E8F0] z-10' : 'border-[#E2E8F0]'}`}>
                                 {/* MAIN EXERCISE */}
-                                <div className={`grid grid-cols-[24px_40px_1fr_auto] sm:grid-cols-[24px_40px_1fr_65px_65px_80px_70px] gap-2 sm:gap-1.5 items-center`}>
+                                <div className="grid grid-cols-[24px_40px_1fr_auto] sm:grid-cols-[24px_40px_1fr_56px_56px_76px_100px] gap-2 sm:gap-1.5 items-center">
                                   <div className="flex items-center justify-center">{dragHandle}</div>
                                   <div className="w-9 h-9 rounded-md overflow-hidden bg-white sm:bg-gray-50 border border-[#E2E8F0] flex items-center justify-center shrink-0">
                                     {e.gif_url ? (
@@ -7787,48 +7854,43 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                   </div>
                                   <div className="text-[13px] font-semibold text-[#0B1929] leading-tight min-w-0 pr-1">
                                     <div className="truncate">{e.nombre}</div>
-                                    <div className="flex items-center flex-wrap gap-1.5 mt-0.5">
+                                    <div className="flex items-center flex-wrap gap-1.5 mt-1">
                                       <span className="text-[10px] text-[#6B7A8D] font-normal">{GRUPO_LABELS[normalizeMuscleGroup(e.grupo_muscular)] || e.grupo_muscular}</span>
-                                      {(() => {
-                                        const hMark = lookupExerciseHistory(patientHistoryMarks, e);
-                                        if (!hMark) return null;
-                                        const u = e.unidad || "kg";
-                                        const wLbl = hMark.lastWeightKg != null ? `${convertWeightToInput(hMark.lastWeightKg, u)} ${u}` : null;
-                                        const rLbl = hMark.lastReps != null ? `${hMark.lastReps} reps` : null;
-                                        return (
-                                          <button
-                                            type="button"
-                                            onClick={() => applyHistoryMarksToExercise(i)}
-                                            className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold border transition-colors cursor-pointer ${
-                                              e._historyApplied
-                                                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                                : "bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100"
-                                            }`}
-                                            title="Aplicar últimas marcas registradas en este ejercicio"
-                                          >
-                                            <TrendingUp className="w-2.5 h-2.5" />
-                                            <span>
-                                              {e._historyApplied
-                                                ? "Marcas aplicadas"
-                                                : `Última: ${[wLbl, rLbl].filter(Boolean).join(" × ")}`}
-                                            </span>
-                                          </button>
-                                        );
-                                      })()}
+                                      {hMark ? (
+                                        <button
+                                          type="button"
+                                          onClick={() => applyHistoryMarksToExercise(i)}
+                                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold border transition-colors cursor-pointer ${
+                                            e._historyApplied
+                                              ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-2xs"
+                                              : "bg-[var(--brand-secondary)] text-[var(--brand-primary)] border-[var(--brand-primary)]/35 hover:bg-[var(--brand-primary)] hover:text-white"
+                                          }`}
+                                          title="Importar la mejor marca histórica registrada por este paciente en este ejercicio"
+                                        >
+                                          {e._historyApplied ? <CheckCircle2 className="w-3 h-3 shrink-0" /> : <Trophy className="w-3 h-3 shrink-0" />}
+                                          <span>
+                                            {e._historyApplied
+                                              ? `Mejor marca aplicada${markSummaryLabel ? ` · ${markSummaryLabel}` : ""}`
+                                              : `Importar mejor marca${markSummaryLabel ? ` · ${markSummaryLabel}` : ""}`}
+                                          </span>
+                                        </button>
+                                      ) : !loadingPatientHistory ? (
+                                        <span className="text-[10px] text-[#94A3B8] font-normal">• Sin marcas previas</span>
+                                      ) : null}
                                     </div>
                                   </div>
                                   
-                                  <div className="col-span-4 sm:col-span-3 sm:col-start-4 sm:row-start-1 grid grid-cols-3 gap-2 sm:grid-cols-[65px_65px_80px] sm:gap-1.5 mt-1.5 sm:mt-0 pt-2 sm:pt-0 border-t border-[#E2E8F0] sm:border-none">
+                                  <div className="col-span-4 sm:col-span-3 sm:col-start-4 sm:row-start-1 grid grid-cols-3 gap-2 sm:grid-cols-[56px_56px_76px] sm:gap-1.5 mt-1.5 sm:mt-0 pt-2 sm:pt-0 border-t border-[#E2E8F0] sm:border-none">
                                     <div className="flex flex-col gap-0.5 sm:block">
                                       <span className="text-[10px] font-semibold text-[#6B7A8D] sm:hidden text-center w-full">SERIES</span>
-                                      <input type="number" className="w-full px-2 py-1.5 rounded-lg border border-[#E2E8F0] bg-white text-[13px] font-semibold text-center" value={e.num_series} onChange={ev=>updEj(i,"num_series",ev.target.value)} placeholder="4" />
+                                      <input type="number" className="w-full px-1.5 py-1.5 rounded-lg border border-[#E2E8F0] bg-white text-[13px] font-semibold text-center focus:outline-none focus:border-[var(--brand-primary)]" value={e.num_series} onChange={ev=>updEj(i,"num_series",ev.target.value)} placeholder="4" />
                                     </div>
                                     <div className="flex flex-col gap-0.5 sm:block">
                                       <span className="text-[10px] font-semibold text-[#6B7A8D] sm:hidden text-center w-full">REPS</span>
                                       <input
                                         type="number"
-                                        disabled={Array.isArray(e.seriesForm) && e.seriesForm.length > 0}
-                                        className="w-full px-2 py-1.5 rounded-lg border border-[#E2E8F0] bg-white disabled:bg-slate-100 disabled:text-slate-400 text-[13px] font-semibold text-center"
+                                        disabled={isPerSeriesOpen}
+                                        className="w-full px-1.5 py-1.5 rounded-lg border border-[#E2E8F0] bg-white disabled:bg-slate-100 disabled:text-slate-400 text-[13px] font-semibold text-center focus:outline-none focus:border-[var(--brand-primary)]"
                                         value={e.reps_sugeridas}
                                         onChange={ev=>updEj(i,"reps_sugeridas",ev.target.value)}
                                         placeholder="10"
@@ -7840,13 +7902,13 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                         <input
                                           type="text"
                                           inputMode="decimal"
-                                          disabled={Array.isArray(e.seriesForm) && e.seriesForm.length > 0}
-                                          className="w-full pl-2 pr-6 py-1.5 rounded-lg border border-[#E2E8F0] bg-white disabled:bg-slate-100 disabled:text-slate-400 text-[13px] font-semibold text-center"
+                                          disabled={isPerSeriesOpen}
+                                          className="w-full pl-1.5 pr-6 py-1.5 rounded-lg border border-[#E2E8F0] bg-white disabled:bg-slate-100 disabled:text-slate-400 text-[13px] font-semibold text-center focus:outline-none focus:border-[var(--brand-primary)]"
                                           value={e.peso_sugerido||""}
                                           onChange={ev=>updEj(i,"peso_sugerido",ev.target.value)}
                                           placeholder="-"
                                         />
-                                        <button type="button" onClick={() => toggleUnidad(i)} className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] font-bold text-[#6B7A8D] uppercase hover:text-[#0B1929]">{e.unidad || 'KG'}</button>
+                                        <button type="button" onClick={() => toggleUnidad(i)} className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] font-bold text-[#6B7A8D] uppercase hover:text-[var(--brand-primary)] cursor-pointer">{e.unidad || 'KG'}</button>
                                       </div>
                                     </div>
                                   </div>
@@ -7855,12 +7917,12 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                     <button
                                       type="button"
                                       onClick={() => togglePerSeries(i)}
-                                      className={`p-1.5 rounded-lg flex items-center justify-center transition-colors border-none cursor-pointer ${
-                                        Array.isArray(e.seriesForm) && e.seriesForm.length > 0
-                                          ? "bg-indigo-600 text-white shadow-2xs"
-                                          : "bg-gray-100 text-[#6B7A8D] hover:bg-gray-200"
+                                      className={`p-1.5 rounded-lg flex items-center justify-center transition-colors border-none cursor-pointer shrink-0 ${
+                                        isPerSeriesOpen
+                                          ? "bg-[var(--brand-primary)] text-white shadow-2xs"
+                                          : "bg-gray-100 text-[#6B7A8D] hover:bg-[var(--brand-secondary)] hover:text-[var(--brand-primary)]"
                                       }`}
-                                      title={Array.isArray(e.seriesForm) && e.seriesForm.length > 0 ? "Volver a peso/reps uniforme" : "Configurar reps y peso por serie (híbrido)"}
+                                      title={isPerSeriesOpen ? "Volver a peso/reps uniforme" : "Configurar reps y peso por serie (híbrido)"}
                                     >
                                       <ListOrdered className="w-[14px] h-[14px]" />
                                     </button>
@@ -7874,37 +7936,50 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                             catalogRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
                                           }
                                         }}
-                                        className={`p-1.5 rounded-lg flex items-center justify-center transition-colors border-none ${activeAltSlot === i ? 'bg-[var(--brand-primary)] text-white shadow-2xs' : 'bg-gray-100 text-[#6B7A8D] hover:bg-gray-200'}`}
+                                        className={`p-1.5 rounded-lg flex items-center justify-center transition-colors border-none cursor-pointer shrink-0 ${activeAltSlot === i ? 'bg-[var(--brand-primary)] text-white shadow-2xs' : 'bg-gray-100 text-[#6B7A8D] hover:bg-[var(--brand-secondary)] hover:text-[var(--brand-primary)]'}`}
                                         title="Añadir ejercicio alternativo"
                                       >
                                         <Plus className="w-[14px] h-[14px]" />
                                       </button>
                                     )}
-                                    <button type="button" onClick={() => remEj(i)} className="bg-red-50 text-red-500 rounded-lg p-1.5 hover:bg-red-100 flex items-center justify-center transition-colors border-none" title="Eliminar ejercicio">
+                                    <button type="button" onClick={() => remEj(i)} className="bg-red-50 text-red-500 rounded-lg p-1.5 hover:bg-red-100 flex items-center justify-center transition-colors border-none cursor-pointer shrink-0" title="Eliminar ejercicio">
                                       <Trash2 className="w-[14px] h-[14px]" />
                                     </button>
                                   </div>
                                 </div>
 
                                 {/* PER-SERIES HYBRID EDITOR */}
-                                {Array.isArray(e.seriesForm) && e.seriesForm.length > 0 && (
-                                  <div className="mt-2 sm:ml-[64px] p-2.5 rounded-xl bg-indigo-50/60 border border-indigo-200/80 space-y-2">
-                                    <div className="flex items-center justify-between gap-2">
-                                      <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-900">
+                                {isPerSeriesOpen && (
+                                  <div className="mt-2.5 sm:ml-[64px] p-2.5 rounded-xl bg-[var(--brand-secondary)]/55 border border-[var(--brand-primary)]/25 space-y-2">
+                                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--brand-primary)]">
                                         Desglose por serie ({e.seriesForm.length} series • {(e.unidad || "kg").toUpperCase()})
                                       </span>
-                                      <button
-                                        type="button"
-                                        onClick={() => togglePerSeries(i)}
-                                        className="text-[10px] font-bold text-indigo-700 hover:underline cursor-pointer"
-                                      >
-                                        Usar valor uniforme
-                                      </button>
+                                      <div className="flex items-center gap-2.5">
+                                        {hMark && (
+                                          <button
+                                            type="button"
+                                            onClick={() => applyHistoryMarksToExercise(i)}
+                                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-[var(--brand-primary)] text-white hover:opacity-90 text-[10px] font-bold transition-opacity cursor-pointer shadow-2xs"
+                                            title="Rellenar cada serie con la mejor marca histórica del paciente"
+                                          >
+                                            <Trophy className="w-2.5 h-2.5 shrink-0" />
+                                            <span>{markSummaryLabel ? `Importar mejor (${markSummaryLabel})` : "Importar mejor marca"}</span>
+                                          </button>
+                                        )}
+                                        <button
+                                          type="button"
+                                          onClick={() => togglePerSeries(i)}
+                                          className="text-[10px] font-bold text-[var(--brand-primary)] hover:underline cursor-pointer"
+                                        >
+                                          Usar valor uniforme
+                                        </button>
+                                      </div>
                                     </div>
                                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                                       {e.seriesForm.map((sf, si) => (
-                                        <div key={si} className="bg-white rounded-lg border border-indigo-100 p-1.5 space-y-1">
-                                          <div className="text-[9px] font-extrabold text-indigo-600 uppercase text-center">Serie {si + 1}</div>
+                                        <div key={si} className="bg-white rounded-lg border border-[var(--brand-primary)]/20 p-1.5 space-y-1">
+                                          <div className="text-[9px] font-extrabold text-[var(--brand-primary)] uppercase text-center">Serie {si + 1}</div>
                                           <div className="grid grid-cols-2 gap-1">
                                             <input
                                               type="number"
@@ -7913,7 +7988,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                               onChange={(ev) => updSerieField(i, si, "reps", ev.target.value)}
                                               placeholder="Reps"
                                               title={`Reps Serie ${si + 1}`}
-                                              className="w-full px-1 py-1 rounded border border-[#E2E8F0] text-[11px] font-semibold text-center"
+                                              className="w-full px-1 py-1 rounded border border-[#E2E8F0] focus:outline-none focus:border-[var(--brand-primary)] text-[11px] font-semibold text-center"
                                             />
                                             <input
                                               type="text"
@@ -7922,7 +7997,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                               onChange={(ev) => updSerieField(i, si, "peso", ev.target.value)}
                                               placeholder={e.unidad || "kg"}
                                               title={`Peso Serie ${si + 1}`}
-                                              className="w-full px-1 py-1 rounded border border-[#E2E8F0] text-[11px] font-semibold text-center"
+                                              className="w-full px-1 py-1 rounded border border-[#E2E8F0] focus:outline-none focus:border-[var(--brand-primary)] text-[11px] font-semibold text-center"
                                             />
                                           </div>
                                         </div>
@@ -7933,7 +8008,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                             
                                 {/* ACTIVE ALT SLOT INDICATOR */}
                                 {activeAltSlot === i && (
-                                  <div className="mt-2 sm:ml-[64px] p-2.5 border-2 border-dashed border-[var(--brand-primary)] rounded-xl bg-blue-50/70 flex items-center justify-between gap-2">
+                                  <div className="mt-2 sm:ml-[64px] p-2.5 border-2 border-dashed border-[var(--brand-primary)] rounded-xl bg-[var(--brand-secondary)]/70 flex items-center justify-between gap-2">
                                     <div className="text-xs font-semibold text-[#0B1929]">
                                       Selecciona un ejercicio del catálogo para añadirlo como alternativa de <span className="text-[var(--brand-primary)]">{e.nombre}</span>
                                     </div>
@@ -7945,7 +8020,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                             
                                 {/* ALTERNATIVES */}
                                 {(e.alternativas || []).map((alt, altIdx) => (
-                                  <div key={`alt-${altIdx}`} className="mt-2 ml-3 sm:ml-[64px] grid grid-cols-[28px_1fr_auto] sm:grid-cols-[28px_1fr_65px_80px_36px] gap-2 sm:gap-1.5 items-center p-2 sm:py-1.5 sm:px-2 bg-white sm:bg-[#F8FAFC] rounded-xl border border-[#E2E8F0]">
+                                  <div key={`alt-${altIdx}`} className="mt-2 ml-3 sm:ml-[64px] grid grid-cols-[28px_1fr_auto] sm:grid-cols-[28px_1fr_56px_76px_100px] gap-2 sm:gap-1.5 items-center p-2 sm:py-1.5 sm:px-2 bg-white sm:bg-[#F8FAFC] rounded-xl border border-[#E2E8F0]">
                                     <div className="w-7 h-7 rounded-md overflow-hidden bg-gray-50 border border-[#E2E8F0] flex items-center justify-center shrink-0">
                                       {alt.gif_url ? (
                                         /\.(mp4|webm|mov)($|\?)/i.test(alt.gif_url) ? (
@@ -7956,20 +8031,20 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                       ) : <Dumbbell className="w-[14px] h-[14px] text-[#6B7A8D]" />}
                                     </div>
                                     <div className="flex items-center gap-1.5 min-w-0">
-                                      <span className="px-1.5 py-0.5 bg-blue-50 text-[var(--brand-primary)] border border-blue-200 rounded text-[9px] font-bold shrink-0">ALT {altIdx + 1}</span>
+                                      <span className="px-1.5 py-0.5 bg-[var(--brand-secondary)] text-[var(--brand-primary)] border border-[var(--brand-primary)]/30 rounded text-[9px] font-bold shrink-0">ALT {altIdx + 1}</span>
                                       <span className="text-[12px] font-medium text-[#0B1929] leading-tight truncate">{alt.nombre}</span>
                                     </div>
                                     
-                                    <div className="col-span-3 sm:col-span-2 sm:col-start-3 sm:row-start-1 grid grid-cols-2 gap-2 sm:grid-cols-[65px_80px] sm:gap-1.5 mt-1 sm:mt-0 pt-1.5 sm:pt-0 border-t border-[#E2E8F0] sm:border-none">
+                                    <div className="col-span-3 sm:col-span-2 sm:col-start-3 sm:row-start-1 grid grid-cols-2 gap-2 sm:grid-cols-[56px_76px] sm:gap-1.5 mt-1 sm:mt-0 pt-1.5 sm:pt-0 border-t border-[#E2E8F0] sm:border-none">
                                       <div className="flex flex-col gap-0.5 sm:block">
                                         <span className="text-[10px] font-semibold text-[#6B7A8D] sm:hidden text-center w-full">REPS</span>
-                                        <input type="number" className="w-full px-2 py-1 rounded-lg border border-[#E2E8F0] bg-white text-[12px] font-semibold text-center" value={alt.reps_sugeridas} onChange={ev=>updAlt(i,altIdx,"reps_sugeridas",ev.target.value)} placeholder="10" />
+                                        <input type="number" className="w-full px-1.5 py-1 rounded-lg border border-[#E2E8F0] bg-white text-[12px] font-semibold text-center focus:outline-none focus:border-[var(--brand-primary)]" value={alt.reps_sugeridas} onChange={ev=>updAlt(i,altIdx,"reps_sugeridas",ev.target.value)} placeholder="10" />
                                       </div>
                                       <div className="flex flex-col gap-0.5 sm:block">
                                         <span className="text-[10px] font-semibold text-[#6B7A8D] sm:hidden text-center w-full">PESO</span>
                                         <div className="relative w-full">
-                                          <input type="text" inputMode="decimal" className="w-full pl-2 pr-6 py-1 rounded-lg border border-[#E2E8F0] bg-white text-[12px] font-semibold text-center" value={alt.peso_sugerido||""} onChange={ev=>updAlt(i,altIdx,"peso_sugerido",ev.target.value)} placeholder="-" />
-                                          <button type="button" onClick={() => toggleUnidadAlt(i, altIdx)} className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] font-bold text-[#6B7A8D] uppercase hover:text-[#0B1929]">{alt.unidad || 'KG'}</button>
+                                          <input type="text" inputMode="decimal" className="w-full pl-1.5 pr-6 py-1 rounded-lg border border-[#E2E8F0] bg-white text-[12px] font-semibold text-center focus:outline-none focus:border-[var(--brand-primary)]" value={alt.peso_sugerido||""} onChange={ev=>updAlt(i,altIdx,"peso_sugerido",ev.target.value)} placeholder="-" />
+                                          <button type="button" onClick={() => toggleUnidadAlt(i, altIdx)} className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] font-bold text-[#6B7A8D] uppercase hover:text-[var(--brand-primary)] cursor-pointer">{alt.unidad || 'KG'}</button>
                                         </div>
                                       </div>
                                     </div>
@@ -7978,7 +8053,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                       <button type="button" onClick={() => promoteAlt(i, altIdx)} className="bg-amber-50 text-amber-600 rounded-lg p-1.5 hover:bg-amber-100 flex items-center justify-center transition-colors border-none cursor-pointer" title="Promover a ejercicio principal">
                                         <ArrowUp className="w-[14px] h-[14px]" />
                                       </button>
-                                      <button type="button" onClick={() => remAlt(i, altIdx)} className="bg-red-50 text-red-500 rounded-lg p-1.5 hover:bg-red-100 flex items-center justify-center transition-colors border-none" title="Quitar alternativa">
+                                      <button type="button" onClick={() => remAlt(i, altIdx)} className="bg-red-50 text-red-500 rounded-lg p-1.5 hover:bg-red-100 flex items-center justify-center transition-colors border-none cursor-pointer" title="Quitar alternativa">
                                         <X className="w-[14px] h-[14px]" />
                                       </button>
                                     </div>
@@ -7987,7 +8062,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                               </div>
                             )}
                           </SortableItem>
-                        ))}
+                          );
+                        })}
                       </SortableContext>
                     </DndContext>
                 </div>
