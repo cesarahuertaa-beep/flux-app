@@ -278,17 +278,16 @@ function extractMarksFromRowsByMode(rows, numSeries, fallbackReps = 10, fallback
 
     const bestSession = sessions[0];
     const fallbackKg = parseRawWeightToKg(fallbackPesoKg);
-    let lastValidSet = null;
+    const defaultSessionReps = bestSession.repReps ?? (parseInt(fallbackReps, 10) || 10);
+    const defaultSessionPeso = bestSession.repWeightKg !== undefined && bestSession.repWeightKg !== null ? bestSession.repWeightKg : fallbackKg;
     const seriesMarks = [];
 
     for (let si = 0; si < count; si++) {
       const cell = bestSession.wMap.get(si);
-      const hasCell = cell && (cell.reps != null || cell.peso != null);
-      const finalReps = hasCell && cell.reps != null ? cell.reps : (lastValidSet?.reps ?? (parseInt(fallbackReps, 10) || 10));
-      const finalPeso = hasCell && cell.peso != null ? cell.peso : (lastValidSet ? lastValidSet.peso : fallbackKg);
-      const entry = { reps: finalReps, peso: finalPeso };
-      if (hasCell && (cell.reps > 0 || (cell.peso != null && cell.peso >= 0))) lastValidSet = entry;
-      seriesMarks.push(entry);
+      const hasCell = cell && ((cell.reps != null && cell.reps > 0) || (cell.peso != null && cell.peso >= 0));
+      const finalReps = hasCell && cell.reps != null && cell.reps > 0 ? cell.reps : defaultSessionReps;
+      const finalPeso = hasCell && cell.peso != null && cell.peso >= 0 ? cell.peso : defaultSessionPeso;
+      seriesMarks.push({ reps: finalReps, peso: finalPeso });
     }
 
     return finalizeExtractedMarks(
@@ -420,10 +419,32 @@ export function buildPatientExerciseHistory(pastRutinas, allProgresoRows, exclud
   for (const r of pastRutinas) {
     const isExcludedCycle = excludeCicloId && String(r.ciclo_id || "") === String(excludeCicloId);
     for (const ej of r.ejercicios || []) {
-      const nSeries = parseInt(ej.num_series, 10) || 4;
+      const nSeries = parseInt(ej.num_series || ej.series, 10) || 4;
+      let rawAlts = ej.alternativas;
+      if (typeof rawAlts === "string") {
+        try {
+          rawAlts = JSON.parse(rawAlts);
+        } catch {
+          rawAlts = [];
+        }
+      }
+      const normalizedEj = {
+        ...ej,
+        nombre: ej.nombre || ej.ejercicio || "",
+        reps_sugeridas: ej.reps_sugeridas ?? ej.repeticiones ?? 10,
+      };
       const variants = [
-        { vid: "original", obj: ej },
-        ...(Array.isArray(ej.alternativas) ? ej.alternativas.map((alt, idx) => ({ vid: `alt_${idx}`, obj: alt })) : []),
+        { vid: "original", obj: normalizedEj },
+        ...(Array.isArray(rawAlts)
+          ? rawAlts.map((alt, idx) => ({
+              vid: `alt_${idx}`,
+              obj: {
+                ...alt,
+                nombre: alt?.nombre || alt?.ejercicio || "",
+                reps_sugeridas: alt?.reps_sugeridas ?? alt?.repeticiones ?? normalizedEj.reps_sugeridas,
+              },
+            }))
+          : []),
       ];
 
       for (const { vid, obj } of variants) {
@@ -462,14 +483,18 @@ export function buildPatientExerciseHistory(pastRutinas, allProgresoRows, exclud
 
 export function lookupExerciseHistory(map, obj) {
   if (!map || !obj) return null;
-  if (obj.biblioteca_id && map[`bib:${obj.biblioteca_id}`]) {
-    return map[`bib:${obj.biblioteca_id}`];
-  }
+  const byBib = obj.biblioteca_id ? map[`bib:${obj.biblioteca_id}`] || null : null;
   const nameNorm = normalizeExerciseName(obj.nombre);
-  if (nameNorm && map[`name:${nameNorm}`]) {
-    return map[`name:${nameNorm}`];
+  const byName = nameNorm ? map[`name:${nameNorm}`] || null : null;
+  if (byBib && byName) {
+    if (typeof byBib === "object" && typeof byName === "object") {
+      return isBetterExerciseMark(byName, byBib) ? byName : byBib;
+    }
+    if (typeof byBib === "number" && typeof byName === "number") {
+      return Math.max(byBib, byName);
+    }
   }
-  return null;
+  return byBib || byName || null;
 }
 
 /** Aplica migración de mejores marcas reales sobre un ejercicio clonado (principal + alternativas). */
@@ -510,5 +535,133 @@ export function migrateClonedExerciseWithProgress(oldEj, progRowsByEjVar) {
     peso_sugerido: origMigrated.peso_sugerido,
     series_detalle: origMigrated.series_detalle,
     alternativas: migratedAlts,
+  };
+}
+
+/** Carga filas de `progreso` estrictamente de un `cliente_id` paginando de a 1000 sin truncamientos silenciosos. */
+export async function fetchPagedProgresoRows(getter, clientId, extraFilter = "") {
+  if (!getter || !clientId) return { rows: [], ok: false };
+  const PAGE = 1000;
+  const all = [];
+  const filterPart = extraFilter ? `&${extraFilter}` : "";
+
+  try {
+    for (let offset = 0; offset < 6000; offset += PAGE) {
+      const chunk = await getter(
+        `progreso?cliente_id=eq.${clientId}${filterPart}&select=*&order=updated_at.desc&limit=${PAGE}&offset=${offset}`
+      );
+      if (!Array.isArray(chunk) || chunk.length === 0) break;
+      all.push(...chunk);
+      if (chunk.length < PAGE) break;
+    }
+    return { rows: all, ok: true };
+  } catch {
+    try {
+      const fallback = await getter(
+        `progreso?cliente_id=eq.${clientId}${filterPart}&select=*&limit=3000`
+      );
+      return { rows: Array.isArray(fallback) ? fallback : [], ok: Array.isArray(fallback) };
+    } catch {
+      return { rows: [], ok: false };
+    }
+  }
+}
+
+/**
+ * Carga el historial de rutinas y marcas reales estrictamente para un `cliente_id` específico
+ * (sin cruzar otros perfiles ni depender de `rutinas.created_at`).
+ */
+export async function fetchClientExerciseHistoryData(getter, clientId, { excludeCicloId = null } = {}) {
+  if (!getter || !clientId) {
+    return { latestByKey: {}, bestByKey: {}, best1RMByKey: {}, ok: false };
+  }
+
+  let pastRuts;
+  let rutsOk;
+  try {
+    pastRuts = await getter(`rutinas?cliente_id=eq.${clientId}&select=*,ejercicios(*)&order=orden.asc`);
+    rutsOk = Array.isArray(pastRuts);
+  } catch {
+    try {
+      pastRuts = await getter(`rutinas?cliente_id=eq.${clientId}&select=*,ejercicios(*)`);
+      rutsOk = Array.isArray(pastRuts);
+    } catch {
+      pastRuts = [];
+      rutsOk = false;
+    }
+  }
+
+  const progRes = await fetchPagedProgresoRows(getter, clientId);
+  const progRows = progRes.rows;
+  let enrichedRutinas = Array.isArray(pastRuts) ? pastRuts.map((r) => ({ ...r })) : [];
+
+  // 1. Si el embed `ejercicios(*)` vino vacío en alguna rutina, consultar ejercicios por rutina_id
+  const emptyRutIds = enrichedRutinas
+    .filter((r) => r?.id && (!Array.isArray(r.ejercicios) || r.ejercicios.length === 0))
+    .map((r) => r.id);
+
+  if (emptyRutIds.length > 0) {
+    const chunkSize = 50;
+    const byRutina = new Map();
+    for (let i = 0; i < emptyRutIds.length; i += chunkSize) {
+      const slice = emptyRutIds.slice(i, i + chunkSize);
+      const directEjs = await getter(`ejercicios?rutina_id=in.(${slice.join(",")})&select=*`).catch(() => []);
+      (Array.isArray(directEjs) ? directEjs : []).forEach((ej) => {
+        if (!byRutina.has(ej.rutina_id)) byRutina.set(ej.rutina_id, []);
+        byRutina.get(ej.rutina_id).push(ej);
+      });
+    }
+    enrichedRutinas = enrichedRutinas.map((r) =>
+      (!Array.isArray(r.ejercicios) || r.ejercicios.length === 0) && byRutina.has(r.id)
+        ? { ...r, ejercicios: byRutina.get(r.id) }
+        : r
+    );
+  }
+
+  // 2. Respaldo final (patrón Progreso.jsx): resolver ejercicio_id presentes en progreso no cubiertos aún
+  const coveredEjIds = new Set();
+  const rutinaCicloById = new Map();
+  enrichedRutinas.forEach((r) => {
+    if (r?.id) rutinaCicloById.set(r.id, r.ciclo_id || null);
+    (r.ejercicios || []).forEach((ej) => {
+      if (ej?.id) coveredEjIds.add(String(ej.id));
+    });
+  });
+
+  const missingEjIds = [];
+  const seenMissing = new Set();
+  for (const pr of progRows) {
+    const ejId = pr?.ejercicio_id;
+    if (ejId && !coveredEjIds.has(String(ejId)) && !seenMissing.has(String(ejId))) {
+      seenMissing.add(String(ejId));
+      missingEjIds.push(ejId);
+    }
+  }
+
+  if (missingEjIds.length > 0) {
+    const extraEjsByCiclo = new Map();
+    for (let i = 0; i < missingEjIds.length; i += 60) {
+      const slice = missingEjIds.slice(i, i + 60);
+      const directEjs = await getter(`ejercicios?id=in.(${slice.join(",")})&select=*`).catch(() => []);
+      (Array.isArray(directEjs) ? directEjs : []).forEach((ej) => {
+        const cId = (ej.rutina_id && rutinaCicloById.get(ej.rutina_id)) || "__orphan__";
+        if (!extraEjsByCiclo.has(cId)) extraEjsByCiclo.set(cId, []);
+        extraEjsByCiclo.get(cId).push(ej);
+      });
+    }
+    for (const [cId, ejsList] of extraEjsByCiclo.entries()) {
+      enrichedRutinas.push({
+        id: `fallback_${cId}`,
+        ciclo_id: cId === "__orphan__" ? null : cId,
+        ejercicios: ejsList,
+      });
+    }
+  }
+
+  const history = buildPatientExerciseHistory(enrichedRutinas, progRows, excludeCicloId);
+  return {
+    ...history,
+    progRows,
+    ok: rutsOk && progRes.ok,
   };
 }

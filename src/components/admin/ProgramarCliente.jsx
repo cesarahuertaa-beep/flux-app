@@ -25,7 +25,8 @@ import { CustomSelect } from "../ui/CustomSelect";
 import { generateNutriPDF } from "../../utils/pdf";
 import { dbPeek, dbGet, dbGetFresh, dbPost, dbPatch, dbDel, dbUpsert, storageUpload, updateQueryCache, invalidateCache } from "../../lib/supabase";
 import {
-  buildPatientExerciseHistory,
+  fetchClientExerciseHistoryData,
+  fetchPagedProgresoRows,
   lookupExerciseHistory,
   migrateClonedExerciseWithProgress,
   normalizeSeriesDetalle,
@@ -1077,61 +1078,25 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     historialLoadedRef.current = false;
   }, [activeSpecialistId]);
 
-  const fetchPagedProgreso = useCallback(async (clientId, extraFilter = "", force = false) => {
-    if (!clientId) return [];
-    const PAGE = 1000;
-    const all = [];
-    let useOrder = true;
-    const getter = force ? dbGetFresh : dbGet;
-    const filterPart = extraFilter ? `&${extraFilter}` : "";
-
-    for (let offset = 0; offset < 6000; offset += PAGE) {
-      const orderPart = useOrder ? "&order=updated_at.desc.nullslast" : "";
-      let chunk = null;
-      try {
-        chunk = await getter(
-          `progreso?cliente_id=eq.${clientId}${filterPart}&select=ejercicio_id,variante_id,semana,serie,tipo,valor${orderPart}&limit=${PAGE}&offset=${offset}`
-        );
-      } catch {
-        if (useOrder) {
-          useOrder = false;
-          chunk = await getter(
-            `progreso?cliente_id=eq.${clientId}${filterPart}&select=ejercicio_id,variante_id,semana,serie,tipo,valor&limit=${PAGE}&offset=${offset}`
-          ).catch(() => []);
-        } else {
-          chunk = [];
-        }
-      }
-      if (!Array.isArray(chunk) || chunk.length === 0) break;
-      all.push(...chunk);
-      if (chunk.length < PAGE) break;
-    }
-    return all;
-  }, []);
-
   const loadPatientExerciseHistory = useCallback(async (clientId, { force = false } = {}) => {
     if (!clientId) return;
     if (!force && loadedHistoryClientRef.current === clientId) return;
     setLoadingPatientHistory(true);
     try {
       const getter = force ? dbGetFresh : dbGet;
-      const [pastRuts, progRows] = await Promise.all([
-        getter(
-          `rutinas?cliente_id=eq.${clientId}&select=id,ciclo_id,created_at,ejercicios(id,biblioteca_id,nombre,num_series,reps_sugeridas,peso_sugerido,alternativas)&order=created_at.desc`
-        ).catch(() => []),
-        fetchPagedProgreso(clientId, "", force).catch(() => []),
-      ]);
-      const { bestByKey } = buildPatientExerciseHistory(pastRuts, progRows, null);
-      setPatientHistoryMarks(bestByKey);
-      if (Array.isArray(pastRuts)) {
+      const res = await fetchClientExerciseHistoryData(getter, clientId);
+      setPatientHistoryMarks(res.bestByKey || {});
+      if (res.ok || Object.keys(res.bestByKey || {}).length > 0) {
         loadedHistoryClientRef.current = clientId;
+      } else {
+        loadedHistoryClientRef.current = null;
       }
     } catch {
       loadedHistoryClientRef.current = null;
     } finally {
       setLoadingPatientHistory(false);
     }
-  }, [fetchPagedProgreso]);
+  }, []);
 
   useEffect(() => {
     setPatientHistoryMarks({});
@@ -1545,6 +1510,9 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     let timer = null;
     const onCacheUpdated = (ev) => {
       const table = ev?.detail?.table;
+      if (table === "progreso" || table === "rutinas" || table === "ejercicios") {
+        loadedHistoryClientRef.current = null;
+      }
       if (table && !["ciclos", "nutricion", "nutricion_dias", "comidas", "rutinas", "ejercicios", "metricas_progreso", "clientes", "*"].includes(table)) return;
       if (saving || showDiaModal || showRutinaModal || showPlanModal || savingRutinaRef.current || savingDiaRef.current) {
         pendingCacheReloadRef.current = true;
@@ -2003,8 +1971,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
               if (planForm.migrarMarcas) {
                 const oldEjIds = oldRuts.flatMap((r) => (r.ejercicios || []).map((ej) => ej.id)).filter(Boolean);
                 if (oldEjIds.length > 0) {
-                  const progRows = await fetchPagedProgreso(selected.id, `ejercicio_id=in.(${oldEjIds.join(",")})`, true).catch(() => []);
-                  (Array.isArray(progRows) ? progRows : []).forEach((pr) => {
+                  const progRes = await fetchPagedProgresoRows(dbGetFresh, selected.id, `ejercicio_id=in.(${oldEjIds.join(",")})`).catch(() => ({ rows: [] }));
+                  (Array.isArray(progRes?.rows) ? progRes.rows : []).forEach((pr) => {
                     const mapKey = `${pr.ejercicio_id}:${pr.variante_id || "original"}`;
                     if (!progByEjVar.has(mapKey)) progByEjVar.set(mapKey, []);
                     progByEjVar.get(mapKey).push(pr);

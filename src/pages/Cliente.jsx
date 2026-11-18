@@ -5,7 +5,7 @@ import { useBackButton } from "../lib/backButtonHandler";
 import { getAll } from "../lib/offlineQueue";
 import { useBrand } from "../components/BrandContext";
 import { getCurrentCycleWeekInfo, getCycleServices } from "../utils/helpers";
-import { buildPatientExerciseHistory } from "../utils/routineHelpers";
+import { fetchClientExerciseHistoryData } from "../utils/routineHelpers";
 import BloqueadoPaciente from "../components/BloqueadoPaciente";
 import { UtensilsCrossed, Dumbbell, User, CalendarDays, Camera, ShoppingBag, MapPin, Trophy, Activity, ClipboardList, X, Footprints } from "lucide-react";
 import { enrichMetrica } from "../lib/bodyComposition";
@@ -317,13 +317,12 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
       });
 
       // Cargar historial transversal de rutinas, progreso completo y sesiones finalizadas
-      const [allClientRutinas, ps, sesRows] = await Promise.all([
-        fetcher(`rutinas?cliente_id=eq.${cliente.id}&select=id,ciclo_id,created_at,ejercicios(id,biblioteca_id,nombre,num_series,reps_sugeridas,peso_sugerido,alternativas)&order=created_at.desc`).catch(() => []),
-        fetcher(`progreso?cliente_id=eq.${cliente.id}&limit=3000`).catch(() => []),
+      const [historyRes, sesRows] = await Promise.all([
+        fetchClientExerciseHistoryData(fetcher, cliente.id, { excludeCicloId: ciclo?.id || null }).catch(() => ({ best1RMByKey: {}, progRows: [] })),
         fetcher(`rutina_sesiones?cliente_id=eq.${cliente.id}&limit=500`).catch(() => null),
       ]);
 
-      let progressRows = Array.isArray(ps) ? ps : [];
+      let progressRows = Array.isArray(historyRes?.progRows) ? historyRes.progRows : [];
       if (progressRows.length === 0) {
         const allIds = rsFull.flatMap(r => (r.ejercicios || []).map(e => e.id));
         if (allIds.length > 0) {
@@ -331,12 +330,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
         }
       }
 
-      if (Array.isArray(allClientRutinas) && Array.isArray(progressRows) && progressRows.length > 0) {
-        const { best1RMByKey } = buildPatientExerciseHistory(allClientRutinas, progressRows, ciclo?.id || null);
-        setHistoricalBest1RMMap(best1RMByKey);
-      } else {
-        setHistoricalBest1RMMap({});
-      }
+      setHistoricalBest1RMMap(historyRes?.best1RMByKey || {});
 
       if (Array.isArray(sesRows)) {
         const sesMap = {};
