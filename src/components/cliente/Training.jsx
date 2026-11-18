@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { Play, Pause, RotateCcw, Save, ChevronDown, TrendingUp, TrendingDown, Minus, Plus, Dumbbell, Check, CheckCheck, X, Square, Trophy, Sparkles, Flame } from "lucide-react";
+import { Play, Pause, RotateCcw, Save, ChevronDown, TrendingUp, TrendingDown, Minus, Plus, Dumbbell, Check, CheckCheck, X, Square, Trophy, Sparkles, Flame, Lock, Unlock, CheckCircle2 } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { useBackButton } from "../../lib/backButtonHandler";
 import { CachedImage } from "../../lib/mediaCache";
 import { timerStore } from "../../lib/timerStore";
 import { GRUPO_LABELS, normalizeMuscleGroup } from "../../lib/constants";
+import { ConfirmModal } from "../ui/ConfirmModal";
+import { getSeriesSuggestion, lookupExerciseHistory } from "../../utils/routineHelpers";
 
 function TimerCard({ brandColor }) {
   const [tState, setTState] = useState(() => timerStore.getState());
@@ -444,6 +446,9 @@ export default function Training({
   rutinas,
   progreso,
   progresoSemanaAnterior = {}, 
+  historicalBest1RMMap = {},
+  finalizedSessions = {},
+  onSetSessionFinalized,
   clienteNombre,
   onProgressChange,
   semanaActualCiclo = 1,
@@ -461,6 +466,8 @@ export default function Training({
   const [activeVariant,   setActiveVariant]   = useState({}); // { [exId]: 'original' | 'alt_0' }
   const [previewEx, setPreviewEx] = useState(null);
   const [showResumen,     setShowResumen]     = useState(false);
+  const [confirmReopenSession, setConfirmReopenSession] = useState(false);
+  const [finalizingSession, setFinalizingSession] = useState(false);
 
   useBackButton(!!previewEx, () => setPreviewEx(null), 50);
   useBackButton(showResumen, () => setShowResumen(false), 30);
@@ -567,9 +574,10 @@ export default function Training({
   };
 
   const getPrevVal = (exId, variantId, exObj, si, tipo) => {
+    const suggested = getSeriesSuggestion(exObj, si);
     if (wi === 0) {
-      if (tipo === "reps") return exObj.reps_sugeridas || "10";
-      if (tipo === "peso") return exObj.peso_sugerido || "-";
+      if (tipo === "reps") return suggested.reps;
+      if (tipo === "peso") return suggested.peso;
       return "";
     }
     // Buscar en semanas anteriores desde wi - 1 hacia atrás hasta encontrar el último registro real
@@ -580,8 +588,8 @@ export default function Training({
         return val;
       }
     }
-    if (tipo === "reps") return exObj.reps_sugeridas || "10";
-    if (tipo === "peso") return exObj.peso_sugerido || "-";
+    if (tipo === "reps") return suggested.reps;
+    if (tipo === "peso") return suggested.peso;
     return "N/A";
   };
 
@@ -634,10 +642,10 @@ export default function Training({
     return ((e1RM_actual - e1RM_prev) / e1RM_prev) * 100;
   };
 
-  // ── Detección de Récord Personal (PR 🏆) por ejercicio ──
+  // ── Detección de Récord Personal (PR 🏆) por ejercicio (cruzando ciclos previos + semanas previas) ──
   const getExercisePRData = (ex, variantId, activeObj) => {
     const nSeries = parseInt(activeObj?.num_series || ex.num_series) || 3;
-    let bestHistorical1RM = 0;
+    let bestHistorical1RM = Number(lookupExerciseHistory(historicalBest1RMMap, activeObj)) || 0;
 
     // Buscar el mejor 1RM en todas las semanas anteriores (0 .. wi - 1)
     for (let w = 0; w < wi; w++) {
@@ -689,7 +697,12 @@ export default function Training({
     };
   };
 
-  // ── Métricas en vivo de la sesión del día ──
+  const sessionKey = rutinaActiva?.id ? `${rutinaActiva.id}-${semanaActualCiclo}` : null;
+  const currentSessionRec = sessionKey ? finalizedSessions?.[sessionKey] : null;
+  const isSessionFinalized = Boolean(currentSessionRec?.finalizada);
+  const inputsDisabled = isLocked || isSessionFinalized;
+
+  // ── Métricas en vivo de la sesión del día (100% exige reps + peso en cada serie) ──
   let totalSetsDay = 0;
   let completedSetsDay = 0;
   let totalVolumeKg = 0;
@@ -705,13 +718,23 @@ export default function Training({
     for (let s = 0; s < nSeries; s++) {
       const rVal = progreso[`${ex.id}-${wi}-${s}-reps-${variantId}`];
       const pVal = progreso[`${ex.id}-${wi}-${s}-peso-${variantId}`];
-      if (rVal !== undefined && rVal !== "") {
+      const setIsFalta = rVal === "Falta";
+      const rStr = String(rVal ?? "").trim();
+      const pStr = String(pVal ?? "").trim();
+      const hasReps = rStr !== "" && (setIsFalta || (!isNaN(Number(rStr)) && Number(rStr) > 0));
+      const hasPeso = setIsFalta || (pStr !== "" && !isNaN(Number(pStr)) && Number(pStr) >= 0);
+
+      if (hasReps && hasPeso) {
         completedSetsDay++;
+      }
+      if (rStr !== "") {
         exHasCompletedSet = true;
-        const rNum = parseFloat(rVal);
-        const pNum = parseFloat(pVal);
-        if (!isNaN(rNum) && rNum > 0 && !isNaN(pNum) && pNum > 0) {
-          totalVolumeKg += rNum * pNum;
+        if (!setIsFalta) {
+          const rNum = parseFloat(rStr);
+          const pNum = parseFloat(pStr);
+          if (!isNaN(rNum) && rNum > 0 && !isNaN(pNum) && pNum > 0) {
+            totalVolumeKg += rNum * pNum;
+          }
         }
       }
     }
@@ -861,6 +884,33 @@ export default function Training({
           </div>
         </div>
 
+        {/* Aviso de Sesión Finalizada (bloqueo seguro contra ediciones accidentales) */}
+        {isSessionFinalized && !isLocked && (
+          <div className="bg-emerald-50 border-b md:border border-emerald-200 rounded-none md:rounded-xl px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                <CheckCircle2 size={16} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-emerald-950">Sesión finalizada y bloqueada</p>
+                <p className="text-[11px] text-emerald-800">
+                  Tus marcas están protegidas contra toques accidentales durante esta semana.
+                </p>
+              </div>
+            </div>
+            {typeof onSetSessionFinalized === "function" && (
+              <button
+                type="button"
+                onClick={() => setConfirmReopenSession(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-emerald-300 text-emerald-900 hover:bg-emerald-100 text-[11px] font-bold transition-colors cursor-pointer shrink-0"
+              >
+                <Unlock size={12} />
+                <span>Desbloquear para editar</span>
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Cronómetro inline, justo antes del primer ejercicio (igual que Figma) */}
         <TimerCard brandColor="var(--brand-primary)" />
 
@@ -959,8 +1009,12 @@ export default function Training({
                       {otherVariants.map((v) => (
                         <button 
                           key={v.variantId}
-                          onClick={() => setActiveVariant(s => ({ ...s, [ex.id]: v.variantId }))}
-                          className="w-16 sm:w-20 flex-shrink-0 flex flex-col gap-1.5 items-center opacity-60 hover:opacity-100 transition-opacity"
+                          type="button"
+                          disabled={inputsDisabled}
+                          onClick={() => !inputsDisabled && setActiveVariant(s => ({ ...s, [ex.id]: v.variantId }))}
+                          className={`w-16 sm:w-20 flex-shrink-0 flex flex-col gap-1.5 items-center transition-opacity ${
+                            inputsDisabled ? "opacity-40 cursor-not-allowed" : "opacity-60 hover:opacity-100 cursor-pointer"
+                          }`}
                         >
                           <div className="w-16 h-16 sm:w-20 sm:h-20 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg flex items-center justify-center shadow-sm relative overflow-hidden">
                             {v.obj.gif_url ? (
@@ -1059,13 +1113,15 @@ export default function Training({
                                       pattern={isFalta ? undefined : "[0-9]*"}
                                       placeholder={prevReps}
                                       value={repVal}
-                                      disabled={isLocked}
-                                      onFocus={() => setFocusedInput({ exId: ex.id, wi, si })}
+                                      disabled={inputsDisabled}
+                                      onFocus={() => !inputsDisabled && setFocusedInput({ exId: ex.id, wi, si })}
                                       onBlur={() => setTimeout(() => setFocusedInput(null), 250)}
                                       onChange={(e) => onProgressChange(ex.id, wi, si,"reps", e.target.value, activeVarId)}
                                       className={`w-full h-10 rounded-lg border px-2 text-center text-[15px] font-semibold transition-shadow ${
                                         isFalta
                                           ? "border-red-300 bg-red-50/70 text-red-600 font-bold"
+                                          : inputsDisabled
+                                          ? "border-[#E2E8F0] bg-[#F8FAFC] text-[#475569] cursor-not-allowed"
                                           : "border-[#E2E8F0] bg-white text-[#0B1929] placeholder-[#9BA5B0] focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] outline-none"
                                       }`}
                                     />
@@ -1077,8 +1133,9 @@ export default function Training({
                                       inputMode="decimal"
                                       placeholder={displayPrevKg}
                                       value={localWeightInputs[kgKey] !== undefined ? localWeightInputs[kgKey] : displayKgVal}
-                                      disabled={isLocked || isFalta}
+                                      disabled={inputsDisabled || isFalta}
                                       onFocus={() => {
+                                        if (inputsDisabled) return;
                                         setFocusedInput({ exId: ex.id, wi, si });
                                         // Seed local state with current display value so user starts from what they see
                                         setLocalWeightInputs(prev => ({ ...prev, [kgKey]: displayKgVal || "" }));
@@ -1113,6 +1170,8 @@ export default function Training({
                                       className={`w-full h-10 rounded-lg border px-2 pr-7 text-center text-[15px] font-semibold transition-shadow ${
                                         isFalta
                                           ? "border-red-200 bg-red-50/30 text-red-400"
+                                          : inputsDisabled
+                                          ? "border-[#E2E8F0] bg-[#F8FAFC] text-[#475569] cursor-not-allowed"
                                           : "border-[#E2E8F0] bg-white text-[#0B1929] placeholder-[#9BA5B0] focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] outline-none"
                                       }`}
                                     />
@@ -1145,7 +1204,7 @@ export default function Training({
                                 </div>
                                 
                                 {/* Barra de Acciones Accesible (Falté / Corporal) */}
-                                {focusedInput?.exId === ex.id && focusedInput?.wi === wi && focusedInput?.si === si && (
+                                {!inputsDisabled && focusedInput?.exId === ex.id && focusedInput?.wi === wi && focusedInput?.si === si && (
                                   <div className="flex gap-2 mt-1.5 pl-10 pr-14 animate-in fade-in slide-in-from-top-1 duration-200">
                                     <button
                                       type="button"
@@ -1271,23 +1330,26 @@ export default function Training({
         </div>
       )}
 
-        {/* Botón para abrir Resumen y Recompensas del Entrenamiento */}
-        {completedSetsDay > 0 && (
+        {/* Botón para abrir Resumen y Finalizar Entrenamiento */}
+        {(completedSetsDay > 0 || isSessionFinalized) && (
           <div className="pt-3 px-4 md:px-0">
             <button
               onClick={() => setShowResumen(true)}
               className="w-full py-3.5 px-6 rounded-2xl font-bold text-sm text-white shadow-lg hover:opacity-95 transition-all flex items-center justify-center gap-2.5 cursor-pointer"
               style={{
-                background:
-                  completionPct === 100
-                    ? "linear-gradient(135deg, #10B981 0%, #059669 100%)"
-                    : "var(--brand-primary)",
+                background: isSessionFinalized
+                  ? "linear-gradient(135deg, #0B1929 0%, #1E293B 100%)"
+                  : completionPct === 100
+                  ? "linear-gradient(135deg, #10B981 0%, #059669 100%)"
+                  : "var(--brand-primary)",
               }}
             >
-              <Trophy size={18} />
+              {isSessionFinalized ? <CheckCircle2 size={18} className="text-emerald-400" /> : <Trophy size={18} />}
               <span>
-                {completionPct === 100
-                  ? "¡Entrenamiento Completado! Ver Resumen y Recompensas"
+                {isSessionFinalized
+                  ? "Sesión Finalizada • Ver Resumen y Récords"
+                  : completionPct === 100
+                  ? "¡Entrenamiento al 100%! Finalizar y Ver Resumen"
                   : "Ver Resumen de Sesión y Récords (PR)"}
               </span>
             </button>
@@ -1320,10 +1382,18 @@ export default function Training({
                 Semana {semanaActualCiclo} • Resumen de Sesión
               </p>
               <h2 className="text-2xl font-bold text-[#0B1929] mt-1" style={{ fontFamily: "DM Sans" }}>
-                {completionPct === 100 ? "¡Sesión Completada!" : "Avance de Entrenamiento"}
+                {isSessionFinalized
+                  ? "¡Sesión Finalizada!"
+                  : completionPct === 100
+                  ? "¡Sesión Completada al 100%!"
+                  : "Avance de Entrenamiento"}
               </h2>
               <p className="text-xs text-[#6B7A8D] mt-1">
-                Cada serie registrada suma puntos de experiencia (XP) a tu mapa muscular.
+                {isSessionFinalized
+                  ? "Tus series quedaron protegidas contra ediciones accidentales mientras siga activa la semana."
+                  : completionPct === 100
+                  ? "Todas tus series (reps y peso) están completas. Puedes sellar el día ahora."
+                  : "Cada serie registrada (reps y peso) suma XP a tu mapa muscular."}
               </p>
             </div>
 
@@ -1408,15 +1478,94 @@ export default function Training({
               </div>
             )}
 
-            <button
-              onClick={() => setShowResumen(false)}
-              className="w-full py-3 rounded-xl bg-[#0B1929] text-white text-sm font-bold hover:opacity-90 transition-opacity cursor-pointer"
-            >
-              Continuar
-            </button>
+            {completionPct === 100 && !isSessionFinalized && !isLocked && typeof onSetSessionFinalized === "function" ? (
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  disabled={finalizingSession}
+                  onClick={async () => {
+                    setFinalizingSession(true);
+                    try {
+                      await onSetSessionFinalized(rutinaActiva.id, semanaActualCiclo, true, {
+                        series: `${completedSetsDay}/${totalSetsDay}`,
+                        volumeKg: Math.round(totalVolumeKg),
+                        prs: sessionPRs.length,
+                      });
+                      setShowResumen(false);
+                    } finally {
+                      setFinalizingSession(false);
+                    }
+                  }}
+                  className="w-full py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white text-sm font-bold transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Lock size={16} />
+                  <span>{finalizingSession ? "Guardando y cerrando..." : "Finalizar sesión y sellar día"}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowResumen(false)}
+                  className="w-full py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-[#0B1929] text-xs font-bold transition-colors cursor-pointer"
+                >
+                  Seguir editando
+                </button>
+              </div>
+            ) : isSessionFinalized ? (
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={() => setShowResumen(false)}
+                  className="w-full py-3 rounded-xl bg-[#0B1929] text-white text-sm font-bold hover:opacity-90 transition-opacity cursor-pointer"
+                >
+                  Cerrar
+                </button>
+                {!isLocked && typeof onSetSessionFinalized === "function" && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowResumen(false);
+                      setConfirmReopenSession(true);
+                    }}
+                    className="w-full py-2 rounded-xl border border-[#E2E8F0] text-[#6B7A8D] hover:text-[#0B1929] hover:bg-slate-50 text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <Unlock size={13} />
+                    <span>Desbloquear sesión para corregir un dato</span>
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-[11px] text-center text-[#6B7A8D]">
+                  Completa todas las series (reps y peso) al 100% para habilitar el cierre de sesión.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowResumen(false)}
+                  className="w-full py-3 rounded-xl bg-[#0B1929] text-white text-sm font-bold hover:opacity-90 transition-opacity cursor-pointer"
+                >
+                  Continuar
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={confirmReopenSession}
+        onClose={() => setConfirmReopenSession(false)}
+        onConfirm={async () => {
+          setConfirmReopenSession(false);
+          if (rutinaActiva?.id && typeof onSetSessionFinalized === "function") {
+            await onSetSessionFinalized(rutinaActiva.id, semanaActualCiclo, false);
+          }
+        }}
+        title="¿Desbloquear sesión finalizada?"
+        description="Podrás corregir repeticiones o pesos mientras siga activa esta semana. Cuando termines, podrás volver a sellar el día."
+        confirmText="Desbloquear"
+        cancelText="Mantener sellada"
+        danger={false}
+        icon="alert"
+      />
     
       {/* Modal preview */}
       {previewEx && (

@@ -5,6 +5,26 @@ import { useBackButton } from "../../lib/backButtonHandler";
 import { ConfirmModal, showFluxAlert } from "./ConfirmModal";
 import { CustomSelect } from "./CustomSelect";
 import { parseMealOptions, formatMealOptionsKeepSmae } from "../../lib/mealOptions";
+import { normalizeSeriesDetalle } from "../../utils/routineHelpers";
+
+const mapExerciseForTemplate = (e, eIdx) => ({
+  biblioteca_id: e.biblioteca_id || null,
+  nombre: e.nombre || "",
+  gif_url: e.gif_url || "",
+  grupo_muscular: e.grupo_muscular || "",
+  tipo_movimiento: e.tipo_movimiento || "",
+  num_series: Number(e.num_series) || 4,
+  reps_sugeridas: Number(e.reps_sugeridas) || 10,
+  peso_sugerido: (e.peso_sugerido !== "" && e.peso_sugerido !== null && e.peso_sugerido !== undefined && !isNaN(e.peso_sugerido)) ? Number(e.peso_sugerido) : null,
+  unidad: e.unidad || "kg",
+  series_detalle: normalizeSeriesDetalle(e.series_detalle),
+  orden: e.orden != null ? e.orden : eIdx,
+  alternativas: (e.alternativas || []).map((alt) => ({
+    ...alt,
+    peso_sugerido: (alt.peso_sugerido !== "" && alt.peso_sugerido !== null && alt.peso_sugerido !== undefined && !isNaN(alt.peso_sugerido)) ? Number(alt.peso_sugerido) : null,
+    series_detalle: normalizeSeriesDetalle(alt.series_detalle),
+  })),
+});
 
 const SUPA_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -319,22 +339,7 @@ export default function TemplatesManagerModal({
               nombre: r.nombre,
               semanas: Number(r.semanas) || Number(currentData?.semanas) || 4,
               orden: r.orden != null ? r.orden : rIdx,
-              ejercicios: (r.ejercicios || []).map((e, eIdx) => ({
-                biblioteca_id: e.biblioteca_id || null,
-                nombre: e.nombre || "",
-                gif_url: e.gif_url || "",
-                grupo_muscular: e.grupo_muscular || "",
-                tipo_movimiento: e.tipo_movimiento || "",
-                num_series: Number(e.num_series) || 4,
-                reps_sugeridas: Number(e.reps_sugeridas) || 10,
-                peso_sugerido: (e.peso_sugerido !== "" && e.peso_sugerido !== null && e.peso_sugerido !== undefined && !isNaN(e.peso_sugerido)) ? Number(e.peso_sugerido) : null,
-                unidad: e.unidad || "kg",
-                orden: e.orden != null ? e.orden : eIdx,
-                alternativas: (e.alternativas || []).map((alt) => ({
-                  ...alt,
-                  peso_sugerido: (alt.peso_sugerido !== "" && alt.peso_sugerido !== null && alt.peso_sugerido !== undefined && !isNaN(alt.peso_sugerido)) ? Number(alt.peso_sugerido) : null
-                }))
-              }))
+              ejercicios: (r.ejercicios || []).map((e, eIdx) => mapExerciseForTemplate(e, eIdx))
             }))
           })
     };
@@ -437,22 +442,7 @@ export default function TemplatesManagerModal({
             nombre: r.nombre,
             semanas: Number(r.semanas) || 4,
             orden: r.orden != null ? r.orden : rIdx,
-            ejercicios: sortedEjs.map((e, eIdx) => ({
-              biblioteca_id: e.biblioteca_id || null,
-              nombre: e.nombre || "",
-              gif_url: e.gif_url || "",
-              grupo_muscular: e.grupo_muscular || "",
-              tipo_movimiento: e.tipo_movimiento || "",
-              num_series: Number(e.num_series) || 4,
-              reps_sugeridas: Number(e.reps_sugeridas) || 10,
-              peso_sugerido: (e.peso_sugerido !== "" && e.peso_sugerido !== null && e.peso_sugerido !== undefined && !isNaN(e.peso_sugerido)) ? Number(e.peso_sugerido) : null,
-              unidad: e.unidad || "kg",
-              orden: e.orden != null ? e.orden : eIdx,
-              alternativas: (e.alternativas || []).map((alt) => ({
-                ...alt,
-                peso_sugerido: (alt.peso_sugerido !== "" && alt.peso_sugerido !== null && alt.peso_sugerido !== undefined && !isNaN(alt.peso_sugerido)) ? Number(alt.peso_sugerido) : null
-              }))
-            }))
+            ejercicios: sortedEjs.map((e, eIdx) => mapExerciseForTemplate(e, eIdx))
           };
         });
 

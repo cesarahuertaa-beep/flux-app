@@ -5,6 +5,7 @@ import { useBackButton } from "../lib/backButtonHandler";
 import { getAll } from "../lib/offlineQueue";
 import { useBrand } from "../components/BrandContext";
 import { getCurrentCycleWeekInfo, getCycleServices } from "../utils/helpers";
+import { buildPatientExerciseHistory } from "../utils/routineHelpers";
 import BloqueadoPaciente from "../components/BloqueadoPaciente";
 import { UtensilsCrossed, Dumbbell, User, CalendarDays, Camera, ShoppingBag, MapPin, Trophy, Activity, ClipboardList, X, Footprints } from "lucide-react";
 import { enrichMetrica } from "../lib/bodyComposition";
@@ -175,6 +176,21 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
   const hasLoadedRef = useRef(_peekCiclos !== null || _peekRs !== null || _peekNs !== null);
   const [cicloActivo, setCicloActivo] = useState(() => _peekCiclo);
   const [cicloLoaded, setCicloLoaded] = useState(() => _peekCiclosAll !== null || _peekCiclos !== null);
+  const [historicalBest1RMMap, setHistoricalBest1RMMap] = useState({});
+  const [finalizedSessions, setFinalizedSessions] = useState(() => {
+    const out = {};
+    try {
+      const localRaw = cliente?.id ? localStorage.getItem(`flux_rutina_sesiones_${cliente.id}`) : null;
+      if (localRaw) Object.assign(out, JSON.parse(localRaw));
+    } catch {}
+    const peekSes = cliente?.id ? dbPeek(`rutina_sesiones?cliente_id=eq.${cliente.id}&limit=500`) : null;
+    if (Array.isArray(peekSes)) {
+      peekSes.forEach((s) => {
+        if (s?.rutina_id && s?.semana != null) out[`${s.rutina_id}-${s.semana}`] = s;
+      });
+    }
+    return out;
+  });
   const [syncStatus, setSyncStatus] = useState("synced");
   const [nutriologoBloqueado, setNutriologoBloqueado] = useState(false);
   const [ultimoPeso, setUltimoPeso] = useState(() => {
@@ -300,19 +316,47 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
         return [...rsFull, ...tempRutinas];
       });
 
-      const allIds = rsFull.flatMap(r => (r.ejercicios || []).map(e => e.id));
-      const progPath = allIds.length > 0
-        ? `progreso?cliente_id=eq.${cliente.id}&ejercicio_id=in.(${allIds.join(",")})&limit=3000`
-        : `progreso?cliente_id=eq.${cliente.id}&limit=3000`;
+      // Cargar historial transversal de rutinas, progreso completo y sesiones finalizadas
+      const [allClientRutinas, ps, sesRows] = await Promise.all([
+        fetcher(`rutinas?cliente_id=eq.${cliente.id}&select=id,ciclo_id,created_at,ejercicios(id,biblioteca_id,nombre,num_series,reps_sugeridas,peso_sugerido,alternativas)&order=created_at.desc`).catch(() => []),
+        fetcher(`progreso?cliente_id=eq.${cliente.id}&limit=3000`).catch(() => []),
+        fetcher(`rutina_sesiones?cliente_id=eq.${cliente.id}&limit=500`).catch(() => null),
+      ]);
 
-      let ps = await fetcher(progPath).catch(() => []);
-      if (!Array.isArray(ps) || ps.length === 0) {
-        ps = await fetcher(`progreso?cliente_id=eq.${cliente.id}&limit=3000`).catch(() => []);
+      let progressRows = Array.isArray(ps) ? ps : [];
+      if (progressRows.length === 0) {
+        const allIds = rsFull.flatMap(r => (r.ejercicios || []).map(e => e.id));
+        if (allIds.length > 0) {
+          progressRows = await fetcher(`progreso?cliente_id=eq.${cliente.id}&ejercicio_id=in.(${allIds.join(",")})&limit=3000`).catch(() => []);
+        }
       }
 
-      if (ps && Array.isArray(ps)) {
+      if (Array.isArray(allClientRutinas) && Array.isArray(progressRows) && progressRows.length > 0) {
+        const { best1RMByKey } = buildPatientExerciseHistory(allClientRutinas, progressRows, ciclo?.id || null);
+        setHistoricalBest1RMMap(best1RMByKey);
+      } else {
+        setHistoricalBest1RMMap({});
+      }
+
+      if (Array.isArray(sesRows)) {
+        const sesMap = {};
+        sesRows.forEach((s) => {
+          if (s?.rutina_id && s?.semana != null) {
+            sesMap[`${s.rutina_id}-${s.semana}`] = s;
+          }
+        });
+        setFinalizedSessions((prev) => {
+          const merged = { ...prev, ...sesMap };
+          try {
+            localStorage.setItem(`flux_rutina_sesiones_${cliente.id}`, JSON.stringify(merged));
+          } catch {}
+          return merged;
+        });
+      }
+
+      if (progressRows && Array.isArray(progressRows)) {
         const pm = {};
-        ps.forEach(p => {
+        progressRows.forEach(p => {
           pm[`${p.ejercicio_id}-${p.semana}-${p.serie}-${p.tipo}-${p.variante_id || 'original'}`] = p.valor;
         });
 
@@ -342,7 +386,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
 
     const onCacheUpdated = (ev) => {
       const table = ev?.detail?.table;
-      if (table && !["ciclos", "nutricion", "nutricion_dias", "comidas", "rutinas", "ejercicios", "progreso", "nutricion_progreso", "metricas_progreso"].includes(table)) return;
+      if (table && !["ciclos", "nutricion", "nutricion_dias", "comidas", "rutinas", "ejercicios", "progreso", "nutricion_progreso", "metricas_progreso", "rutina_sesiones"].includes(table)) return;
       if (cacheTimer) clearTimeout(cacheTimer);
       cacheTimer = setTimeout(() => {
         if (
@@ -429,6 +473,56 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
     }, 500);
   };
 
+  const flushPendingWorkoutSaves = async () => {
+    if (globalSaveTimerRef.current) {
+      clearTimeout(globalSaveTimerRef.current);
+      globalSaveTimerRef.current = null;
+    }
+    const recordsToSave = Object.values(pendingSavesRef.current || {});
+    if (recordsToSave.length === 0) return true;
+    pendingSavesRef.current = {};
+    setSyncStatus("saving");
+    try {
+      await offlineAwareUpsert(recordsToSave);
+      setSyncStatus(navigator.onLine && (await getPendingMutations()) === 0 ? "synced" : "local");
+      return true;
+    } catch (e) {
+      console.error("Error guardando progreso en lote:", e);
+      setSyncStatus("local");
+      return false;
+    }
+  };
+
+  const handleSetSessionFinalized = async (rutinaId, semana, finalizada, resumen = {}) => {
+    if (!cliente?.id || !rutinaId) return;
+    if (finalizada) {
+      await flushPendingWorkoutSaves();
+    }
+    const key = `${rutinaId}-${semana}`;
+    const record = {
+      cliente_id: cliente.id,
+      rutina_id: rutinaId,
+      semana: Number(semana) || 1,
+      finalizada: Boolean(finalizada),
+      finalizada_at: new Date().toISOString(),
+      resumen: resumen || {},
+    };
+    setFinalizedSessions((prev) => {
+      const next = { ...prev, [key]: record };
+      try {
+        localStorage.setItem(`flux_rutina_sesiones_${cliente.id}`, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+    try {
+      await dbUpsert("rutina_sesiones?on_conflict=cliente_id,rutina_id,semana", [record], {
+        headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+      });
+    } catch (e) {
+      console.warn("rutina_sesiones upsert (ejecuta el SQL de migración si aún no existe):", e?.message || e);
+    }
+  };
+
   const handleProgressChange = (ejId, wi, si, tipo, val, variante_id ="original") => {
     const key = `${ejId}-${wi}-${si}-${tipo}-${variante_id}`;
     setProgreso(p => ({ ...p, [key]: val }));
@@ -450,21 +544,8 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
       clearTimeout(globalSaveTimerRef.current);
     }
     
-    globalSaveTimerRef.current = setTimeout(async () => {
-      const recordsToSave = Object.values(pendingSavesRef.current);
-      if (recordsToSave.length === 0) return;
-      
-      // Limpiar cola para el próximo lote
-      pendingSavesRef.current = {};
-      
-      try {
-        // Enviar todo el paquete en una sola petición
-        await offlineAwareUpsert(recordsToSave);
-        setSyncStatus(navigator.onLine && (await getPendingMutations()) === 0 ? "synced" : "local");
-      } catch(e) {
-        console.error("Error guardando progreso en lote:", e);
-        setSyncStatus("local");
-      }
+    globalSaveTimerRef.current = setTimeout(() => {
+      flushPendingWorkoutSaves();
     }, 1000); // 1 segundo global debounce
   };
 
@@ -600,6 +681,9 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
                     rutinas={rutinas} 
                     progreso={progreso}
                     progresoSemanaAnterior={progreso}
+                    historicalBest1RMMap={historicalBest1RMMap}
+                    finalizedSessions={finalizedSessions}
+                    onSetSessionFinalized={handleSetSessionFinalized}
                     clienteNombre={cliente.nombre}
                     onSaveExercise={async () => {}}
                     onProgressChange={handleProgressChange}

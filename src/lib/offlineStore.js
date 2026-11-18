@@ -24,6 +24,7 @@ const PROTECTED_TABLES = new Set([
   "nutricion_progreso",
   "comidas",
   "rutinas",
+  "rutina_sesiones",
   "ejercicios",
   "biblioteca_ejercicios",
 ]);

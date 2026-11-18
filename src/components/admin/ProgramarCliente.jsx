@@ -17,13 +17,24 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { SortableItem } from "../SortableItem";
-import { RefreshCw, ChevronDown, Trash2, Calendar, Activity, CheckCircle2, AlertCircle, ShieldAlert, AlertTriangle, Save, Edit2, Plus, Search, FileText, Download, Lock, X, Utensils, Dumbbell, BarChart2, Camera, Image as ImageIcon, Bookmark, Calculator, ArrowLeft, ArrowUp, User, Check, ClipboardList, RotateCcw, MessageCircle, Copy, TrendingUp, Sparkles, Flame, Target, Droplets, Pill, Clock, Loader2 } from "lucide-react";
+import { RefreshCw, ChevronDown, Trash2, Calendar, Activity, CheckCircle2, AlertCircle, ShieldAlert, AlertTriangle, Save, Edit2, Plus, Search, FileText, Download, Lock, X, Utensils, Dumbbell, BarChart2, Camera, Image as ImageIcon, Bookmark, Calculator, ArrowLeft, ArrowUp, User, Check, ClipboardList, RotateCcw, MessageCircle, Copy, TrendingUp, Sparkles, Flame, Target, Droplets, Pill, Clock, Loader2, ListOrdered } from "lucide-react";
 import { EjercicioSelector } from "./EjercicioSelector";
 import { GRUPO_LABELS, normalizeMuscleGroup } from "../../lib/constants";
 import { ConfirmModal } from "../ui/ConfirmModal";
 import { CustomSelect } from "../ui/CustomSelect";
 import { generateNutriPDF } from "../../utils/pdf";
 import { dbPeek, dbGet, dbGetFresh, dbPost, dbPatch, dbDel, dbUpsert, storageUpload, updateQueryCache, invalidateCache } from "../../lib/supabase";
+import {
+  buildPatientExerciseHistory,
+  lookupExerciseHistory,
+  migrateClonedExerciseWithProgress,
+  normalizeSeriesDetalle,
+  seriesDetalleToForm,
+  seriesFormToDb,
+  convertWeightToInput,
+  convertInputWeightToKg,
+  hasCustomSeriesBreakdown,
+} from "../../utils/routineHelpers";
 import { useBrand } from "../BrandContext";
 import { useBackButton } from "../../lib/backButtonHandler";
 import { CachedImage } from "../../lib/mediaCache";
@@ -201,8 +212,11 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       servicios: { nutricion: true, entrenamiento: true },
       enfoque: "",
       clonarAnterior: true,
+      migrarMarcas: true,
     };
   });
+  const [patientHistoryMarks, setPatientHistoryMarks] = useState({});
+  const loadedHistoryClientRef = useRef(null);
   const [autoOpenCheckinTrigger, setAutoOpenCheckinTrigger] = useState(0);
   const [nutriView, setNutriView] = useState("programar"); // "programar" | "tracking"
   const [entrenoView, setEntrenoView] = useState("programar"); // "programar" | "tracking"
@@ -1062,6 +1076,76 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     historialLoadedRef.current = false;
   }, [activeSpecialistId]);
 
+  useEffect(() => {
+    setPatientHistoryMarks({});
+    loadedHistoryClientRef.current = null;
+  }, [selected?.id]);
+
+  const loadPatientExerciseHistory = useCallback(async (clientId) => {
+    if (!clientId || loadedHistoryClientRef.current === clientId) return;
+    loadedHistoryClientRef.current = clientId;
+    try {
+      const [pastRuts, progRows] = await Promise.all([
+        dbGet(`rutinas?cliente_id=eq.${clientId}&select=id,ciclo_id,created_at,ejercicios(id,biblioteca_id,nombre,num_series,reps_sugeridas,peso_sugerido,series_detalle,alternativas)&order=created_at.desc`).catch(() => []),
+        dbGet(`progreso?cliente_id=eq.${clientId}&limit=3000`).catch(() => []),
+      ]);
+      const { latestByKey } = buildPatientExerciseHistory(pastRuts, progRows, null);
+      setPatientHistoryMarks(latestByKey);
+    } catch {}
+  }, []);
+
+  /** Persiste ejercicios con series_detalle, haciendo fallback si la columna aún no existe en BD. */
+  const persistEjerciciosSafe = async (rows, { upsert = false } = {}) => {
+    if (!Array.isArray(rows) || rows.length === 0) return;
+    const exec = (payload) =>
+      upsert
+        ? dbUpsert("ejercicios?on_conflict=id", payload, {
+            headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+          })
+        : dbPost("ejercicios", payload, { headers: { Prefer: "return=minimal" } });
+    try {
+      await exec(rows);
+    } catch (err) {
+      const msg = String(err?.message || err || "");
+      if (msg.includes("series_detalle") && (msg.includes("PGRST204") || msg.includes("column"))) {
+        const stripped = rows.map(({ series_detalle: _omit, ...rest }) => rest);
+        await exec(stripped);
+      } else {
+        throw err;
+      }
+    }
+  };
+
+  /** Convierte un registro de ejercicio (BD o historial) al formato editable del modal híbrido. */
+  const exerciseToFormItem = (x, { clearIds = false } = {}) => {
+    const unit = x.unidad || "kg";
+    const numSeries = parseInt(x.num_series, 10) || 4;
+    const scalarPesoInput = formatWeightForInput(x.peso_sugerido, unit);
+    const normDetalle = normalizeSeriesDetalle(x.series_detalle);
+    const seriesForm =
+      normDetalle.length > 0
+        ? seriesDetalleToForm(normDetalle, numSeries, x.reps_sugeridas || 10, scalarPesoInput, unit)
+        : [];
+    const copy = {
+      ...x,
+      peso_sugerido: scalarPesoInput,
+      unidad: unit,
+      series_detalle: normDetalle,
+      seriesForm,
+      alternativas: (x.alternativas || []).map((alt) => ({
+        ...alt,
+        peso_sugerido: formatWeightForInput(alt.peso_sugerido, alt.unidad || unit),
+        series_detalle: normalizeSeriesDetalle(alt.series_detalle),
+      })),
+      _dndId: String((!clearIds && x.id) || Math.random().toString(36).slice(2, 9)),
+    };
+    if (clearIds) {
+      delete copy.id;
+      delete copy.rutina_id;
+    }
+    return copy;
+  };
+
   const loadHistorial = useCallback(async () => {
     if (!clientes || clientes.length === 0 || historialLoadedRef.current) return;
     const ownClientes = activeSpecialistId
@@ -1133,20 +1217,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         diasSeleccionados: p.diasSeleccionados?.length > 0 ? p.diasSeleccionados : dSel,
         tituloPersonalizado: tPers ? `${tPers} (Copia)` : "Rutina importada",
         semanas: r.semanas,
-        ejercicios: (ejs || []).map(x => {
-          const copy = {
-            ...x,
-            peso_sugerido: formatWeightForInput(x.peso_sugerido, x.unidad || "kg"),
-            alternativas: (x.alternativas || []).map(alt => ({
-              ...alt,
-              peso_sugerido: formatWeightForInput(alt.peso_sugerido, alt.unidad || x.unidad || "kg"),
-            })),
-            _dndId: Math.random().toString(36).slice(2, 9),
-          };
-          delete copy.id;
-          delete copy.rutina_id;
-          return copy;
-        })
+        ejercicios: (ejs || []).map(x => exerciseToFormItem(x, { clearIds: true }))
       }));
       setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Rutina cargada del historial</div>);
     } catch(err) { 
@@ -1643,6 +1714,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       servicios: { ...prevServices },
       enfoque: "",
       clonarAnterior: ciclos.length > 0,
+      migrarMarcas: true,
     });
 
     setShowPlanModal(true);
@@ -1876,9 +1948,22 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
               }
             }
 
-            // 2. Clonar Rutinas
+            // 2. Clonar Rutinas (con migración opcional de últimas marcas reales alcanzadas)
             const oldRuts = await dbGet(`rutinas?ciclo_id=eq.${cicloAnterior.id}&select=*,ejercicios(*)&order=orden.asc`).catch(() => []);
             if (Array.isArray(oldRuts) && oldRuts.length > 0) {
+              let progByEjVar = new Map();
+              if (planForm.migrarMarcas) {
+                const oldEjIds = oldRuts.flatMap((r) => (r.ejercicios || []).map((ej) => ej.id)).filter(Boolean);
+                if (oldEjIds.length > 0) {
+                  const progRows = await dbGetFresh(`progreso?cliente_id=eq.${selected.id}&ejercicio_id=in.(${oldEjIds.join(",")})&limit=3000`).catch(() => []);
+                  (Array.isArray(progRows) ? progRows : []).forEach((pr) => {
+                    const mapKey = `${pr.ejercicio_id}:${pr.variante_id || "original"}`;
+                    if (!progByEjVar.has(mapKey)) progByEjVar.set(mapKey, []);
+                    progByEjVar.get(mapKey).push(pr);
+                  });
+                }
+              }
+
               savingRutinaRef.current = true;
               try {
                 for (const r of oldRuts) {
@@ -1891,24 +1976,36 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                   });
                   const newR = rRes && rRes[0];
                   if (newR && r.ejercicios && r.ejercicios.length > 0) {
-                    const ejsData = r.ejercicios.map((ej, ejIdx) => ({
-                      rutina_id: newR.id,
-                      biblioteca_id: ej.biblioteca_id || null,
-                      nombre: ej.nombre || ej.ejercicio || "",
-                      gif_url: ej.gif_url || "",
-                      grupo_muscular: ej.grupo_muscular || "",
-                      tipo_movimiento: ej.tipo_movimiento || ej.tipo_ejercicio || "",
-                      num_series: +ej.num_series || +ej.series || 4,
-                      reps_sugeridas: +ej.reps_sugeridas || +ej.repeticiones || 10,
-                      peso_sugerido: (ej.peso_sugerido !== "" && ej.peso_sugerido !== null && ej.peso_sugerido !== undefined && !isNaN(ej.peso_sugerido)) ? Number(ej.peso_sugerido) : null,
-                      unidad: ej.unidad || "kg",
-                      alternativas: (ej.alternativas || []).map(alt => ({
-                        ...alt,
-                        peso_sugerido: (alt.peso_sugerido !== "" && alt.peso_sugerido !== null && alt.peso_sugerido !== undefined && !isNaN(alt.peso_sugerido)) ? Number(alt.peso_sugerido) : null,
-                      })),
-                      orden: ej.orden != null ? ej.orden : ejIdx,
-                    }));
-                    await dbPost("ejercicios", ejsData, { headers: { Prefer: "return=minimal" } });
+                    const ejsData = r.ejercicios.map((ej, ejIdx) => {
+                      const migrated = planForm.migrarMarcas
+                        ? migrateClonedExerciseWithProgress(ej, progByEjVar)
+                        : {
+                            reps_sugeridas: +ej.reps_sugeridas || +ej.repeticiones || 10,
+                            peso_sugerido: (ej.peso_sugerido !== "" && ej.peso_sugerido !== null && ej.peso_sugerido !== undefined && !isNaN(ej.peso_sugerido)) ? Number(ej.peso_sugerido) : null,
+                            series_detalle: normalizeSeriesDetalle(ej.series_detalle),
+                            alternativas: (ej.alternativas || []).map(alt => ({
+                              ...alt,
+                              peso_sugerido: (alt.peso_sugerido !== "" && alt.peso_sugerido !== null && alt.peso_sugerido !== undefined && !isNaN(alt.peso_sugerido)) ? Number(alt.peso_sugerido) : null,
+                              series_detalle: normalizeSeriesDetalle(alt.series_detalle),
+                            })),
+                          };
+                      return {
+                        rutina_id: newR.id,
+                        biblioteca_id: ej.biblioteca_id || null,
+                        nombre: ej.nombre || ej.ejercicio || "",
+                        gif_url: ej.gif_url || "",
+                        grupo_muscular: ej.grupo_muscular || "",
+                        tipo_movimiento: ej.tipo_movimiento || ej.tipo_ejercicio || "",
+                        num_series: +ej.num_series || +ej.series || 4,
+                        reps_sugeridas: migrated.reps_sugeridas,
+                        peso_sugerido: migrated.peso_sugerido,
+                        unidad: ej.unidad || "kg",
+                        series_detalle: migrated.series_detalle,
+                        alternativas: migrated.alternativas,
+                        orden: ej.orden != null ? ej.orden : ejIdx,
+                      };
+                    });
+                    await persistEjerciciosSafe(ejsData);
                   }
                 }
               } finally {
@@ -2273,9 +2370,11 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
               reps_sugeridas: +e.reps_sugeridas || 10,
               peso_sugerido: (e.peso_sugerido !== "" && e.peso_sugerido !== null && e.peso_sugerido !== undefined && !isNaN(e.peso_sugerido)) ? Number(e.peso_sugerido) : null,
               unidad: e.unidad || "kg",
+              series_detalle: normalizeSeriesDetalle(e.series_detalle),
               alternativas: (e.alternativas || []).map((alt) => ({
                 ...alt,
                 peso_sugerido: (alt.peso_sugerido !== "" && alt.peso_sugerido !== null && alt.peso_sugerido !== undefined && !isNaN(alt.peso_sugerido)) ? Number(alt.peso_sugerido) : null,
+                series_detalle: normalizeSeriesDetalle(alt.series_detalle),
               })),
               orden: eIdx,
             });
@@ -2283,7 +2382,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         });
 
         if (allEjerciciosPayload.length > 0) {
-          await dbPost("ejercicios", allEjerciciosPayload, { headers: { Prefer: "return=minimal" } });
+          await persistEjerciciosSafe(allEjerciciosPayload);
         }
       }
 
@@ -3290,12 +3389,14 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     if (interceptNoPlan()) return; 
     if (isEstandarLimit(rutinas.length, "rutinas")) return;
     loadHistorial();
+    if (selected?.id) loadPatientExerciseHistory(selected.id);
     setEditRutina(null); 
     setActiveAltSlot(null);
     setRutinaForm({ diasSeleccionados:[], tituloPersonalizado:"", ejercicios:[] }); 
     setShowRutinaModal(true); 
   };
   const openEditRutina = (r) => { 
+    if (selected?.id) loadPatientExerciseHistory(selected.id);
     const parts = (r.nombre ||"").split('|');
     let dSel = [];
     let tPers = r.nombre ||"";
@@ -3311,32 +3412,59 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     setRutinaForm({ 
       diasSeleccionados: dSel,
       tituloPersonalizado: tPers,
-      ejercicios: (r.ejercicios || []).map(e => ({
-        ...e,
-        peso_sugerido: formatWeightForInput(e.peso_sugerido, e.unidad || "kg"),
-        alternativas: (e.alternativas || []).map(alt => ({
-          ...alt,
-          peso_sugerido: formatWeightForInput(alt.peso_sugerido, alt.unidad || e.unidad || "kg"),
-        })),
-        _dndId: String(e.id || Math.random().toString(36).slice(2,9)),
-      }))
+      ejercicios: (r.ejercicios || []).map(e => exerciseToFormItem(e))
     }); 
     setShowRutinaModal(true); 
   };
 
-  const saveRutina = async () => {
-    const toKg = (val, unit) => {
-      if (!val && val !== 0) return null;
-      const n = parseFloat(val);
-      if (isNaN(n)) return null;
-      return unit === 'lb' ? parseFloat((n * 0.45359237).toFixed(4)) : n;
-    };
+  const serializeExerciseForDb = (e, rid, orden) => {
+    const unit = e.unidad || "kg";
+    const numSeries = +e.num_series || 4;
+    let repsSug = +e.reps_sugeridas || 10;
+    let pesoSugKg = convertInputWeightToKg(e.peso_sugerido, unit);
+    let seriesDetalle = [];
 
+    if (Array.isArray(e.seriesForm) && e.seriesForm.length > 0) {
+      const converted = seriesFormToDb(e.seriesForm, unit, numSeries);
+      const validWeights = converted.map((s) => s.peso).filter((p) => p !== null);
+      const firstReps = converted[0]?.reps;
+      if (firstReps) repsSug = firstReps;
+      if (validWeights.length > 0) pesoSugKg = Math.max(...validWeights);
+      if (hasCustomSeriesBreakdown(converted, repsSug, pesoSugKg)) {
+        seriesDetalle = converted;
+      }
+    } else if (Array.isArray(e.series_detalle) && e.series_detalle.length > 0) {
+      seriesDetalle = normalizeSeriesDetalle(e.series_detalle);
+    }
+
+    return {
+      rutina_id: rid,
+      biblioteca_id: e.biblioteca_id || null,
+      nombre: e.nombre,
+      gif_url: e.gif_url || "",
+      grupo_muscular: e.grupo_muscular || "",
+      tipo_movimiento: e.tipo_movimiento || "",
+      num_series: numSeries,
+      reps_sugeridas: repsSug,
+      peso_sugerido: pesoSugKg,
+      unidad: unit,
+      series_detalle: seriesDetalle,
+      alternativas: (e.alternativas || []).map((alt) => ({
+        ...alt,
+        peso_sugerido: convertInputWeightToKg(alt.peso_sugerido, alt.unidad || unit),
+        series_detalle: normalizeSeriesDetalle(alt.series_detalle),
+      })),
+      orden,
+    };
+  };
+
+  const saveRutina = async () => {
     const formSnap = {
       ...rutinaForm,
       diasSeleccionados: [...(rutinaForm.diasSeleccionados || [])],
       ejercicios: (rutinaForm.ejercicios || []).map(e => ({
         ...e,
+        seriesForm: Array.isArray(e.seriesForm) ? e.seriesForm.map(s => ({ ...s })) : [],
         alternativas: (e.alternativas || []).map(a => ({ ...a })),
       })),
     };
@@ -3371,22 +3499,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       const finalName = dSeleccionados.length > 0 ? `${dSeleccionados[0]}|${formSnap.tituloPersonalizado}` : formSnap.tituloPersonalizado;
       const optimisticEjercicios = formSnap.ejercicios.map((e, i) => ({
         ...e,
+        ...serializeExerciseForDb(e, editRutinaSnap.id, i),
         id: e.id || `temp_ej_${Date.now()}_${i}`,
-        rutina_id: editRutinaSnap.id,
-        biblioteca_id: e.biblioteca_id || null,
-        nombre: e.nombre,
-        gif_url: e.gif_url || "",
-        grupo_muscular: e.grupo_muscular || "",
-        tipo_movimiento: e.tipo_movimiento || "",
-        num_series: +e.num_series || 4,
-        reps_sugeridas: +e.reps_sugeridas || 10,
-        peso_sugerido: toKg(e.peso_sugerido, e.unidad || "kg"),
-        unidad: e.unidad || "kg",
-        alternativas: (e.alternativas || []).map(alt => ({
-          ...alt,
-          peso_sugerido: toKg(alt.peso_sugerido, alt.unidad || e.unidad || "kg"),
-        })),
-        orden: i,
       }));
       const optimisticRutina = {
         ...editRutinaSnap,
@@ -3412,22 +3526,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           orden: prevRutinas.length + idx,
           ejercicios: formSnap.ejercicios.map((e, i) => ({
             ...e,
+            ...serializeExerciseForDb(e, tempRutId, i),
             id: `temp_ej_${Date.now()}_${idx}_${i}`,
-            rutina_id: tempRutId,
-            biblioteca_id: e.biblioteca_id || null,
-            nombre: e.nombre,
-            gif_url: e.gif_url || "",
-            grupo_muscular: e.grupo_muscular || "",
-            tipo_movimiento: e.tipo_movimiento || "",
-            num_series: +e.num_series || 4,
-            reps_sugeridas: +e.reps_sugeridas || 10,
-            peso_sugerido: toKg(e.peso_sugerido, e.unidad || "kg"),
-            unidad: e.unidad || "kg",
-            alternativas: (e.alternativas || []).map(alt => ({
-              ...alt,
-              peso_sugerido: toKg(alt.peso_sugerido, alt.unidad || e.unidad || "kg"),
-            })),
-            orden: i,
           })),
         };
       });
@@ -3456,23 +3556,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         const toInsert = [];
 
         formSnap.ejercicios.forEach((e, i) => {
-          const data = {
-            rutina_id: rid,
-            biblioteca_id: e.biblioteca_id || null,
-            nombre: e.nombre,
-            gif_url: e.gif_url || "",
-            grupo_muscular: e.grupo_muscular || "",
-            tipo_movimiento: e.tipo_movimiento || "",
-            num_series: +e.num_series || 4,
-            reps_sugeridas: +e.reps_sugeridas || 10,
-            peso_sugerido: toKg(e.peso_sugerido, e.unidad || "kg"),
-            unidad: e.unidad || "kg",
-            alternativas: (e.alternativas || []).map(alt => ({
-              ...alt,
-              peso_sugerido: toKg(alt.peso_sugerido, alt.unidad || e.unidad || "kg"),
-            })),
-            orden: i,
-          };
+          const data = serializeExerciseForDb(e, rid, i);
           if (e.id && !String(e.id).startsWith("temp_")) {
             data.id = e.id;
             toUpdate.push(data);
@@ -3488,18 +3572,10 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           ops.push(dbDel(`ejercicios?id=in.(${toDelete.join(",")})`));
         }
         if (toUpdate.length > 0) {
-          ops.push(
-            dbUpsert("ejercicios?on_conflict=id", toUpdate, {
-              headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
-            })
-          );
+          ops.push(persistEjerciciosSafe(toUpdate, { upsert: true }));
         }
         if (toInsert.length > 0) {
-          ops.push(
-            dbPost("ejercicios", toInsert, {
-              headers: { Prefer: "return=minimal" },
-            })
-          );
+          ops.push(persistEjerciciosSafe(toInsert));
         }
         await Promise.all(ops);
       } else {
@@ -3535,30 +3611,12 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         const ejerciciosData = [];
         (creadas || []).forEach(nuevaRutina => {
           formSnap.ejercicios.forEach((e, i) => {
-            ejerciciosData.push({
-              rutina_id: nuevaRutina.id,
-              biblioteca_id: e.biblioteca_id || null,
-              nombre: e.nombre,
-              gif_url: e.gif_url || "",
-              grupo_muscular: e.grupo_muscular || "",
-              tipo_movimiento: e.tipo_movimiento || "",
-              num_series: +e.num_series || 4,
-              reps_sugeridas: +e.reps_sugeridas || 10,
-              peso_sugerido: toKg(e.peso_sugerido, e.unidad || "kg"),
-              unidad: e.unidad || "kg",
-              alternativas: (e.alternativas || []).map(alt => ({
-                ...alt,
-                peso_sugerido: toKg(alt.peso_sugerido, alt.unidad || e.unidad || "kg"),
-              })),
-              orden: i,
-            });
+            ejerciciosData.push(serializeExerciseForDb(e, nuevaRutina.id, i));
           });
         });
 
         if (ejerciciosData.length > 0) {
-          await dbPost("ejercicios", ejerciciosData, {
-            headers: { Prefer: "return=minimal" },
-          });
+          await persistEjerciciosSafe(ejerciciosData);
         }
       }
 
@@ -3652,7 +3710,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       setRutinaForm(p => ({ ...p, ejercicios:[...p.ejercicios, { 
         _dndId: Math.random().toString(36).slice(2,9), 
         biblioteca_id:ej.id, nombre:ej.nombre, grupo_muscular:ej.grupo_muscular, 
-        gif_url:ej.gif_url||"", num_series:4, reps_sugeridas:10, peso_sugerido:"", unidad:"kg", alternativas:[] 
+        gif_url:ej.gif_url||"", num_series:4, reps_sugeridas:10, peso_sugerido:"", unidad:"kg", series_detalle:[], seriesForm:[], alternativas:[] 
       }] }));
     } else {
       setRutinaForm(p => {
@@ -3667,7 +3725,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           gif_url: ej.gif_url || "",
           reps_sugeridas: main.reps_sugeridas || 10,
           peso_sugerido: main.peso_sugerido || "",
-          unidad: main.unidad || "kg"
+          unidad: main.unidad || "kg",
+          series_detalle: []
         };
         es[activeAltSlot] = { ...main, alternativas: [...(main.alternativas || []), newAlt] };
         return { ...p, ejercicios: es };
@@ -3676,7 +3735,129 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     }
   };
 
-  const updEj = (i, f, v) => setRutinaForm(p => { const es=[...p.ejercicios]; es[i]={...es[i],[f]:v}; return { ...p, ejercicios:es }; });
+  const updEj = (i, f, v) => setRutinaForm(p => {
+    const es = [...p.ejercicios];
+    const cur = { ...es[i], [f]: v };
+    if (f === "num_series" && Array.isArray(cur.seriesForm) && cur.seriesForm.length > 0) {
+      const nextCount = Math.max(1, Math.min(12, parseInt(v, 10) || 1));
+      const prevRows = cur.seriesForm;
+      const last = prevRows[prevRows.length - 1] || { reps: String(cur.reps_sugeridas || 10), peso: String(cur.peso_sugerido || "") };
+      cur.seriesForm = Array.from({ length: nextCount }, (_, idx) => (prevRows[idx] ? { ...prevRows[idx] } : { ...last }));
+    }
+    es[i] = cur;
+    return { ...p, ejercicios: es };
+  });
+
+  const togglePerSeries = (i) => setRutinaForm(p => {
+    const es = [...p.ejercicios];
+    const cur = es[i];
+    if (!cur) return p;
+    if (Array.isArray(cur.seriesForm) && cur.seriesForm.length > 0) {
+      const first = cur.seriesForm[0] || {};
+      es[i] = {
+        ...cur,
+        reps_sugeridas: first.reps || cur.reps_sugeridas || 10,
+        peso_sugerido: first.peso !== undefined ? first.peso : (cur.peso_sugerido || ""),
+        series_detalle: [],
+        seriesForm: [],
+      };
+    } else {
+      const count = Math.max(1, Math.min(12, parseInt(cur.num_series, 10) || 4));
+      es[i] = {
+        ...cur,
+        seriesForm: Array.from({ length: count }, () => ({
+          reps: String(cur.reps_sugeridas || 10),
+          peso: String(cur.peso_sugerido || ""),
+        })),
+      };
+    }
+    return { ...p, ejercicios: es };
+  });
+
+  const updSerieField = (i, si, field, val) => setRutinaForm(p => {
+    const es = [...p.ejercicios];
+    const cur = { ...es[i] };
+    const nextSeries = (cur.seriesForm || []).map((s, idx) => (idx === si ? { ...s, [field]: val } : s));
+    cur.seriesForm = nextSeries;
+    if (si === 0 && field === "reps" && val !== "") cur.reps_sugeridas = val;
+    if (si === 0 && field === "peso") cur.peso_sugerido = val;
+    es[i] = cur;
+    return { ...p, ejercicios: es };
+  });
+
+  const applyMarkToExerciseObject = (exObj, mark) => {
+    if (!mark) return exObj;
+    const unit = exObj.unidad || "kg";
+    const numSeries = Math.max(1, parseInt(exObj.num_series, 10) || 4);
+    const repsStr = String(mark.reps_sugeridas || exObj.reps_sugeridas || 10);
+    const pesoStr = mark.peso_sugerido != null ? convertWeightToInput(mark.peso_sugerido, unit) : (exObj.peso_sugerido || "");
+    const hasVaryingSeries = Array.isArray(mark.series_detalle) && mark.series_detalle.length > 0;
+    const nextSeriesForm = hasVaryingSeries
+      ? seriesDetalleToForm(mark.allSeriesMarks, numSeries, repsStr, pesoStr, unit)
+      : [];
+    return {
+      ...exObj,
+      reps_sugeridas: repsStr,
+      peso_sugerido: pesoStr,
+      series_detalle: hasVaryingSeries ? mark.series_detalle : [],
+      seriesForm: nextSeriesForm,
+      _historyApplied: true,
+    };
+  };
+
+  const applyHistoryMarksToExercise = (i) => {
+    setRutinaForm(p => {
+      const es = [...p.ejercicios];
+      const cur = es[i];
+      if (!cur) return p;
+      const mark = lookupExerciseHistory(patientHistoryMarks, cur);
+      const nextAlts = (cur.alternativas || []).map((alt) => {
+        const altMark = lookupExerciseHistory(patientHistoryMarks, alt);
+        if (!altMark) return alt;
+        const altUnit = alt.unidad || cur.unidad || "kg";
+        return {
+          ...alt,
+          reps_sugeridas: String(altMark.reps_sugeridas || alt.reps_sugeridas || 10),
+          peso_sugerido: altMark.peso_sugerido != null ? convertWeightToInput(altMark.peso_sugerido, altUnit) : (alt.peso_sugerido || ""),
+          series_detalle: Array.isArray(altMark.series_detalle) ? altMark.series_detalle : [],
+        };
+      });
+      es[i] = { ...(mark ? applyMarkToExerciseObject(cur, mark) : cur), alternativas: nextAlts };
+      return { ...p, ejercicios: es };
+    });
+  };
+
+  const applyAllHistoryMarksToRoutine = () => {
+    let appliedCount = 0;
+    setRutinaForm(p => {
+      const es = p.ejercicios.map((cur) => {
+        const mark = lookupExerciseHistory(patientHistoryMarks, cur);
+        if (mark) appliedCount++;
+        const nextAlts = (cur.alternativas || []).map((alt) => {
+          const altMark = lookupExerciseHistory(patientHistoryMarks, alt);
+          if (!altMark) return alt;
+          const altUnit = alt.unidad || cur.unidad || "kg";
+          return {
+            ...alt,
+            reps_sugeridas: String(altMark.reps_sugeridas || alt.reps_sugeridas || 10),
+            peso_sugerido: altMark.peso_sugerido != null ? convertWeightToInput(altMark.peso_sugerido, altUnit) : (alt.peso_sugerido || ""),
+            series_detalle: Array.isArray(altMark.series_detalle) ? altMark.series_detalle : [],
+          };
+        });
+        return { ...(mark ? applyMarkToExerciseObject(cur, mark) : cur), alternativas: nextAlts };
+      });
+      return { ...p, ejercicios: es };
+    });
+    if (appliedCount > 0) {
+      setMsg?.(
+        <div className="flex items-center gap-1.5">
+          <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+          Se importaron marcas previas en {appliedCount} ejercicio{appliedCount === 1 ? "" : "s"}
+        </div>
+      );
+    }
+  };
+
   const remEj = (i) => setRutinaForm(p => ({ ...p, ejercicios:p.ejercicios.filter((_,x)=>x!==i) }));
   
   const toggleUnidad = (i) => setRutinaForm(p => { const es=[...p.ejercicios]; es[i]={...es[i], unidad: es[i].unidad ==="lb" ?"kg" :"lb"}; return { ...p, ejercicios:es }; });
@@ -3690,6 +3871,11 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     const targetAlt = alts[altIdx];
     if (!targetAlt) return p;
 
+    const mainUnit = main.unidad || "kg";
+    const mainDetalleDb = Array.isArray(main.seriesForm) && main.seriesForm.length > 0
+      ? seriesFormToDb(main.seriesForm, mainUnit, +main.num_series || 4)
+      : normalizeSeriesDetalle(main.series_detalle);
+
     const oldMainAsAlt = {
       biblioteca_id: main.biblioteca_id || null,
       nombre: main.nombre,
@@ -3697,10 +3883,17 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       gif_url: main.gif_url || "",
       reps_sugeridas: main.reps_sugeridas || 10,
       peso_sugerido: main.peso_sugerido || "",
-      unidad: main.unidad || "kg"
+      unidad: mainUnit,
+      series_detalle: mainDetalleDb,
     };
 
     const newAlts = alts.map((a, idx) => idx === altIdx ? oldMainAsAlt : a);
+    const targetUnit = targetAlt.unidad || mainUnit;
+    const targetDetalle = normalizeSeriesDetalle(targetAlt.series_detalle);
+    const targetPesoInput = targetAlt.peso_sugerido ?? main.peso_sugerido;
+    const targetSeriesForm = targetDetalle.length > 0
+      ? seriesDetalleToForm(targetDetalle, +main.num_series || 4, targetAlt.reps_sugeridas ?? main.reps_sugeridas, targetPesoInput, targetUnit)
+      : [];
 
     es[i] = {
       ...main,
@@ -3709,8 +3902,10 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       grupo_muscular: targetAlt.grupo_muscular || main.grupo_muscular || "",
       gif_url: targetAlt.gif_url || "",
       reps_sugeridas: targetAlt.reps_sugeridas ?? main.reps_sugeridas,
-      peso_sugerido: targetAlt.peso_sugerido ?? main.peso_sugerido,
-      unidad: targetAlt.unidad || main.unidad || "kg",
+      peso_sugerido: targetPesoInput,
+      unidad: targetUnit,
+      series_detalle: targetDetalle,
+      seriesForm: targetSeriesForm,
       alternativas: newAlts
     };
 
@@ -5244,29 +5439,58 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
               {/* ── Opción de Clonar Plan Anterior (Solo en modo creación si ya existen planes) ── */}
               {planModalMode === "create" && ciclos.length > 0 && (
-                <div
-                  onClick={() => setPlanForm(p => ({ ...p, clonarAnterior: !p.clonarAnterior }))}
-                  className={`p-3.5 rounded-xl border flex items-start gap-3 cursor-pointer transition-all ${
-                    planForm.clonarAnterior
-                      ? "bg-indigo-50/50 border-indigo-200 text-indigo-950 shadow-2xs"
-                      : "bg-gray-50/60 border-[#E2E8F0] text-[#6B7A8D]"
-                  }`}
-                >
-                  <div className={`w-4 h-4 rounded-md mt-0.5 flex items-center justify-center border shrink-0 ${
-                    planForm.clonarAnterior
-                      ? "bg-indigo-600 border-indigo-600 text-white"
-                      : "border-gray-300 bg-white"
-                  }`}>
-                    {planForm.clonarAnterior && <Check className="w-3 h-3 stroke-[3]" />}
+                <div className="space-y-2">
+                  <div
+                    onClick={() => setPlanForm(p => ({ ...p, clonarAnterior: !p.clonarAnterior }))}
+                    className={`p-3.5 rounded-xl border flex items-start gap-3 cursor-pointer transition-all ${
+                      planForm.clonarAnterior
+                        ? "bg-indigo-50/50 border-indigo-200 text-indigo-950 shadow-2xs"
+                        : "bg-gray-50/60 border-[#E2E8F0] text-[#6B7A8D]"
+                    }`}
+                  >
+                    <div className={`w-4 h-4 rounded-md mt-0.5 flex items-center justify-center border shrink-0 ${
+                      planForm.clonarAnterior
+                        ? "bg-indigo-600 border-indigo-600 text-white"
+                        : "border-gray-300 bg-white"
+                    }`}>
+                      {planForm.clonarAnterior && <Check className="w-3 h-3 stroke-[3]" />}
+                    </div>
+                    <div className="min-w-0">
+                      <span className="text-xs font-bold block text-[#0B1929]">
+                        Clonar comidas y rutinas del plan anterior
+                      </span>
+                      <span className="text-[11px] text-[#6B7A8D] leading-tight block mt-0.5">
+                        Copia la estructura del ciclo previo como base de trabajo para que no tengas que empezar desde cero. Si lo desmarcas, arranca en blanco.
+                      </span>
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <span className="text-xs font-bold block text-[#0B1929]">
-                      Clonar comidas y rutinas del plan anterior
-                    </span>
-                    <span className="text-[11px] text-[#6B7A8D] leading-tight block mt-0.5">
-                      Copia la estructura del ciclo previo como base de trabajo para que no tengas que empezar desde cero. Si lo desmarcas, arranca en blanco.
-                    </span>
-                  </div>
+
+                  {planForm.clonarAnterior && planForm.servicios?.entrenamiento && (
+                    <div
+                      onClick={() => setPlanForm(p => ({ ...p, migrarMarcas: !p.migrarMarcas }))}
+                      className={`ml-3 p-3 rounded-xl border flex items-start gap-2.5 cursor-pointer transition-all ${
+                        planForm.migrarMarcas
+                          ? "bg-emerald-50/60 border-emerald-200 text-emerald-950"
+                          : "bg-white border-[#E2E8F0] text-[#6B7A8D]"
+                      }`}
+                    >
+                      <div className={`w-4 h-4 rounded-md mt-0.5 flex items-center justify-center border shrink-0 ${
+                        planForm.migrarMarcas
+                          ? "bg-emerald-600 border-emerald-600 text-white"
+                          : "border-gray-300 bg-white"
+                      }`}>
+                        {planForm.migrarMarcas && <Check className="w-3 h-3 stroke-[3]" />}
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-xs font-bold block text-[#0B1929]">
+                          Migrar últimas marcas reales alcanzadas (peso y reps por serie)
+                        </span>
+                        <span className="text-[11px] text-[#6B7A8D] leading-tight block mt-0.5">
+                          Toma los últimos pesos y repeticiones reales del ciclo previo para continuar desde tu nivel actual en vez de volver a las cargas iniciales.
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -7508,13 +7732,24 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
             {/* Right Column: Ejercicios Programados & Alternativas */}
             <div className="lg:col-span-7 bg-white rounded-none md:rounded-2xl border-0 md:border border-[#E2E8F0] p-4 sm:p-6 shadow-none md:shadow-sm">
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-between gap-2 flex-wrap mb-4">
                 <div>
                   <h3 className="text-sm font-bold text-[#0B1929] uppercase tracking-wider">
                     Ejercicios Asignados ({rutinaForm.ejercicios.length})
                   </h3>
-                  <p className="text-xs text-[#6B7A8D] mt-0.5">Arrastra para reordenar o pulsa (+) en un ejercicio para asignarle hasta 2 alternativas</p>
+                  <p className="text-xs text-[#6B7A8D] mt-0.5">Arrastra para reordenar, abre &ldquo;Por serie&rdquo; si varía cada serie o pulsa (+) para alternativas</p>
                 </div>
+                {rutinaForm.ejercicios.some((ejItem) => Boolean(lookupExerciseHistory(patientHistoryMarks, ejItem))) && (
+                  <button
+                    type="button"
+                    onClick={applyAllHistoryMarksToRoutine}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 text-xs font-bold transition-colors cursor-pointer shrink-0"
+                    title="Rellenar peso y repeticiones con las últimas marcas registradas del paciente"
+                  >
+                    <TrendingUp className="w-3.5 h-3.5" />
+                    <span>Importar últimas marcas</span>
+                  </button>
+                )}
               </div>
 
               {rutinaForm.ejercicios.length === 0 ? (
@@ -7552,7 +7787,35 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                   </div>
                                   <div className="text-[13px] font-semibold text-[#0B1929] leading-tight min-w-0 pr-1">
                                     <div className="truncate">{e.nombre}</div>
-                                    <span className="text-[10px] text-[#6B7A8D] font-normal">{GRUPO_LABELS[normalizeMuscleGroup(e.grupo_muscular)] || e.grupo_muscular}</span>
+                                    <div className="flex items-center flex-wrap gap-1.5 mt-0.5">
+                                      <span className="text-[10px] text-[#6B7A8D] font-normal">{GRUPO_LABELS[normalizeMuscleGroup(e.grupo_muscular)] || e.grupo_muscular}</span>
+                                      {(() => {
+                                        const hMark = lookupExerciseHistory(patientHistoryMarks, e);
+                                        if (!hMark) return null;
+                                        const u = e.unidad || "kg";
+                                        const wLbl = hMark.lastWeightKg != null ? `${convertWeightToInput(hMark.lastWeightKg, u)} ${u}` : null;
+                                        const rLbl = hMark.lastReps != null ? `${hMark.lastReps} reps` : null;
+                                        return (
+                                          <button
+                                            type="button"
+                                            onClick={() => applyHistoryMarksToExercise(i)}
+                                            className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold border transition-colors cursor-pointer ${
+                                              e._historyApplied
+                                                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                                : "bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100"
+                                            }`}
+                                            title="Aplicar últimas marcas registradas en este ejercicio"
+                                          >
+                                            <TrendingUp className="w-2.5 h-2.5" />
+                                            <span>
+                                              {e._historyApplied
+                                                ? "Marcas aplicadas"
+                                                : `Última: ${[wLbl, rLbl].filter(Boolean).join(" × ")}`}
+                                            </span>
+                                          </button>
+                                        );
+                                      })()}
+                                    </div>
                                   </div>
                                   
                                   <div className="col-span-4 sm:col-span-3 sm:col-start-4 sm:row-start-1 grid grid-cols-3 gap-2 sm:grid-cols-[65px_65px_80px] sm:gap-1.5 mt-1.5 sm:mt-0 pt-2 sm:pt-0 border-t border-[#E2E8F0] sm:border-none">
@@ -7562,18 +7825,45 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                     </div>
                                     <div className="flex flex-col gap-0.5 sm:block">
                                       <span className="text-[10px] font-semibold text-[#6B7A8D] sm:hidden text-center w-full">REPS</span>
-                                      <input type="number" className="w-full px-2 py-1.5 rounded-lg border border-[#E2E8F0] bg-white text-[13px] font-semibold text-center" value={e.reps_sugeridas} onChange={ev=>updEj(i,"reps_sugeridas",ev.target.value)} placeholder="10" />
+                                      <input
+                                        type="number"
+                                        disabled={Array.isArray(e.seriesForm) && e.seriesForm.length > 0}
+                                        className="w-full px-2 py-1.5 rounded-lg border border-[#E2E8F0] bg-white disabled:bg-slate-100 disabled:text-slate-400 text-[13px] font-semibold text-center"
+                                        value={e.reps_sugeridas}
+                                        onChange={ev=>updEj(i,"reps_sugeridas",ev.target.value)}
+                                        placeholder="10"
+                                      />
                                     </div>
                                     <div className="flex flex-col gap-0.5 sm:block">
                                       <span className="text-[10px] font-semibold text-[#6B7A8D] sm:hidden text-center w-full">PESO</span>
                                       <div className="relative w-full">
-                                        <input type="text" inputMode="decimal" className="w-full pl-2 pr-6 py-1.5 rounded-lg border border-[#E2E8F0] bg-white text-[13px] font-semibold text-center" value={e.peso_sugerido||""} onChange={ev=>updEj(i,"peso_sugerido",ev.target.value)} placeholder="-" />
+                                        <input
+                                          type="text"
+                                          inputMode="decimal"
+                                          disabled={Array.isArray(e.seriesForm) && e.seriesForm.length > 0}
+                                          className="w-full pl-2 pr-6 py-1.5 rounded-lg border border-[#E2E8F0] bg-white disabled:bg-slate-100 disabled:text-slate-400 text-[13px] font-semibold text-center"
+                                          value={e.peso_sugerido||""}
+                                          onChange={ev=>updEj(i,"peso_sugerido",ev.target.value)}
+                                          placeholder="-"
+                                        />
                                         <button type="button" onClick={() => toggleUnidad(i)} className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] font-bold text-[#6B7A8D] uppercase hover:text-[#0B1929]">{e.unidad || 'KG'}</button>
                                       </div>
                                     </div>
                                   </div>
                             
                                   <div className="col-start-4 row-start-1 sm:col-start-7 sm:row-start-1 flex items-center justify-end gap-1 self-center">
+                                    <button
+                                      type="button"
+                                      onClick={() => togglePerSeries(i)}
+                                      className={`p-1.5 rounded-lg flex items-center justify-center transition-colors border-none cursor-pointer ${
+                                        Array.isArray(e.seriesForm) && e.seriesForm.length > 0
+                                          ? "bg-indigo-600 text-white shadow-2xs"
+                                          : "bg-gray-100 text-[#6B7A8D] hover:bg-gray-200"
+                                      }`}
+                                      title={Array.isArray(e.seriesForm) && e.seriesForm.length > 0 ? "Volver a peso/reps uniforme" : "Configurar reps y peso por serie (híbrido)"}
+                                    >
+                                      <ListOrdered className="w-[14px] h-[14px]" />
+                                    </button>
                                     {(e.alternativas || []).length < 2 && (
                                       <button
                                         type="button"
@@ -7595,6 +7885,51 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                     </button>
                                   </div>
                                 </div>
+
+                                {/* PER-SERIES HYBRID EDITOR */}
+                                {Array.isArray(e.seriesForm) && e.seriesForm.length > 0 && (
+                                  <div className="mt-2 sm:ml-[64px] p-2.5 rounded-xl bg-indigo-50/60 border border-indigo-200/80 space-y-2">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-900">
+                                        Desglose por serie ({e.seriesForm.length} series • {(e.unidad || "kg").toUpperCase()})
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => togglePerSeries(i)}
+                                        className="text-[10px] font-bold text-indigo-700 hover:underline cursor-pointer"
+                                      >
+                                        Usar valor uniforme
+                                      </button>
+                                    </div>
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                      {e.seriesForm.map((sf, si) => (
+                                        <div key={si} className="bg-white rounded-lg border border-indigo-100 p-1.5 space-y-1">
+                                          <div className="text-[9px] font-extrabold text-indigo-600 uppercase text-center">Serie {si + 1}</div>
+                                          <div className="grid grid-cols-2 gap-1">
+                                            <input
+                                              type="number"
+                                              min="1"
+                                              value={sf.reps}
+                                              onChange={(ev) => updSerieField(i, si, "reps", ev.target.value)}
+                                              placeholder="Reps"
+                                              title={`Reps Serie ${si + 1}`}
+                                              className="w-full px-1 py-1 rounded border border-[#E2E8F0] text-[11px] font-semibold text-center"
+                                            />
+                                            <input
+                                              type="text"
+                                              inputMode="decimal"
+                                              value={sf.peso}
+                                              onChange={(ev) => updSerieField(i, si, "peso", ev.target.value)}
+                                              placeholder={e.unidad || "kg"}
+                                              title={`Peso Serie ${si + 1}`}
+                                              className="w-full px-1 py-1 rounded border border-[#E2E8F0] text-[11px] font-semibold text-center"
+                                            />
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
                             
                                 {/* ACTIVE ALT SLOT INDICATOR */}
                                 {activeAltSlot === i && (
