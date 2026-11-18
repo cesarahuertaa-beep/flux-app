@@ -17,12 +17,12 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { SortableItem } from "../SortableItem";
-import { RefreshCw, ChevronDown, Trash2, Calendar, Activity, CheckCircle2, AlertCircle, ShieldAlert, AlertTriangle, Save, Edit2, Plus, Search, FileText, Download, Lock, X, Utensils, Dumbbell, BarChart2, Camera, Image as ImageIcon, Bookmark, Calculator, ArrowLeft, ArrowUp, User, Check, ClipboardList, RotateCcw, MessageCircle, Copy, TrendingUp, Sparkles, Flame, Target, Droplets, Pill, Clock, Loader2, ListOrdered, Trophy } from "lucide-react";
+import { RefreshCw, ChevronDown, Trash2, Calendar, Activity, CheckCircle2, AlertCircle, ShieldAlert, AlertTriangle, Save, Edit2, Plus, Search, FileText, Download, Lock, X, Utensils, Dumbbell, BarChart2, Camera, Image as ImageIcon, Bookmark, Calculator, ArrowLeft, ArrowUp, User, Check, ClipboardList, RotateCcw, MessageCircle, Copy, TrendingUp, Sparkles, Flame, Target, Droplets, Pill, Clock, Loader2, ListOrdered, Trophy, Link2, Unlink2, SlidersHorizontal, Timer } from "lucide-react";
 import { EjercicioSelector } from "./EjercicioSelector";
 import { GRUPO_LABELS, normalizeMuscleGroup } from "../../lib/constants";
 import { ConfirmModal } from "../ui/ConfirmModal";
 import { CustomSelect } from "../ui/CustomSelect";
-import { generateNutriPDF } from "../../utils/pdf";
+import { generateNutriPDF, generateRutinaPDF } from "../../utils/pdf";
 import { dbPeek, dbGet, dbGetFresh, dbPost, dbPatch, dbDel, dbUpsert, storageUpload, updateQueryCache, invalidateCache } from "../../lib/supabase";
 import {
   fetchClientExerciseHistoryData,
@@ -35,6 +35,14 @@ import {
   convertWeightToInput,
   convertInputWeightToKg,
   hasCustomSeriesBreakdown,
+  SERIES_TYPES,
+  normalizeSeriesType,
+  getSeriesVisualLabels,
+  countEffectiveSeries,
+  computeWeeklyMuscleVolume,
+  parseRecommendedVolumeRange,
+  normalizeSupersetBlocks,
+  formatRestLabel,
 } from "../../utils/routineHelpers";
 import { useBrand } from "../BrandContext";
 import { useBackButton } from "../../lib/backButtonHandler";
@@ -1107,24 +1115,56 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     }
   }, [selected?.id, loadPatientExerciseHistory]);
 
-  /** Persiste ejercicios con series_detalle, haciendo fallback si la columna aún no existe en BD. */
+  /** Extrae los campos opcionales de prescripción (descanso, RIR, nota, biserie) para persistencia uniforme. */
+  const extractOptionalExerciseFields = (src) => {
+    const restRaw = src?.descanso_seg;
+    const restParsed =
+      restRaw !== null && restRaw !== undefined && String(restRaw).trim() !== ""
+        ? parseInt(restRaw, 10)
+        : NaN;
+    const rir = src?.rir_objetivo ? String(src.rir_objetivo).trim() : "";
+    const nota = src?.nota_tecnica ? String(src.nota_tecnica).trim() : "";
+    const bloque = src?.bloque_grupo ? String(src.bloque_grupo).trim() : "";
+    return {
+      descanso_seg: !isNaN(restParsed) && restParsed > 0 ? Math.min(600, restParsed) : null,
+      rir_objetivo: rir || null,
+      nota_tecnica: nota || null,
+      bloque_grupo: bloque || null,
+    };
+  };
+
+  /** Persiste ejercicios con campos opcionales, haciendo fallback si alguna columna aún no existe en BD. */
   const persistEjerciciosSafe = async (rows, { upsert = false } = {}) => {
     if (!Array.isArray(rows) || rows.length === 0) return;
+    const optionalCols = ["series_detalle", "descanso_seg", "rir_objetivo", "nota_tecnica", "bloque_grupo"];
     const exec = (payload) =>
       upsert
         ? dbUpsert("ejercicios?on_conflict=id", payload, {
             headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
           })
         : dbPost("ejercicios", payload, { headers: { Prefer: "return=minimal" } });
-    try {
-      await exec(rows);
-    } catch (err) {
-      const msg = String(err?.message || err || "");
-      if (msg.includes("series_detalle") && (msg.includes("PGRST204") || msg.includes("column"))) {
-        const stripped = rows.map(({ series_detalle: _omit, ...rest }) => rest);
-        await exec(stripped);
-      } else {
-        throw err;
+
+    let currentPayload = rows;
+    let remainingCols = [...optionalCols];
+
+    for (let attempt = 0; attempt <= optionalCols.length; attempt++) {
+      try {
+        await exec(currentPayload);
+        return;
+      } catch (err) {
+        const msg = String(err?.message || err || "");
+        const isMissingColErr = msg.includes("PGRST204") || msg.includes("column");
+        if (!isMissingColErr || remainingCols.length === 0) {
+          throw err;
+        }
+        const matchedCols = remainingCols.filter((c) => msg.includes(c));
+        const colsToStrip = matchedCols.length > 0 ? matchedCols : remainingCols;
+        remainingCols = remainingCols.filter((c) => !colsToStrip.includes(c));
+        currentPayload = currentPayload.map((r) => {
+          const clone = { ...r };
+          colsToStrip.forEach((c) => delete clone[c]);
+          return clone;
+        });
       }
     }
   };
@@ -1145,6 +1185,11 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       unidad: unit,
       series_detalle: normDetalle,
       seriesForm,
+      descanso_seg: x.descanso_seg != null && x.descanso_seg !== "" ? String(x.descanso_seg) : "",
+      rir_objetivo: x.rir_objetivo || "",
+      nota_tecnica: x.nota_tecnica || "",
+      bloque_grupo: x.bloque_grupo || null,
+      _showOptions: false,
       alternativas: (x.alternativas || []).map((alt) => ({
         ...alt,
         peso_sugerido: formatWeightForInput(alt.peso_sugerido, alt.unidad || unit),
@@ -2017,6 +2062,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                         peso_sugerido: migrated.peso_sugerido,
                         unidad: ej.unidad || "kg",
                         series_detalle: migrated.series_detalle,
+                        ...extractOptionalExerciseFields(ej),
                         alternativas: migrated.alternativas,
                         orden: ej.orden != null ? ej.orden : ejIdx,
                       };
@@ -2387,6 +2433,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
               peso_sugerido: (e.peso_sugerido !== "" && e.peso_sugerido !== null && e.peso_sugerido !== undefined && !isNaN(e.peso_sugerido)) ? Number(e.peso_sugerido) : null,
               unidad: e.unidad || "kg",
               series_detalle: normalizeSeriesDetalle(e.series_detalle),
+              ...extractOptionalExerciseFields(e),
               alternativas: (e.alternativas || []).map((alt) => ({
                 ...alt,
                 peso_sugerido: (alt.peso_sugerido !== "" && alt.peso_sugerido !== null && alt.peso_sugerido !== undefined && !isNaN(alt.peso_sugerido)) ? Number(alt.peso_sugerido) : null,
@@ -3442,8 +3489,10 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
     if (Array.isArray(e.seriesForm) && e.seriesForm.length > 0) {
       const converted = seriesFormToDb(e.seriesForm, unit, numSeries);
-      const validWeights = converted.map((s) => s.peso).filter((p) => p !== null);
-      const firstReps = converted[0]?.reps;
+      const workingRows = converted.filter((s) => normalizeSeriesType(s.tipo) !== "warmup");
+      const refRows = workingRows.length > 0 ? workingRows : converted;
+      const validWeights = refRows.map((s) => s.peso).filter((p) => p !== null);
+      const firstReps = refRows[0]?.reps;
       if (firstReps) repsSug = firstReps;
       if (validWeights.length > 0) pesoSugKg = Math.max(...validWeights);
       if (hasCustomSeriesBreakdown(converted, repsSug, pesoSugKg)) {
@@ -3465,6 +3514,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       peso_sugerido: pesoSugKg,
       unidad: unit,
       series_detalle: seriesDetalle,
+      ...extractOptionalExerciseFields(e),
       alternativas: (e.alternativas || []).map((alt) => ({
         ...alt,
         peso_sugerido: convertInputWeightToKg(alt.peso_sugerido, alt.unidad || unit),
@@ -3478,11 +3528,13 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     const formSnap = {
       ...rutinaForm,
       diasSeleccionados: [...(rutinaForm.diasSeleccionados || [])],
-      ejercicios: (rutinaForm.ejercicios || []).map(e => ({
-        ...e,
-        seriesForm: Array.isArray(e.seriesForm) ? e.seriesForm.map(s => ({ ...s })) : [],
-        alternativas: (e.alternativas || []).map(a => ({ ...a })),
-      })),
+      ejercicios: normalizeSupersetBlocks(
+        (rutinaForm.ejercicios || []).map(e => ({
+          ...e,
+          seriesForm: Array.isArray(e.seriesForm) ? e.seriesForm.map(s => ({ ...s })) : [],
+          alternativas: (e.alternativas || []).map(a => ({ ...a })),
+        }))
+      ),
     };
     const editRutinaSnap = editRutina;
     const prevRutinas = rutinas;
@@ -3726,7 +3778,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       setRutinaForm(p => ({ ...p, ejercicios:[...p.ejercicios, { 
         _dndId: Math.random().toString(36).slice(2,9), 
         biblioteca_id:ej.id, nombre:ej.nombre, grupo_muscular:ej.grupo_muscular, 
-        gif_url:ej.gif_url||"", num_series:4, reps_sugeridas:10, peso_sugerido:"", unidad:"kg", series_detalle:[], seriesForm:[], alternativas:[] 
+        gif_url:ej.gif_url||"", num_series:4, reps_sugeridas:10, peso_sugerido:"", unidad:"kg", series_detalle:[], seriesForm:[], alternativas:[],
+        descanso_seg: "", rir_objetivo: "", nota_tecnica: "", bloque_grupo: null, _showOptions: false
       }] }));
     } else {
       setRutinaForm(p => {
@@ -3753,12 +3806,14 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
   const updEj = (i, f, v) => setRutinaForm(p => {
     const es = [...p.ejercicios];
-    const cur = { ...es[i], [f]: v, ...(f !== "unidad" ? { _historyApplied: false } : {}) };
+    const cur = { ...es[i], [f]: v, ...(f !== "unidad" && f !== "descanso_seg" && f !== "rir_objetivo" && f !== "nota_tecnica" ? { _historyApplied: false } : {}) };
     if (f === "num_series" && Array.isArray(cur.seriesForm) && cur.seriesForm.length > 0) {
       const nextCount = Math.max(1, Math.min(12, parseInt(v, 10) || 1));
       const prevRows = cur.seriesForm;
-      const last = prevRows[prevRows.length - 1] || { reps: String(cur.reps_sugeridas || 10), peso: String(cur.peso_sugerido || "") };
-      cur.seriesForm = Array.from({ length: nextCount }, (_, idx) => (prevRows[idx] ? { ...prevRows[idx] } : { ...last }));
+      const last = prevRows[prevRows.length - 1] || { reps: String(cur.reps_sugeridas || 10), peso: String(cur.peso_sugerido || ""), tipo: "normal" };
+      cur.seriesForm = Array.from({ length: nextCount }, (_, idx) =>
+        prevRows[idx] ? { ...prevRows[idx] } : { reps: last.reps, peso: last.peso, tipo: "normal" }
+      );
     }
     es[i] = cur;
     return { ...p, ejercicios: es };
@@ -3769,11 +3824,11 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     const cur = es[i];
     if (!cur) return p;
     if (Array.isArray(cur.seriesForm) && cur.seriesForm.length > 0) {
-      const first = cur.seriesForm[0] || {};
+      const firstWorking = cur.seriesForm.find((s) => normalizeSeriesType(s.tipo) !== "warmup") || cur.seriesForm[0] || {};
       es[i] = {
         ...cur,
-        reps_sugeridas: first.reps || cur.reps_sugeridas || 10,
-        peso_sugerido: first.peso !== undefined ? first.peso : (cur.peso_sugerido || ""),
+        reps_sugeridas: firstWorking.reps || cur.reps_sugeridas || 10,
+        peso_sugerido: firstWorking.peso !== undefined ? firstWorking.peso : (cur.peso_sugerido || ""),
         series_detalle: [],
         seriesForm: [],
       };
@@ -3784,6 +3839,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         seriesForm: Array.from({ length: count }, () => ({
           reps: String(cur.reps_sugeridas || 10),
           peso: String(cur.peso_sugerido || ""),
+          tipo: "normal",
         })),
       };
     }
@@ -3801,23 +3857,83 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     return { ...p, ejercicios: es };
   });
 
+  const toggleSeriesType = (i, si) => setRutinaForm(p => {
+    const es = [...p.ejercicios];
+    const cur = es[i];
+    if (!cur || !Array.isArray(cur.seriesForm)) return p;
+    const nextSeries = cur.seriesForm.map((s, idx) => {
+      if (idx !== si) return s;
+      const curType = normalizeSeriesType(s.tipo);
+      const nextType = SERIES_TYPES[curType]?.next || "normal";
+      return { ...s, tipo: nextType };
+    });
+    es[i] = { ...cur, seriesForm: nextSeries };
+    return { ...p, ejercicios: es };
+  });
+
+  const toggleExerciseOptions = (i) => setRutinaForm(p => {
+    const es = [...p.ejercicios];
+    if (!es[i]) return p;
+    es[i] = { ...es[i], _showOptions: !es[i]._showOptions };
+    return { ...p, ejercicios: es };
+  });
+
+  const toggleSupersetWithNext = (i) => setRutinaForm(p => {
+    const es = [...(p.ejercicios || [])].map(item => ({ ...item }));
+    const cur = es[i];
+    const next = es[i + 1];
+    if (!cur) return p;
+
+    if (cur.bloque_grupo && next && cur.bloque_grupo === next.bloque_grupo) {
+      // Desvincular este bloque entre i e i+1
+      const groupId = cur.bloque_grupo;
+      const prevSame = i > 0 && es[i - 1]?.bloque_grupo === groupId;
+      if (prevSame) {
+        // i pertenece al bloque anterior; cortar desde i+1
+        es[i + 1].bloque_grupo = null;
+      } else {
+        es[i].bloque_grupo = null;
+      }
+    } else if (cur.bloque_grupo && (!next || cur.bloque_grupo !== next.bloque_grupo) && i === es.length - 1) {
+      es[i].bloque_grupo = null;
+    } else if (next) {
+      const targetGroup = cur.bloque_grupo || next.bloque_grupo || `SS_${Date.now()}`;
+      es[i].bloque_grupo = targetGroup;
+      es[i + 1].bloque_grupo = targetGroup;
+    } else if (cur.bloque_grupo) {
+      es[i].bloque_grupo = null;
+    }
+
+    return { ...p, ejercicios: normalizeSupersetBlocks(es) };
+  });
+
   const applyMarkToExerciseObject = (exObj, mark) => {
     if (!mark) return exObj;
     const unit = exObj.unidad || "kg";
     const numSeries = Math.max(1, parseInt(exObj.num_series, 10) || 4);
     const repsStr = String(mark.reps_sugeridas || exObj.reps_sugeridas || 10);
     const pesoStr = mark.peso_sugerido != null ? convertWeightToInput(mark.peso_sugerido, unit) : (exObj.peso_sugerido || "");
+    const existingTypes = Array.isArray(exObj.seriesForm) && exObj.seriesForm.length > 0
+      ? exObj.seriesForm.map((s) => normalizeSeriesType(s.tipo))
+      : normalizeSeriesDetalle(exObj.series_detalle).map((s) => normalizeSeriesType(s.tipo));
+    const hasCoachTypes = existingTypes.some((t) => t !== "normal");
     const keepPerSeriesOpen = Array.isArray(exObj.seriesForm) && exObj.seriesForm.length > 0;
     const hasVaryingSeries = Array.isArray(mark.series_detalle) && mark.series_detalle.length > 0;
-    const nextSeriesForm =
-      hasVaryingSeries || keepPerSeriesOpen
+    const rawSeriesForm =
+      hasVaryingSeries || keepPerSeriesOpen || hasCoachTypes
         ? seriesDetalleToForm(mark.allSeriesMarks || mark.series_detalle, numSeries, repsStr, pesoStr, unit)
         : [];
+    const nextSeriesForm = rawSeriesForm.map((row, idx) => ({
+      ...row,
+      tipo: existingTypes[idx] && existingTypes[idx] !== "normal" ? existingTypes[idx] : normalizeSeriesType(row.tipo),
+    }));
     return {
       ...exObj,
       reps_sugeridas: repsStr,
       peso_sugerido: pesoStr,
-      series_detalle: hasVaryingSeries ? mark.series_detalle : [],
+      series_detalle: hasVaryingSeries || hasCoachTypes
+        ? seriesFormToDb(nextSeriesForm, unit, numSeries)
+        : [],
       seriesForm: nextSeriesForm,
       _historyApplied: true,
     };
@@ -3874,7 +3990,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     }
   };
 
-  const remEj = (i) => setRutinaForm(p => ({ ...p, ejercicios:p.ejercicios.filter((_,x)=>x!==i) }));
+  const remEj = (i) => setRutinaForm(p => ({ ...p, ejercicios: normalizeSupersetBlocks(p.ejercicios.filter((_,x)=>x!==i)) }));
   
   const toggleUnidad = (i) => setRutinaForm(p => { const es=[...p.ejercicios]; es[i]={...es[i], unidad: es[i].unidad ==="lb" ?"kg" :"lb"}; return { ...p, ejercicios:es }; });
   const toggleUnidadAlt = (i, altIdx) => setRutinaForm(p => { const es=[...p.ejercicios]; const alts=[...es[i].alternativas]; alts[altIdx]={...alts[altIdx], unidad: alts[altIdx].unidad ==="lb" ?"kg" :"lb"}; es[i]={...es[i], alternativas: alts}; return { ...p, ejercicios:es }; });
@@ -3991,7 +4107,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       setRutinaForm((p) => {
         const oldIndex = p.ejercicios.findIndex(e => String(e._dndId) === active.id);
         const newIndex = p.ejercicios.findIndex(e => String(e._dndId) === over.id);
-        return { ...p, ejercicios: arrayMove(p.ejercicios, oldIndex, newIndex) };
+        return { ...p, ejercicios: normalizeSupersetBlocks(arrayMove(p.ejercicios, oldIndex, newIndex)) };
       });
     }
   };
@@ -5119,6 +5235,16 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                 )}
               </div>
               <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                {rutinas.length > 0 && (
+                  <button
+                    onClick={() => generateRutinaPDF(selected, rutinas, parsedActiveCycle, brand, smartTrainingPrescription)}
+                    className="w-8 h-8 sm:w-auto sm:px-3 sm:py-1.5 rounded-xl border border-[#E2E8F0] bg-white text-[#0B1929] hover:bg-gray-50 text-xs sm:text-sm font-bold shadow-2xs transition-colors flex items-center justify-center sm:gap-1.5 cursor-pointer"
+                    title="Descargar PDF de Rutinas"
+                  >
+                    <FileText className="w-4 h-4 text-[var(--brand-primary)] shrink-0" />
+                    <span className="hidden sm:inline">Descargar PDF</span>
+                  </button>
+                )}
                 {!isReadOnly && (
                   <button
                     onClick={() => setTemplateModal("rutina")}
@@ -5149,12 +5275,56 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                 )}
               </div>
             </div>
+
+            {/* Monitor en vivo de Volumen Semanal por Grupo Muscular (solo series efectivas) */}
+            {rutinas.length > 0 && (() => {
+              const volSummary = computeWeeklyMuscleVolume(rutinas);
+              const recRange = parseRecommendedVolumeRange(smartTrainingPrescription);
+              if (volSummary.totalEffectiveSets === 0 && volSummary.totalWarmupSets === 0) return null;
+              return (
+                <div className="mb-3 bg-white rounded-none md:rounded-xl border-y md:border border-[#E2E8F0] px-4 py-3">
+                  <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-[#0B1929]">
+                      <BarChart2 className="w-3.5 h-3.5 text-[var(--brand-primary)] shrink-0" />
+                      <span>Volumen Semanal Efectivo</span>
+                      <span className="text-[11px] font-semibold text-[#6B7A8D]">
+                        ({volSummary.totalEffectiveSets} series{volSummary.totalWarmupSets > 0 ? ` + ${volSummary.totalWarmupSets} calent.` : ""})
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-semibold text-[#6B7A8D] bg-[#F8FAFC] border border-[#E2E8F0] px-2 py-0.5 rounded-full">
+                      Ref. {recRange.min}-{recRange.max} series/músculo
+                    </span>
+                  </div>
+                  {volSummary.muscleList.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {volSummary.muscleList.map((m) => {
+                        const isAbove = m.sets > recRange.max;
+                        const isOptimal = m.sets >= recRange.min && m.sets <= recRange.max;
+                        const badgeCls = isAbove
+                          ? "bg-amber-50 text-amber-800 border-amber-200"
+                          : isOptimal
+                          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                          : "bg-[#F8FAFC] text-[#475569] border-[#E2E8F0]";
+                        return (
+                          <span key={m.id} className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg border text-[11px] font-semibold ${badgeCls}`}>
+                            <span>{m.label}</span>
+                            <span className="font-mono font-bold">{m.sets}</span>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndRutinas}>
               <SortableContext items={rutinas.map(r => String(r.id))} strategy={verticalListSortingStrategy}>
                 {rutinas.map(r => {
                   const parts = (r.nombre || "").split('|');
                   const tab = parts.length > 1 ? parts[0] : 'S/D';
                   const title = parts.length > 1 ? parts.slice(1).join('|') : parts[0];
+                  const dayVol = computeWeeklyMuscleVolume([r]);
                   return (
                     <SortableItem key={r.id} id={r.id}>
                       {({ dragHandle, isDragging }) => (
@@ -5168,7 +5338,16 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                 )}
                                 <span className="font-semibold text-[14px] text-[#0B1929] break-words line-clamp-2">{title || "Sin título"}</span>
                               </div>
-                              <span className="text-xs text-[#6B7A8D] mt-0.5 shrink-0">{(r.ejercicios || []).length} ejercicios • {r.semanas} sem</span>
+                              <div className="flex items-center flex-wrap gap-1.5 mt-1">
+                                <span className="text-xs text-[#6B7A8D] shrink-0">
+                                  {(r.ejercicios || []).length} ej • {dayVol.totalEffectiveSets} series ef.{dayVol.totalWarmupSets > 0 ? ` (+${dayVol.totalWarmupSets} cal.)` : ""} • {r.semanas} sem
+                                </span>
+                                {dayVol.muscleList.slice(0, 3).map((m) => (
+                                  <span key={m.id} className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[var(--brand-secondary)]/80 text-[var(--brand-primary)]">
+                                    {m.label} {m.sets}
+                                  </span>
+                                ))}
+                              </div>
                             </div>
                           </div>
                           {!isReadOnly && (
@@ -7750,30 +7929,46 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
             <div className="lg:col-span-7 bg-white rounded-none md:rounded-2xl border-0 md:border border-[#E2E8F0] p-4 sm:p-6 shadow-none md:shadow-sm">
               {(() => {
                 const matchedHistoryCount = rutinaForm.ejercicios.filter((ejItem) => Boolean(lookupExerciseHistory(patientHistoryMarks, ejItem))).length;
+                const sessionVol = computeWeeklyMuscleVolume([{ ejercicios: rutinaForm.ejercicios }]);
                 return (
-                  <div className="flex items-center justify-between gap-2 flex-wrap mb-4">
-                    <div>
-                      <h3 className="text-sm font-bold text-[#0B1929] uppercase tracking-wider">
-                        Ejercicios Asignados ({rutinaForm.ejercicios.length})
-                      </h3>
-                      <p className="text-xs text-[#6B7A8D] mt-0.5">Arrastra para reordenar, abre &ldquo;Por serie&rdquo; si varía cada serie o pulsa (+) para alternativas</p>
+                  <div className="mb-4 space-y-2.5">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div>
+                        <h3 className="text-sm font-bold text-[#0B1929] uppercase tracking-wider">
+                          Ejercicios Asignados ({rutinaForm.ejercicios.length})
+                        </h3>
+                        <p className="text-xs text-[#6B7A8D] mt-0.5">Arrastra para reordenar, abre &ldquo;Por serie&rdquo; si varía cada serie o pulsa (+) para alternativas</p>
+                      </div>
+                      {loadingPatientHistory && matchedHistoryCount === 0 && (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[var(--brand-secondary)]/70 border border-[var(--brand-primary)]/20 text-[var(--brand-primary)] text-[11px] font-semibold">
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          <span>Buscando mejores marcas...</span>
+                        </span>
+                      )}
+                      {matchedHistoryCount > 0 && (
+                        <button
+                          type="button"
+                          onClick={applyAllHistoryMarksToRoutine}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--brand-secondary)] hover:bg-[var(--brand-primary)] border border-[var(--brand-primary)]/40 text-[var(--brand-primary)] hover:text-white text-xs font-bold transition-colors cursor-pointer shrink-0 shadow-2xs"
+                          title="Rellenar peso y repeticiones con las mejores marcas históricas registradas por este paciente"
+                        >
+                          <Trophy className="w-3.5 h-3.5 shrink-0" />
+                          <span>Importar mejores marcas ({matchedHistoryCount})</span>
+                        </button>
+                      )}
                     </div>
-                    {loadingPatientHistory && matchedHistoryCount === 0 && (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[var(--brand-secondary)]/70 border border-[var(--brand-primary)]/20 text-[var(--brand-primary)] text-[11px] font-semibold">
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                        <span>Buscando mejores marcas...</span>
-                      </span>
-                    )}
-                    {matchedHistoryCount > 0 && (
-                      <button
-                        type="button"
-                        onClick={applyAllHistoryMarksToRoutine}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--brand-secondary)] hover:bg-[var(--brand-primary)] border border-[var(--brand-primary)]/40 text-[var(--brand-primary)] hover:text-white text-xs font-bold transition-colors cursor-pointer shrink-0 shadow-2xs"
-                        title="Rellenar peso y repeticiones con las mejores marcas históricas registradas por este paciente"
-                      >
-                        <Trophy className="w-3.5 h-3.5 shrink-0" />
-                        <span>Importar mejores marcas ({matchedHistoryCount})</span>
-                      </button>
+                    {rutinaForm.ejercicios.length > 0 && (
+                      <div className="flex items-center flex-wrap gap-1.5 px-2.5 py-2 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0]">
+                        <span className="text-[11px] font-bold text-[#0B1929] mr-1">
+                          Sesión: {sessionVol.totalEffectiveSets} series efectivas
+                          {sessionVol.totalWarmupSets > 0 ? ` (+${sessionVol.totalWarmupSets} calent.)` : ""}
+                        </span>
+                        {sessionVol.muscleList.map((m) => (
+                          <span key={m.id} className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-white border border-[#E2E8F0] text-[#475569]">
+                            {m.label} <strong className="text-[var(--brand-primary)]">{m.sets}</strong>
+                          </span>
+                        ))}
+                      </div>
                     )}
                   </div>
                 );
@@ -7803,11 +7998,24 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                           const rLbl = hMark?.bestReps != null ? `${hMark.bestReps} reps` : null;
                           const markSummaryLabel = [wLbl, rLbl].filter(Boolean).join(" × ");
                           const isPerSeriesOpen = Array.isArray(e.seriesForm) && e.seriesForm.length > 0;
+                          const visualLabels = isPerSeriesOpen ? getSeriesVisualLabels(e, e.seriesForm.length) : [];
+                          const nextEx = rutinaForm.ejercicios[i + 1];
+                          const isLinkedWithNext = Boolean(e.bloque_grupo && nextEx?.bloque_grupo === e.bloque_grupo);
+                          const hasOptValues = Boolean(
+                            (e.descanso_seg && parseInt(e.descanso_seg, 10) > 0) ||
+                            (e.rir_objetivo && String(e.rir_objetivo).trim()) ||
+                            (e.nota_tecnica && String(e.nota_tecnica).trim())
+                          );
+                          const effSetsCount = countEffectiveSeries(e);
+                          const totalSetsCount = parseInt(e.num_series, 10) || 4;
+                          const warmSetsCount = Math.max(0, totalSetsCount - effSetsCount);
 
                           return (
                           <SortableItem key={e._dndId} id={e._dndId}>
                             {({ dragHandle, isDragging }) => (
-                              <div className={`mb-2.5 sm:mb-2 p-2.5 sm:p-2 bg-[#F8FAFC] sm:bg-transparent rounded-xl sm:rounded-lg border sm:border-b sm:border-t-0 sm:border-x-0 ${isDragging ? 'bg-white shadow-md border-[#E2E8F0] z-10' : 'border-[#E2E8F0]'}`}>
+                              <div className={`mb-2.5 sm:mb-2 p-2.5 sm:p-2 bg-[#F8FAFC] sm:bg-transparent rounded-xl sm:rounded-lg border sm:border-b sm:border-t-0 sm:border-x-0 ${
+                                e.bloque_grupo ? "border-l-4 border-l-[var(--brand-primary)] sm:pl-2.5" : ""
+                              } ${isDragging ? 'bg-white shadow-md border-[#E2E8F0] z-10' : 'border-[#E2E8F0]'}`}>
                                 {/* MAIN EXERCISE */}
                                 <div className="grid grid-cols-[24px_40px_1fr_auto] sm:grid-cols-[24px_40px_1fr_56px_56px_76px_100px] gap-2 sm:gap-1.5 items-center">
                                   <div className="flex items-center justify-center">{dragHandle}</div>
@@ -7821,9 +8029,19 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                     ) : <Dumbbell className="w-[18px] h-[18px] text-[#6B7A8D]" />}
                                   </div>
                                   <div className="text-[13px] font-semibold text-[#0B1929] leading-tight min-w-0 pr-1">
-                                    <div className="truncate">{e.nombre}</div>
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                      {e.bloque_grupo && (
+                                        <span className="px-1.5 py-0.5 rounded bg-[var(--brand-secondary)] text-[var(--brand-primary)] border border-[var(--brand-primary)]/30 text-[9px] font-extrabold uppercase shrink-0">
+                                          Biserie {e.bloque_grupo}
+                                        </span>
+                                      )}
+                                      <span className="truncate">{e.nombre}</span>
+                                    </div>
                                     <div className="flex items-center flex-wrap gap-1.5 mt-1">
-                                      <span className="text-[10px] text-[#6B7A8D] font-normal">{GRUPO_LABELS[normalizeMuscleGroup(e.grupo_muscular)] || e.grupo_muscular}</span>
+                                      <span className="text-[10px] text-[#6B7A8D] font-normal">
+                                        {GRUPO_LABELS[normalizeMuscleGroup(e.grupo_muscular)] || e.grupo_muscular}
+                                        {warmSetsCount > 0 ? ` · ${effSetsCount} ef. / ${warmSetsCount} cal.` : ""}
+                                      </span>
                                       {hMark ? (
                                         <button
                                           type="button"
@@ -7845,6 +8063,42 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                       ) : !loadingPatientHistory ? (
                                         <span className="text-[10px] text-[#94A3B8] font-normal">• Sin marcas previas</span>
                                       ) : null}
+                                      <button
+                                        type="button"
+                                        onClick={() => toggleExerciseOptions(i)}
+                                        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold border transition-colors cursor-pointer ${
+                                          e._showOptions || hasOptValues
+                                            ? "bg-[var(--brand-secondary)] text-[var(--brand-primary)] border-[var(--brand-primary)]/30"
+                                            : "bg-white text-[#6B7A8D] border-[#E2E8F0] hover:text-[var(--brand-primary)]"
+                                        }`}
+                                        title="Opcional: Descanso, RIR objetivo o nota técnica"
+                                      >
+                                        <SlidersHorizontal className="w-2.5 h-2.5 shrink-0" />
+                                        <span>
+                                          {hasOptValues
+                                            ? [
+                                                e.descanso_seg ? formatRestLabel(e.descanso_seg) : "",
+                                                e.rir_objetivo ? `RIR ${e.rir_objetivo}` : "",
+                                                e.nota_tecnica ? "Nota" : "",
+                                              ].filter(Boolean).join(" · ")
+                                            : "+ Descanso / RIR / Nota"}
+                                        </span>
+                                      </button>
+                                      {(i < rutinaForm.ejercicios.length - 1 || e.bloque_grupo) && (
+                                        <button
+                                          type="button"
+                                          onClick={() => toggleSupersetWithNext(i)}
+                                          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold border transition-colors cursor-pointer ${
+                                            isLinkedWithNext || e.bloque_grupo
+                                              ? "bg-[var(--brand-secondary)] text-[var(--brand-primary)] border-[var(--brand-primary)]/35 hover:bg-red-50 hover:text-red-600 hover:border-red-200"
+                                              : "bg-white text-[#6B7A8D] border-[#E2E8F0] hover:text-[var(--brand-primary)]"
+                                          }`}
+                                          title={isLinkedWithNext ? "Desenlazar biserie" : e.bloque_grupo ? "Quitar de biserie" : "Enlazar como biserie con el siguiente ejercicio"}
+                                        >
+                                          {isLinkedWithNext || e.bloque_grupo ? <Unlink2 className="w-2.5 h-2.5 shrink-0" /> : <Link2 className="w-2.5 h-2.5 shrink-0" />}
+                                          <span>{isLinkedWithNext ? `Desenlazar ${e.bloque_grupo}` : e.bloque_grupo ? `Quitar ${e.bloque_grupo}` : "+ Biserie"}</span>
+                                        </button>
+                                      )}
                                     </div>
                                   </div>
                                   
@@ -7916,13 +8170,60 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                   </div>
                                 </div>
 
+                                {/* OPCIONALES: DESCANSO, RIR Y NOTA TÉCNICA */}
+                                {e._showOptions && (
+                                  <div className="mt-2 sm:ml-[64px] p-2.5 rounded-xl bg-white border border-[#E2E8F0] grid grid-cols-2 sm:grid-cols-12 gap-2 items-end">
+                                    <div className="col-span-1 sm:col-span-3">
+                                      <label className="text-[10px] font-bold text-[#6B7A8D] uppercase flex items-center gap-1 mb-1">
+                                        <Timer className="w-3 h-3 text-[var(--brand-primary)]" /> Descanso (seg)
+                                      </label>
+                                      <input
+                                        type="number"
+                                        min="10"
+                                        max="600"
+                                        value={e.descanso_seg || ""}
+                                        onChange={(ev) => updEj(i, "descanso_seg", ev.target.value)}
+                                        placeholder="Ej. 90"
+                                        className="w-full px-2 py-1 rounded-lg border border-[#E2E8F0] text-xs font-semibold focus:outline-none focus:border-[var(--brand-primary)]"
+                                      />
+                                    </div>
+                                    <div className="col-span-1 sm:col-span-3">
+                                      <label className="text-[10px] font-bold text-[#6B7A8D] uppercase block mb-1">RIR Objetivo</label>
+                                      <input
+                                        type="text"
+                                        maxLength={12}
+                                        value={e.rir_objetivo || ""}
+                                        onChange={(ev) => updEj(i, "rir_objetivo", ev.target.value)}
+                                        placeholder="Ej. 1-2"
+                                        className="w-full px-2 py-1 rounded-lg border border-[#E2E8F0] text-xs font-semibold focus:outline-none focus:border-[var(--brand-primary)]"
+                                      />
+                                    </div>
+                                    <div className="col-span-2 sm:col-span-6">
+                                      <label className="text-[10px] font-bold text-[#6B7A8D] uppercase block mb-1">Nota técnica / Cue</label>
+                                      <input
+                                        type="text"
+                                        maxLength={140}
+                                        value={e.nota_tecnica || ""}
+                                        onChange={(ev) => updEj(i, "nota_tecnica", ev.target.value)}
+                                        placeholder="Ej. Pausa 1s abajo, control excéntrico"
+                                        className="w-full px-2 py-1 rounded-lg border border-[#E2E8F0] text-xs font-medium focus:outline-none focus:border-[var(--brand-primary)]"
+                                      />
+                                    </div>
+                                  </div>
+                                )}
+
                                 {/* PER-SERIES HYBRID EDITOR */}
                                 {isPerSeriesOpen && (
                                   <div className="mt-2.5 sm:ml-[64px] p-2.5 rounded-xl bg-[var(--brand-secondary)]/55 border border-[var(--brand-primary)]/25 space-y-2">
                                     <div className="flex items-center justify-between gap-2 flex-wrap">
-                                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--brand-primary)]">
-                                        Desglose por serie ({e.seriesForm.length} series • {(e.unidad || "kg").toUpperCase()})
-                                      </span>
+                                      <div>
+                                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--brand-primary)] block">
+                                          Desglose por serie ({e.seriesForm.length} series • {(e.unidad || "kg").toUpperCase()})
+                                        </span>
+                                        <span className="text-[10px] text-[#6B7A8D]">
+                                          Pulsa la etiqueta de una serie para marcar Calentamiento (no cuenta volumen), Drop Set o Fallo
+                                        </span>
+                                      </div>
                                       <div className="flex items-center gap-2.5">
                                         {hMark && (
                                           <button
@@ -7945,9 +8246,29 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                       </div>
                                     </div>
                                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                      {e.seriesForm.map((sf, si) => (
-                                        <div key={si} className="bg-white rounded-lg border border-[var(--brand-primary)]/20 p-1.5 space-y-1">
-                                          <div className="text-[9px] font-extrabold text-[var(--brand-primary)] uppercase text-center">Serie {si + 1}</div>
+                                      {e.seriesForm.map((sf, si) => {
+                                        const curType = normalizeSeriesType(sf.tipo);
+                                        const typeCfg = SERIES_TYPES[curType] || SERIES_TYPES.normal;
+                                        const vLbl = visualLabels[si] || { label: String(si + 1) };
+                                        const tagCls =
+                                          curType === "warmup"
+                                            ? "bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100"
+                                            : curType === "dropset"
+                                            ? "bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100"
+                                            : curType === "failure"
+                                            ? "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100"
+                                            : "bg-[var(--brand-secondary)]/70 text-[var(--brand-primary)] border-[var(--brand-primary)]/20 hover:bg-[var(--brand-secondary)]";
+                                        return (
+                                        <div key={si} className={`bg-white rounded-lg border p-1.5 space-y-1 ${curType === "warmup" ? "border-amber-200/90" : "border-[var(--brand-primary)]/20"}`}>
+                                          <button
+                                            type="button"
+                                            onClick={() => toggleSeriesType(i, si)}
+                                            className={`w-full px-1 py-0.5 rounded border text-[9px] font-extrabold uppercase flex items-center justify-between gap-1 cursor-pointer transition-colors ${tagCls}`}
+                                            title="Pulsa para cambiar tipo (Normal → Calentamiento → Drop Set → Al fallo)"
+                                          >
+                                            <span>#{vLbl.label}</span>
+                                            <span>{typeCfg.short || "Normal"}</span>
+                                          </button>
                                           <div className="grid grid-cols-2 gap-1">
                                             <input
                                               type="number"
@@ -7969,7 +8290,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                             />
                                           </div>
                                         </div>
-                                      ))}
+                                        );
+                                      })}
                                     </div>
                                   </div>
                                 )}

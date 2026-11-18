@@ -25,6 +25,7 @@ import {
   getActivityFactorInfo
 } from "../../lib/bodyComposition";
 import { GRUPOS, normalizeMuscleGroup } from "../../lib/constants";
+import { normalizeSeriesDetalle } from "../../utils/routineHelpers";
 import { generateProgresoPDF } from "../../utils/pdf";
 
 const EXACT_GROUPS = GRUPOS;
@@ -126,7 +127,7 @@ export default function Progreso({ cliente, isSelfManaged, isActive = true }) {
       // 2. Calcular progreso muscular con datos de rutinas y progreso desde la caché inteligente
       const [allCiclos, rutinas, progs] = await Promise.all([
         dbGet(`ciclos?cliente_id=eq.${cliente.id}&order=created_at.desc`).catch(() => []),
-        dbGet(`rutinas?cliente_id=eq.${cliente.id}&select=id,ciclo_id,ejercicios(id,grupo_muscular,alternativas)`).catch(() => []),
+        dbGet(`rutinas?cliente_id=eq.${cliente.id}&select=id,ciclo_id,ejercicios(*)`).catch(() => []),
         dbGet(`progreso?cliente_id=eq.${cliente.id}&limit=3000`).catch(() => [])
       ]);
 
@@ -135,16 +136,27 @@ export default function Progreso({ cliente, isSelfManaged, isActive = true }) {
       const ciclosActivos = validCiclos.filter(c => c.activo);
 
       const ejMap = {};
+      const warmupMap = {};
+      const registerWarmups = (ejKey, detalleRaw) => {
+        const det = normalizeSeriesDetalle(detalleRaw);
+        const wSet = new Set();
+        det.forEach((s, idx) => {
+          if (s?.tipo === "warmup") wSet.add(idx);
+        });
+        if (wSet.size > 0) warmupMap[ejKey] = wSet;
+      };
       const pendingEjIds = [];
       (rutinas || []).forEach(r => {
         (r.ejercicios || []).forEach(e => {
           if (e.id && e.grupo_muscular) {
             ejMap[e.id] = e.grupo_muscular;
           }
+          if (e.id) registerWarmups(String(e.id), e.series_detalle);
           if (e.id && Array.isArray(e.alternativas)) {
             e.alternativas.forEach((alt, altIdx) => {
               const altGroup = alt?.grupo_muscular || e.grupo_muscular;
               if (altGroup) ejMap[`${e.id}__alt_${altIdx}`] = altGroup;
+              registerWarmups(`${e.id}__alt_${altIdx}`, alt?.series_detalle);
             });
           }
         });
@@ -159,13 +171,15 @@ export default function Progreso({ cliente, isSelfManaged, isActive = true }) {
 
       if (pendingEjIds.length > 0) {
         try {
-          const directEjs = await dbGet(`ejercicios?id=in.(${pendingEjIds.join(",")})&select=id,grupo_muscular,alternativas`).catch(() => []);
+          const directEjs = await dbGet(`ejercicios?id=in.(${pendingEjIds.join(",")})&select=*`).catch(() => []);
           (directEjs || []).forEach(e => {
             if (e.id && e.grupo_muscular) ejMap[e.id] = e.grupo_muscular;
+            if (e.id) registerWarmups(String(e.id), e.series_detalle);
             if (e.id && Array.isArray(e.alternativas)) {
               e.alternativas.forEach((alt, altIdx) => {
                 const altGroup = alt?.grupo_muscular || e.grupo_muscular;
                 if (altGroup) ejMap[`${e.id}__alt_${altIdx}`] = altGroup;
+                registerWarmups(`${e.id}__alt_${altIdx}`, alt?.series_detalle);
               });
             }
           });
@@ -243,18 +257,23 @@ export default function Progreso({ cliente, isSelfManaged, isActive = true }) {
 
               const weekData = byEj[ejVarKey][w];
               if (weekData) {
-                 // Validar si al menos una serie tiene repeticiones completadas
-                 const hasValidSet = Object.values(weekData).some(
-                   s => s && s.reps && s.reps !== "Falta" && s.reps !== "-" && s.reps !== "0"
+                 const warmSet = warmupMap[ejVarKey];
+                 const effectiveEntries = Object.entries(weekData).filter(
+                   ([sKey]) => !(warmSet && warmSet.has(Number(sKey)))
+                 );
+                 const entriesForCheck = effectiveEntries.length > 0 ? effectiveEntries : Object.entries(weekData);
+                 // Validar si al menos una serie efectiva tiene repeticiones completadas
+                 const hasValidSet = entriesForCheck.some(
+                   ([, s]) => s && s.reps && s.reps !== "Falta" && s.reps !== "-" && s.reps !== "0"
                  );
 
                  if (hasValidSet) {
                     muscleStarted[g] = true;
                     musclesTrainedThisWeek.add(g);
                     
-                    // Evaluar la mejor serie de la semana para el 1RM (en lugar de solo la primera serie)
+                    // Evaluar la mejor serie efectiva de la semana para el 1RM (excluyendo calentamiento)
                     let bestCurrent1RM = 0;
-                    Object.values(weekData).forEach(s => {
+                    effectiveEntries.forEach(([, s]) => {
                       if (s && s.peso && s.reps && s.reps !== "Falta" && s.reps !== "-" && s.reps !== "0") {
                         const e1rm = calcular1RM(s.peso, s.reps);
                         if (e1rm && e1rm > bestCurrent1RM) {

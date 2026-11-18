@@ -2,6 +2,14 @@ import { stripSmaeTag } from "../lib/smaeData";
 import { escapeHtml, parseFotos } from "./helpers";
 import { registerBackAction } from "../lib/backButtonHandler";
 import { parseDiaMetadata } from "../lib/mealOptions";
+import { GRUPO_LABELS, normalizeMuscleGroup } from "../lib/constants";
+import {
+  computeWeeklyMuscleVolume,
+  convertWeightToInput,
+  formatRestLabel,
+  getSeriesVisualLabels,
+  normalizeSeriesDetalle,
+} from "./routineHelpers";
 import {
   enrichMetrica,
   getMetodoLabel,
@@ -1658,6 +1666,238 @@ export const generateProgresoPDF = (cliente, rawMetricas = [], brand = {}) => {
     html,
     title: `Expediente de Evaluación — ${cliente.nombre || "Paciente"}`,
     fileName: `Expediente_Evaluacion_${cleanClient}`,
+    accent,
+  });
+};
+
+export const generateRutinaPDF = (cliente, rutinas = [], cycleInfo = {}, brand = {}, smartTraining = null) => {
+  if (!cliente) return;
+  const accent = brand?.color_primario || "#1A6FD4";
+  const dark = darken(accent, 60);
+  const light = tint(accent, 210);
+  const nombre = escapeHtml(brand?.nombre_marca || "FLUX Sport Supplements");
+  const logoUrl = brand?.logo_url ? safeUrl(brand.logo_url) : null;
+
+  const clienteNombre = escapeHtml(cliente.nombre || "Paciente");
+  const clienteObjetivo = escapeHtml(cliente.objetivo || "\u2014");
+  const fechaHoy = new Date().toLocaleDateString("es-MX", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
+  const validRutinas = Array.isArray(rutinas) ? rutinas : [];
+  const weeklyVol = computeWeeklyMuscleVolume(validRutinas);
+  const cycleWeeks = Math.max(
+    1,
+    Math.min(6, parseInt(cycleInfo?.semanas || validRutinas[0]?.semanas, 10) || 4)
+  );
+  const cycleTitle = cycleInfo?.enfoque || cycleInfo?.nombreBase || "Plan Activo";
+
+  const formatPrescriptionHtml = (ej) => {
+    const unit = ej.unidad || "kg";
+    const labels = getSeriesVisualLabels(ej);
+    const detalle = normalizeSeriesDetalle(ej.series_detalle);
+    const effCount = labels.filter((l) => !l.isWarmup).length;
+    const warmCount = labels.length - effCount;
+    const repsDefault = ej.reps_sugeridas || 10;
+    const pesoScalarStr =
+      ej.peso_sugerido !== null && ej.peso_sugerido !== undefined && ej.peso_sugerido !== ""
+        ? `${convertWeightToInput(ej.peso_sugerido, unit)} ${unit}`
+        : "Libre";
+
+    if (detalle.length === 0) {
+      return `<strong>${effCount} &times; ${escapeHtml(repsDefault)} reps</strong><br><span style="color:#475569;font-size:10px;">Carga ref: ${escapeHtml(pesoScalarStr)}</span>`;
+    }
+
+    const lines = labels.map((lbl, idx) => {
+      const det = detalle[idx] || {};
+      const rTxt = det.reps ?? repsDefault;
+      const wTxt =
+        det.peso !== null && det.peso !== undefined
+          ? `${convertWeightToInput(det.peso, unit)} ${unit}`
+          : pesoScalarStr;
+      const prefix = lbl.isWarmup ? `${lbl.label} (Calent.)` : lbl.shortTag ? `${lbl.label} (${lbl.shortTag})` : `S${lbl.label}`;
+      return `<div style="font-size:10px;line-height:1.35;${lbl.isWarmup ? "color:#64748B;" : "color:#0B1929;"}"><strong>${escapeHtml(prefix)}:</strong> ${escapeHtml(rTxt)} &times; ${escapeHtml(wTxt)}</div>`;
+    });
+
+    const headerSummary = `<div style="font-size:10px;font-weight:700;color:${dark};margin-bottom:2px;">${effCount} efect.${warmCount > 0 ? ` + ${warmCount} calent.` : ""}</div>`;
+    return headerSummary + lines.join("");
+  };
+
+  const muscleSummaryHtml =
+    weeklyVol.muscleList.length > 0
+      ? `<div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:10px 12px;margin-bottom:18px;page-break-inside:avoid;break-inside:avoid;">
+          <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.8px;color:${dark};margin-bottom:6px;">
+            Distribuci&oacute;n Semanal de Series Efectivas por Grupo Muscular
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;">
+            ${weeklyVol.muscleList
+              .map(
+                (m) =>
+                  `<span style="display:inline-block;background:#fff;border:1px solid #CBD5E1;border-radius:6px;padding:3px 8px;font-size:10.5px;font-weight:700;color:#0B1929;">${escapeHtml(m.label)}: <span style="color:${accent};">${m.sets}</span></span>`
+              )
+              .join("")}
+          </div>
+        </div>`
+      : "";
+
+  const routinesHtml = validRutinas
+    .map((r) => {
+      const parts = String(r.nombre || "").split("|");
+      const dayCode = parts.length > 1 ? parts[0].trim() : "";
+      const title = parts.length > 1 ? parts.slice(1).join("|").trim() : parts[0];
+      const cleanTitle = dayCode && dayCode !== "S/D" ? `${dayCode} - ${title || "Rutina"}` : title || "Rutina";
+      const dayVol = computeWeeklyMuscleVolume([r]);
+      const daySummary = [
+        `${dayVol.totalEffectiveSets} series efectivas`,
+        dayVol.totalWarmupSets > 0 ? `${dayVol.totalWarmupSets} calent.` : "",
+        dayVol.muscleList
+          .slice(0, 3)
+          .map((m) => m.label)
+          .join(", "),
+      ]
+        .filter(Boolean)
+        .join(" · ");
+
+      const ejs = Array.isArray(r.ejercicios) ? r.ejercicios : [];
+      const blockSubIndex = {};
+
+      const rowsHtml = ejs
+        .map((ej, idx) => {
+          const blk = ej.bloque_grupo ? String(ej.bloque_grupo).trim() : "";
+          let orderLabel = String(idx + 1);
+          if (blk) {
+            blockSubIndex[blk] = (blockSubIndex[blk] || 0) + 1;
+            orderLabel = `${blk}${blockSubIndex[blk]}`;
+          }
+          const grpLabel = GRUPO_LABELS[normalizeMuscleGroup(ej.grupo_muscular)] || ej.grupo_muscular || "—";
+          const alts = Array.isArray(ej.alternativas) ? ej.alternativas : [];
+          const altsHtml =
+            alts.length > 0
+              ? `<div style="margin-top:3px;font-size:9.5px;color:#64748B;">Alt: ${alts.map((a) => escapeHtml(a.nombre)).join(" / ")}</div>`
+              : "";
+
+          const restTxt = formatRestLabel(ej.descanso_seg);
+          const guideParts = [
+            restTxt ? `Descanso: <strong>${escapeHtml(restTxt)}</strong>` : "",
+            ej.rir_objetivo ? `RIR: <strong>${escapeHtml(ej.rir_objetivo)}</strong>` : "",
+            ej.nota_tecnica ? `<div style="margin-top:2px;color:#334155;">${escapeHtml(ej.nota_tecnica)}</div>` : "",
+          ]
+            .filter(Boolean)
+            .join(" &middot; ");
+
+          const semBoxes = Array.from({ length: cycleWeeks })
+            .map(
+              (_, sIdx) =>
+                `<td style="text-align:center;color:#CBD5E1;font-size:9.5px;border-left:1px solid #f1f5f9;">S${sIdx + 1}<br><span style="font-size:8px;">___/___</span></td>`
+            )
+            .join("");
+
+          return `<tr style="${blk ? `border-left:3px solid ${accent};` : ""}">
+            <td style="text-align:center;font-weight:800;color:${blk ? accent : "#475569"};white-space:nowrap;">${escapeHtml(orderLabel)}${blk ? `<div style="font-size:8px;text-transform:uppercase;">Biserie</div>` : ""}</td>
+            <td><strong>${escapeHtml(ej.nombre || "")}</strong>${altsHtml}</td>
+            <td style="color:#475569;font-size:10px;">${escapeHtml(grpLabel)}</td>
+            <td>${formatPrescriptionHtml(ej)}</td>
+            <td style="font-size:10px;color:#475569;">${guideParts || "—"}</td>
+            ${semBoxes}
+          </tr>`;
+        })
+        .join("");
+
+      const weekHeaders = Array.from({ length: cycleWeeks })
+        .map((_, sIdx) => `<th style="text-align:center;width:44px;">Sem ${sIdx + 1}</th>`)
+        .join("");
+
+      return `<div class="dia">
+        <div class="dia-title">
+          ${escapeHtml(cleanTitle)}
+          <span style="float:right;font-size:11px;color:#fff;opacity:0.92;font-weight:normal;">${escapeHtml(daySummary)}</span>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:44px;text-align:center;">#</th>
+              <th>Ejercicio</th>
+              <th style="width:92px;">M&uacute;sculo</th>
+              <th style="width:165px;">Prescripci&oacute;n</th>
+              <th style="width:140px;">Gu&iacute;a T&eacute;cnica</th>
+              ${weekHeaders}
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml || `<tr><td colspan="${5 + cycleWeeks}" style="text-align:center;color:#94A3B8;">Sin ejercicios programados</td></tr>`}
+          </tbody>
+        </table>
+      </div>`;
+    })
+    .join("");
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Plan de Entrenamiento - ${clienteNombre}</title>
+  <style>
+    * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    @page {
+      size: A4 portrait;
+      margin: 14mm 12mm 16mm 12mm;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      color: #0B1929;
+      background: #fff;
+      padding: 24px 20px;
+      margin: 0 auto;
+      max-width: 820px;
+      line-height: 1.45;
+    }
+    @media print {
+      body { padding: 0; margin: 0; max-width: 100%; height: auto !important; min-height: 0 !important; }
+      .flux-page-spacer { display: none !important; height: 0 !important; }
+    }
+    .flux-page-spacer { width: 100%; display: block; margin: 0; padding: 0; border: none; background: transparent; clear: both; }
+    .header { text-align: center; border-bottom: 3px solid ${accent}; padding-bottom: 16px; margin-bottom: 20px; page-break-inside: avoid; break-inside: avoid; }
+    .brand-logo { max-height: 75px; max-width: 220px; object-fit: contain; margin-bottom: 6px; }
+    .brand-name { font-size: 28px; font-weight: 900; color: ${dark}; letter-spacing: 3px; }
+    .brand-sub { font-size: 11px; color: ${accent}; letter-spacing: 2px; margin-top: 2px; text-transform: uppercase; }
+    .client-info { background: ${light}; border-left: 4px solid ${accent}; padding: 10px 14px; border-radius: 6px; margin-bottom: 16px; page-break-inside: avoid; break-inside: avoid; }
+    .macros { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 18px; page-break-inside: avoid; break-inside: avoid; }
+    .macro-box { background: ${dark}; color: white; border-radius: 8px; padding: 10px; text-align: center; page-break-inside: avoid; break-inside: avoid; }
+    .macro-val { font-size: 18px; font-weight: 900; }
+    .macro-lbl { font-size: 10px; opacity: .85; }
+    .dia { margin-bottom: 18px; page-break-inside: avoid; break-inside: avoid; }
+    .dia-title { background: ${accent}; color: white; padding: 8px 12px; border-radius: 6px 6px 0 0; font-weight: 700; font-size: 13px; }
+    table { width: 100%; border-collapse: collapse; page-break-inside: auto; }
+    thead { display: table-header-group; }
+    tr { page-break-inside: avoid; break-inside: avoid; }
+    th { background: ${light}; padding: 7px 8px; text-align: left; font-size: 10.5px; color: ${dark}; font-weight: 700; border-bottom: 1px solid rgba(0,0,0,0.06); }
+    td { padding: 7px 8px; border-bottom: 1px solid #f1f5f9; font-size: 10.5px; vertical-align: top; line-height: 1.35; }
+    .footer { text-align: center; margin-top: 24px; font-size: 11px; color: #64748b; border-top: 1px solid #e2e8f0; padding-top: 12px; page-break-inside: avoid; break-inside: avoid; }
+  </style></head><body>
+  <div class="header">
+    ${logoUrl ? `<img src="${logoUrl}" class="brand-logo" alt="${nombre}"/>` : `<div class="brand-name">${nombre}</div>`}
+    <div class="brand-sub">Plan de Entrenamiento Personalizado</div>
+  </div>
+  <div class="client-info">
+    <strong style="font-size:16px">${clienteNombre}</strong>
+    <span style="float:right;color:#64748B;font-size:12px">${fechaHoy}</span><br>
+    <span style="color:#475569;font-size:12px">Objetivo: ${clienteObjetivo} &middot; Ciclo: ${escapeHtml(cycleTitle)}</span>
+  </div>
+  <div class="macros">
+    <div class="macro-box"><div class="macro-val">${validRutinas.length}</div><div class="macro-lbl">D&iacute;as / Semana</div></div>
+    <div class="macro-box"><div class="macro-val">${weeklyVol.totalEffectiveSets}</div><div class="macro-lbl">Series Efectivas</div></div>
+    <div class="macro-box"><div class="macro-val">${weeklyVol.muscleList.length}</div><div class="macro-lbl">Grupos Musculares</div></div>
+    <div class="macro-box"><div class="macro-val">${escapeHtml(smartTraining?.volumenRpe?.split("•")?.[0]?.trim() || `${cycleWeeks} Sem`)}</div><div class="macro-lbl">${smartTraining?.volumenRpe ? "Intensidad Ref." : "Duraci&oacute;n"}</div></div>
+  </div>
+  ${muscleSummaryHtml}
+  ${routinesHtml}
+  <div class="footer">Plan de entrenamiento generado por ${nombre} &middot; Acompa&ntilde;amiento Cl&iacute;nico y Deportivo</div>
+  ${FLUX_PAGINATION_SCRIPT}
+  </body></html>`;
+
+  const cleanClient = String(cliente.nombre || "Paciente").replace(/[^a-zA-Z0-9_\-]/g, "_");
+  openPdfPreviewModal({
+    html,
+    title: `Plan de Entrenamiento — ${cliente.nombre || "Paciente"}`,
+    fileName: `Plan_Entrenamiento_${cleanClient}`,
     accent,
   });
 };

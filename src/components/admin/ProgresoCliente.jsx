@@ -41,6 +41,7 @@ import {
 import { EvolutionCharts } from "../ui/EvolutionCharts";
 import { BeforeAfterComparator } from "../ui/BeforeAfterComparator";
 import { GRUPO_LABELS, normalizeMuscleGroup } from "../../lib/constants";
+import { getSeriesVisualLabels } from "../../utils/routineHelpers";
 import { ListSkeleton } from "../ui/Skeleton";
 import { ConfirmModal } from "../ui/ConfirmModal";
 import ExpedienteClinicoModal from "../clinical/ExpedienteClinicoModal";
@@ -3660,15 +3661,19 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                             const isOriginal = vid ==="original";
                             const altIdx = isOriginal ? -1 : parseInt(vid.replace("alt_",""));
                             const exObj = isOriginal ? ej : (ej.alternativas || [])[altIdx] || ej;
+                            const rowSeriesCount = exObj.num_series || ej.num_series || 4;
+                            const seriesVisualLabels = getSeriesVisualLabels(exObj, rowSeriesCount);
                             
                             const rowBg = eji % 2 === 0 ?"bg-white" :"bg-gray-50/30";
                             const highlight = !isOriginal ?"bg-[var(--brand-primary)]/5" : rowBg;
 
-                            return Array.from({length: exObj.num_series || ej.num_series || 4}, (_, si) => (
-                              <tr key={`${ej.id}-${vid}-${si}`} className={highlight}>
+                            return Array.from({length: rowSeriesCount}, (_, si) => {
+                              const sLbl = seriesVisualLabels[si] || { label: String(si + 1), isWarmup: false, tipo: "normal" };
+                              return (
+                              <tr key={`${ej.id}-${vid}-${si}`} className={sLbl.isWarmup ? "bg-slate-50/80 opacity-85" : highlight}>
                                 {si === 0 && (
                                   <td 
-                                    rowSpan={exObj.num_series || ej.num_series || 4} 
+                                    rowSpan={rowSeriesCount} 
                                     style={{ width: "32%" }}
                                     className={`px-3 py-2 border border-[#E2E8F0] font-bold align-middle sticky left-0 z-20 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)] w-[32%] ${
                                       !isOriginal ? "bg-[#f0f9ff]" : (eji % 2 === 0 ? "bg-white" : "bg-[#F8FAFC]")
@@ -3693,6 +3698,11 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
 
                                       <div className="min-w-0 flex-1">
                                         <div className="flex items-center flex-wrap gap-1.5 min-w-0">
+                                          {ej.bloque_grupo && (
+                                            <span className="text-[9px] bg-[var(--brand-secondary)] text-[var(--brand-primary)] border border-[var(--brand-primary)]/30 px-1.5 py-0.5 rounded font-extrabold uppercase shrink-0">
+                                              Biserie {ej.bloque_grupo}
+                                            </span>
+                                          )}
                                           <span className="text-[#0B1929] leading-tight break-words">{exObj.nombre}</span>
                                           {!isOriginal && (
                                             <div className="inline-flex items-center gap-1 shrink-0">
@@ -3726,7 +3736,11 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                     </div>
                                   </td>
                                 )}
-                                <td className="px-2 py-1.5 border border-[#E2E8F0] text-center text-[var(--brand-primary)] font-bold font-['Rajdhani']">{si+1}</td>
+                                <td className="px-1.5 py-1.5 border border-[#E2E8F0] text-center font-bold font-['Rajdhani']" title={sLbl.shortTag || `Serie ${si + 1}`}>
+                                  <span className={sLbl.isWarmup ? "text-[#6B7A8D] text-[10px]" : "text-[var(--brand-primary)]"}>
+                                    {sLbl.label}
+                                  </span>
+                                </td>
                                 {semanas.map((s, wi) => {
                                   const pVal = progreso[`${ej.id}-${wi}-${si}-peso-${vid}`] || "";
                                   const rVal = progreso[`${ej.id}-${wi}-${si}-reps-${vid}`] || "";
@@ -3794,7 +3808,8 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                   );
                                 })}
                               </tr>
-                            ));
+                              );
+                            });
                           });
                         })}
                       </tbody>

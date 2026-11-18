@@ -18,6 +18,10 @@ const mapExerciseForTemplate = (e, eIdx) => ({
   peso_sugerido: (e.peso_sugerido !== "" && e.peso_sugerido !== null && e.peso_sugerido !== undefined && !isNaN(e.peso_sugerido)) ? Number(e.peso_sugerido) : null,
   unidad: e.unidad || "kg",
   series_detalle: normalizeSeriesDetalle(e.series_detalle),
+  descanso_seg: (e.descanso_seg !== "" && e.descanso_seg !== null && e.descanso_seg !== undefined && !isNaN(e.descanso_seg)) ? parseInt(e.descanso_seg, 10) : null,
+  rir_objetivo: e.rir_objetivo ? String(e.rir_objetivo).trim() : null,
+  nota_tecnica: e.nota_tecnica ? String(e.nota_tecnica).trim() : null,
+  bloque_grupo: e.bloque_grupo ? String(e.bloque_grupo).trim() : null,
   orden: e.orden != null ? e.orden : eIdx,
   alternativas: (e.alternativas || []).map((alt) => ({
     ...alt,

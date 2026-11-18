@@ -1,8 +1,24 @@
 // Utilidades compartidas para rutinas híbridas (plano + por serie),
-// migración de marcas reales entre ciclos y cálculo histórico de 1RM/PR.
+// etiquetas de serie, superseries, volumen semanal, migración y cálculo histórico 1RM/PR.
+import { GRUPO_LABELS, normalizeMuscleGroup } from "../lib/constants.js";
 
 const LB_TO_KG = 0.45359237;
 const KG_TO_LB = 2.20462262;
+
+export const SERIES_TYPES = {
+  normal:  { id: "normal",  short: "",       badge: "Normal",       next: "warmup"  },
+  warmup:  { id: "warmup",  short: "Calent.", badge: "Calentamiento", next: "dropset" },
+  dropset: { id: "dropset", short: "Drop",    badge: "Drop Set",     next: "failure" },
+  failure: { id: "failure", short: "Fallo",   badge: "Al fallo",     next: "normal"  },
+};
+
+export function normalizeSeriesType(rawType) {
+  const t = String(rawType || "").trim().toLowerCase();
+  if (t === "warmup" || t === "calentamiento" || t === "c" || t === "w") return "warmup";
+  if (t === "dropset" || t === "drop" || t === "d") return "dropset";
+  if (t === "failure" || t === "fallo" || t === "amrap" || t === "f") return "failure";
+  return "normal";
+}
 
 export function normalizeExerciseName(name) {
   return String(name || "")
@@ -68,9 +84,11 @@ export function normalizeSeriesDetalle(rawDetalle) {
     .map((item) => {
       const r = parseInt(item.reps, 10);
       const p = parseRawWeightToKg(item.peso);
+      const tipo = normalizeSeriesType(item.tipo);
       return {
         reps: !isNaN(r) && r > 0 ? r : null,
         peso: p,
+        ...(tipo !== "normal" ? { tipo } : {}),
       };
     });
 }
@@ -85,6 +103,7 @@ export function seriesDetalleToForm(rawDetalle, numSeries, fallbackReps = 10, fa
     return {
       reps: item?.reps != null ? String(item.reps) : String(fallbackReps || 10),
       peso: item?.peso != null ? convertWeightToInput(item.peso, unit) : String(fallbackPesoInput || ""),
+      tipo: normalizeSeriesType(item?.tipo),
     };
   });
 }
@@ -96,19 +115,22 @@ export function seriesFormToDb(formSeries, unit = "kg", numSeries = null) {
   return Array.from({ length: count }, (_, idx) => {
     const s = formSeries[idx] || {};
     const r = parseInt(s.reps, 10);
+    const tipo = normalizeSeriesType(s.tipo);
     return {
       reps: !isNaN(r) && r > 0 ? r : null,
       peso: convertInputWeightToKg(s.peso, unit),
+      ...(tipo !== "normal" ? { tipo } : {}),
     };
   });
 }
 
-/** Verifica si el desglose por serie tiene valores distintos entre sí (justifica persistir detalle). */
+/** Verifica si el desglose por serie tiene valores o etiquetas distintos entre sí (justifica persistir detalle). */
 export function hasCustomSeriesBreakdown(seriesList, scalarReps, scalarPesoKg) {
   if (!Array.isArray(seriesList) || seriesList.length === 0) return false;
   const refReps = parseInt(scalarReps, 10) || null;
   const refPeso = parseRawWeightToKg(scalarPesoKg);
   return seriesList.some((s) => {
+    if (normalizeSeriesType(s?.tipo) !== "normal") return true;
     const repsDiff = s.reps != null && refReps != null ? s.reps !== refReps : s.reps !== refReps;
     const pesoDiff =
       s.peso != null && refPeso != null
@@ -132,12 +154,13 @@ export function getSeriesSuggestion(exObj, serieIdx) {
   return { reps, peso };
 }
 
-function groupProgressRowsByWeek(rows) {
+function groupProgressRowsByWeek(rows, excludeSeriesSet = null) {
   const byWeek = new Map();
   for (const r of rows) {
     const w = parseInt(r.semana, 10);
     const s = parseInt(r.serie, 10);
     if (isNaN(w) || isNaN(s) || w < 0 || s < 0) continue;
+    if (excludeSeriesSet && excludeSeriesSet.has(s)) continue;
     if (!byWeek.has(w)) byWeek.set(w, new Map());
     const wMap = byWeek.get(w);
     if (!wMap.has(s)) wMap.set(s, {});
@@ -253,10 +276,10 @@ function finalizeExtractedMarks(seriesMarks, meta, fallbackReps, fallbackPesoKg)
   };
 }
 
-function extractMarksFromRowsByMode(rows, numSeries, fallbackReps = 10, fallbackPesoKg = null, mode = "latest") {
+function extractMarksFromRowsByMode(rows, numSeries, fallbackReps = 10, fallbackPesoKg = null, mode = "latest", excludeSeriesSet = null) {
   if (!Array.isArray(rows) || rows.length === 0) return null;
   const count = Math.max(1, parseInt(numSeries, 10) || 4);
-  const byWeek = groupProgressRowsByWeek(rows);
+  const byWeek = groupProgressRowsByWeek(rows, excludeSeriesSet);
   if (byWeek.size === 0) return null;
 
   if (mode === "best") {
@@ -364,14 +387,14 @@ function extractMarksFromRowsByMode(rows, numSeries, fallbackReps = 10, fallback
   );
 }
 
-/** Extrae las últimas marcas reales alcanzadas a partir de filas de `progreso` (ignora "Falta" y vacíos). */
-export function extractLatestMarksFromRows(rows, numSeries, fallbackReps = 10, fallbackPesoKg = null) {
-  return extractMarksFromRowsByMode(rows, numSeries, fallbackReps, fallbackPesoKg, "latest");
+/** Extrae las últimas marcas reales alcanzadas a partir de filas de `progreso` (ignora "Falta", vacíos y calentamientos). */
+export function extractLatestMarksFromRows(rows, numSeries, fallbackReps = 10, fallbackPesoKg = null, excludeSeriesSet = null) {
+  return extractMarksFromRowsByMode(rows, numSeries, fallbackReps, fallbackPesoKg, "latest", excludeSeriesSet);
 }
 
-/** Extrae la mejor sesión/marca histórica alcanzada en `progreso` (por 1RM, carga, volumen y reps). */
-export function extractBestMarksFromRows(rows, numSeries, fallbackReps = 10, fallbackPesoKg = null) {
-  return extractMarksFromRowsByMode(rows, numSeries, fallbackReps, fallbackPesoKg, "best");
+/** Extrae la mejor sesión/marca histórica alcanzada en `progreso` (por 1RM, carga, volumen y reps, excluyendo calentamientos). */
+export function extractBestMarksFromRows(rows, numSeries, fallbackReps = 10, fallbackPesoKg = null, excludeSeriesSet = null) {
+  return extractMarksFromRowsByMode(rows, numSeries, fallbackReps, fallbackPesoKg, "best", excludeSeriesSet);
 }
 
 /**
@@ -388,6 +411,35 @@ export function buildPatientExerciseHistory(pastRutinas, allProgresoRows, exclud
     return { latestByKey, bestByKey, best1RMByKey };
   }
 
+  // Indexar qué índices de serie eran calentamiento ("warmup") para excluirlos de 1RM/PR/mejores marcas
+  const warmupSetByEjVar = new Map();
+  for (const r of pastRutinas) {
+    for (const ej of r.ejercicios || []) {
+      if (!ej?.id) continue;
+      const origDet = normalizeSeriesDetalle(ej.series_detalle);
+      const origWarm = new Set();
+      origDet.forEach((s, idx) => {
+        if (s?.tipo === "warmup") origWarm.add(idx);
+      });
+      if (origWarm.size > 0) warmupSetByEjVar.set(`${ej.id}:original`, origWarm);
+
+      let rawAlts = ej.alternativas;
+      if (typeof rawAlts === "string") {
+        try { rawAlts = JSON.parse(rawAlts); } catch { rawAlts = []; }
+      }
+      if (Array.isArray(rawAlts)) {
+        rawAlts.forEach((alt, aIdx) => {
+          const altDet = normalizeSeriesDetalle(alt?.series_detalle);
+          const altWarm = new Set();
+          altDet.forEach((s, idx) => {
+            if (s?.tipo === "warmup") altWarm.add(idx);
+          });
+          if (altWarm.size > 0) warmupSetByEjVar.set(`${ej.id}:alt_${aIdx}`, altWarm);
+        });
+      }
+    }
+  }
+
   const progByEjVar = new Map();
   const best1RMByEjId = new Map();
   const setPairs = new Map();
@@ -395,6 +447,9 @@ export function buildPatientExerciseHistory(pastRutinas, allProgresoRows, exclud
   for (const r of allProgresoRows) {
     const vid = r.variante_id || "original";
     const k = `${r.ejercicio_id}:${vid}`;
+    const sIdx = parseInt(r.serie, 10);
+    if (!isNaN(sIdx) && warmupSetByEjVar.get(k)?.has(sIdx)) continue;
+
     if (!progByEjVar.has(k)) progByEjVar.set(k, []);
     progByEjVar.get(k).push(r);
 
@@ -497,22 +552,73 @@ export function lookupExerciseHistory(map, obj) {
   return byBib || byName || null;
 }
 
+function buildWarmupSetFromDetalle(rawDetalle) {
+  const set = new Set();
+  normalizeSeriesDetalle(rawDetalle).forEach((s, idx) => {
+    if (s?.tipo === "warmup") set.add(idx);
+  });
+  return set;
+}
+
+function mergeTypesFromOldDetalle(oldRawDetalle, migratedObj, nSeries) {
+  const oldNorm = normalizeSeriesDetalle(oldRawDetalle);
+  if (oldNorm.length === 0) return migratedObj;
+  const hasAnyNonNormal = oldNorm.some((s) => s?.tipo && s.tipo !== "normal");
+  if (!hasAnyNonNormal) return migratedObj;
+
+  const baseSeries = Array.isArray(migratedObj.allSeriesMarks) && migratedObj.allSeriesMarks.length > 0
+    ? migratedObj.allSeriesMarks
+    : Array.from({ length: nSeries }, () => ({ reps: migratedObj.reps_sugeridas, peso: migratedObj.peso_sugerido }));
+
+  const merged = Array.from({ length: nSeries }, (_, idx) => {
+    const oldItem = oldNorm[idx];
+    const tipo = normalizeSeriesType(oldItem?.tipo);
+    if (tipo === "warmup") {
+      return {
+        reps: oldItem?.reps ?? baseSeries[idx]?.reps ?? migratedObj.reps_sugeridas,
+        peso: oldItem?.peso !== undefined ? oldItem.peso : null,
+        tipo: "warmup",
+      };
+    }
+    return {
+      reps: baseSeries[idx]?.reps ?? migratedObj.reps_sugeridas,
+      peso: baseSeries[idx]?.peso ?? migratedObj.peso_sugerido,
+      ...(tipo !== "normal" ? { tipo } : {}),
+    };
+  });
+
+  return {
+    ...migratedObj,
+    series_detalle: merged,
+  };
+}
+
 /** Aplica migración de mejores marcas reales sobre un ejercicio clonado (principal + alternativas). */
 export function migrateClonedExerciseWithProgress(oldEj, progRowsByEjVar) {
   const nSeries = parseInt(oldEj.num_series || oldEj.series, 10) || 4;
+  const origWarm = buildWarmupSetFromDetalle(oldEj.series_detalle);
   const origRows = progRowsByEjVar.get(`${oldEj.id}:original`) || [];
-  const origMigrated = extractBestMarksFromRows(origRows, nSeries, oldEj.reps_sugeridas, oldEj.peso_sugerido);
+  const origRawMigrated = extractBestMarksFromRows(origRows, nSeries, oldEj.reps_sugeridas, oldEj.peso_sugerido, origWarm);
+  const origMigrated = origRawMigrated ? mergeTypesFromOldDetalle(oldEj.series_detalle, origRawMigrated, nSeries) : null;
 
   const migratedAlts = (oldEj.alternativas || []).map((alt, idx) => {
+    const altWarm = buildWarmupSetFromDetalle(alt.series_detalle);
     const altRows = progRowsByEjVar.get(`${oldEj.id}:alt_${idx}`) || [];
-    const altMigrated = extractBestMarksFromRows(altRows, nSeries, alt.reps_sugeridas ?? oldEj.reps_sugeridas, alt.peso_sugerido ?? oldEj.peso_sugerido);
-    if (!altMigrated) {
+    const altRawMigrated = extractBestMarksFromRows(
+      altRows,
+      nSeries,
+      alt.reps_sugeridas ?? oldEj.reps_sugeridas,
+      alt.peso_sugerido ?? oldEj.peso_sugerido,
+      altWarm
+    );
+    if (!altRawMigrated) {
       return {
         ...alt,
         peso_sugerido: parseRawWeightToKg(alt.peso_sugerido),
         series_detalle: normalizeSeriesDetalle(alt.series_detalle),
       };
     }
+    const altMigrated = mergeTypesFromOldDetalle(alt.series_detalle, altRawMigrated, nSeries);
     return {
       ...alt,
       reps_sugeridas: altMigrated.reps_sugeridas,
@@ -664,4 +770,143 @@ export async function fetchClientExerciseHistoryData(getter, clientId, { exclude
     progRows,
     ok: rutsOk && progRes.ok,
   };
+}
+
+/** Obtiene el tipo de serie ('normal' | 'warmup' | 'dropset' | 'failure') en el índice `si`. */
+export function getSeriesType(exObj, si) {
+  if (!exObj) return "normal";
+  if (Array.isArray(exObj.seriesForm) && exObj.seriesForm.length > 0) {
+    return normalizeSeriesType(exObj.seriesForm[si]?.tipo);
+  }
+  const det = normalizeSeriesDetalle(exObj.series_detalle);
+  return normalizeSeriesType(det[si]?.tipo);
+}
+
+export function isWarmupSeries(exObj, si) {
+  return getSeriesType(exObj, si) === "warmup";
+}
+
+/** Genera etiquetas visuales consistentes (`C1`, `C2`, `1`, `2`, `D`, `F`) para una lista de series. */
+export function getSeriesVisualLabels(exObj, totalSeries = null) {
+  const count = Math.max(
+    1,
+    parseInt(totalSeries ?? exObj?.num_series ?? exObj?.series, 10) ||
+      (Array.isArray(exObj?.seriesForm) && exObj.seriesForm.length) ||
+      4
+  );
+  let warmIdx = 0;
+  let workIdx = 0;
+  return Array.from({ length: count }, (_, si) => {
+    const tipo = getSeriesType(exObj, si);
+    if (tipo === "warmup") {
+      warmIdx++;
+      return { si, tipo, label: `C${warmIdx}`, isWarmup: true, shortTag: "Calent." };
+    }
+    workIdx++;
+    if (tipo === "dropset") {
+      return { si, tipo, label: `${workIdx}·D`, isWarmup: false, shortTag: "Drop" };
+    }
+    if (tipo === "failure") {
+      return { si, tipo, label: `${workIdx}·F`, isWarmup: false, shortTag: "Fallo" };
+    }
+    return { si, tipo: "normal", label: String(workIdx), isWarmup: false, shortTag: "" };
+  });
+}
+
+/** Retorna la lista de índices de serie efectivos (excluyendo calentamiento; fallback a todas si todas fueran warmup). */
+export function getEffectiveSeriesIndices(exObj, totalSeries = null) {
+  const labels = getSeriesVisualLabels(exObj, totalSeries);
+  const effective = labels.filter((l) => !l.isWarmup).map((l) => l.si);
+  return effective.length > 0 ? effective : labels.map((l) => l.si);
+}
+
+/** Cuenta series efectivas de un ejercicio (excluyendo series etiquetadas como calentamiento). */
+export function countEffectiveSeries(exObj) {
+  const labels = getSeriesVisualLabels(exObj);
+  return labels.filter((l) => !l.isWarmup).length;
+}
+
+/** Calcula el volumen semanal de series efectivas por grupo muscular (solo ejercicios principales). */
+export function computeWeeklyMuscleVolume(rutinasList = []) {
+  const byMuscle = {};
+  let totalEffectiveSets = 0;
+  let totalWarmupSets = 0;
+
+  (Array.isArray(rutinasList) ? rutinasList : []).forEach((r) => {
+    (r?.ejercicios || []).forEach((ej) => {
+      const labels = getSeriesVisualLabels(ej);
+      const eff = labels.filter((l) => !l.isWarmup).length;
+      const warm = labels.length - eff;
+      totalEffectiveSets += eff;
+      totalWarmupSets += warm;
+
+      const grp = normalizeMuscleGroup(ej?.grupo_muscular) || "general";
+      if (eff > 0) {
+        byMuscle[grp] = (byMuscle[grp] || 0) + eff;
+      }
+    });
+  });
+
+  const muscleList = Object.entries(byMuscle)
+    .map(([id, sets]) => ({
+      id,
+      label: GRUPO_LABELS[id] || id.replace(/_/g, " "),
+      sets,
+    }))
+    .sort((a, b) => b.sets - a.sets);
+
+  return { byMuscle, muscleList, totalEffectiveSets, totalWarmupSets };
+}
+
+/** Extrae el rango objetivo [min, max] de series por músculo desde `smartTrainingPrescription`. */
+export function parseRecommendedVolumeRange(smartPrescription) {
+  const str = String(smartPrescription?.volumenRpe || "");
+  const match = str.match(/(\d+)\s*[-–]\s*(\d+)\s*series/i);
+  if (match) {
+    const min = parseInt(match[1], 10);
+    const max = parseInt(match[2], 10);
+    if (!isNaN(min) && !isNaN(max) && max >= min) return { min, max };
+  }
+  return { min: 10, max: 16 };
+}
+
+/** Normaliza bloques de superserie/biserie para que todo bloque tenga >=2 ejercicios contiguos con letras A, B, C... */
+export function normalizeSupersetBlocks(ejercicios = []) {
+  if (!Array.isArray(ejercicios) || ejercicios.length === 0) return [];
+  const list = ejercicios.map((e) => ({ ...e, bloque_grupo: e?.bloque_grupo ? String(e.bloque_grupo).trim() : null }));
+
+  // Detectar carreras contiguas del mismo bloque_grupo; bloques de longitud 1 se limpian a null
+  const runs = [];
+  let idx = 0;
+  while (idx < list.length) {
+    const g = list[idx].bloque_grupo;
+    if (!g) {
+      runs.push({ start: idx, len: 1, group: null });
+      idx++;
+      continue;
+    }
+    let end = idx + 1;
+    while (end < list.length && list[end].bloque_grupo === g) end++;
+    runs.push({ start: idx, len: end - idx, group: end - idx >= 2 ? g : null });
+    idx = end;
+  }
+
+  let letterCode = 65; // 'A'
+  for (const run of runs) {
+    const finalCode = run.group ? String.fromCharCode(letterCode++) : null;
+    for (let k = run.start; k < run.start + run.len; k++) {
+      list[k].bloque_grupo = finalCode;
+    }
+  }
+  return list;
+}
+
+/** Formatea descanso sugerido en segundos (ej. 90 -> "1m 30s" o "90s"). */
+export function formatRestLabel(seconds) {
+  const s = parseInt(seconds, 10);
+  if (!s || isNaN(s) || s <= 0) return "";
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  const rem = s % 60;
+  return rem === 0 ? `${m} min` : `${m}m ${rem}s`;
 }

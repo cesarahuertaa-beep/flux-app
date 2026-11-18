@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { Play, Pause, RotateCcw, Save, ChevronDown, TrendingUp, TrendingDown, Minus, Plus, Dumbbell, Check, CheckCheck, X, Square, Trophy, Sparkles, Flame, Lock, Unlock, CheckCircle2 } from "lucide-react";
+import { Play, Pause, RotateCcw, Save, ChevronDown, TrendingUp, TrendingDown, Minus, Plus, Dumbbell, Check, CheckCheck, X, Square, Trophy, Sparkles, Flame, Lock, Unlock, CheckCircle2, Timer, Link2, StickyNote } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { useBackButton } from "../../lib/backButtonHandler";
 import { CachedImage } from "../../lib/mediaCache";
 import { timerStore } from "../../lib/timerStore";
 import { GRUPO_LABELS, normalizeMuscleGroup } from "../../lib/constants";
 import { ConfirmModal } from "../ui/ConfirmModal";
-import { getSeriesSuggestion, lookupExerciseHistory } from "../../utils/routineHelpers";
+import { getSeriesSuggestion, lookupExerciseHistory, getSeriesVisualLabels, getEffectiveSeriesIndices, isWarmupSeries, formatRestLabel } from "../../utils/routineHelpers";
 
 function TimerCard({ brandColor }) {
   const [tState, setTState] = useState(() => timerStore.getState());
@@ -554,6 +554,7 @@ export default function Training({
       const dataPoint = { week: `Sem ${w + 1}` };
       let hasData = false;
       for (let s = 0; s < nSeries; s++) {
+        if (isWarmupSeries(activeObj, s)) continue;
         const p = parseFloat(progreso[`${ex.id}-${w}-${s}-peso-${variantId}`]);
         const rVal = progreso[`${ex.id}-${w}-${s}-reps-${variantId}`];
         const r = rVal === "Falta" ? 0 : parseFloat(rVal);
@@ -650,6 +651,7 @@ export default function Training({
     // Buscar el mejor 1RM en todas las semanas anteriores (0 .. wi - 1)
     for (let w = 0; w < wi; w++) {
       for (let s = 0; s < nSeries; s++) {
+        if (isWarmupSeries(activeObj, s)) continue;
         const pKey = `${ex.id}-${w}-${s}-peso-${variantId}`;
         const rKey = `${ex.id}-${w}-${s}-reps-${variantId}`;
         const p = progreso[pKey] ?? (w === wi - 1 ? progresoSemanaAnterior[pKey] : null);
@@ -665,6 +667,7 @@ export default function Training({
     let bestReps = 0;
 
     for (let s = 0; s < nSeries; s++) {
+      if (isWarmupSeries(activeObj, s)) continue;
       const p = progreso[`${ex.id}-${wi}-${s}-peso-${variantId}`];
       const r = progreso[`${ex.id}-${wi}-${s}-reps-${variantId}`];
       const e1rm = calcular1RM(p, r);
@@ -712,10 +715,12 @@ export default function Training({
   ejercicios.forEach((ex) => {
     const { obj: activeObj, variantId } = getVariantObj(ex);
     const nSeries = parseInt(activeObj?.num_series || ex.num_series) || 3;
-    totalSetsDay += nSeries;
+    const effectiveIdxSet = new Set(getEffectiveSeriesIndices(activeObj, nSeries));
+    totalSetsDay += effectiveIdxSet.size;
 
     let exHasCompletedSet = false;
     for (let s = 0; s < nSeries; s++) {
+      if (!effectiveIdxSet.has(s)) continue;
       const rVal = progreso[`${ex.id}-${wi}-${s}-reps-${variantId}`];
       const pVal = progreso[`${ex.id}-${wi}-${s}-peso-${variantId}`];
       const setIsFalta = rVal === "Falta";
@@ -921,13 +926,24 @@ export default function Training({
         ) : (
           <div className="bg-white md:bg-transparent rounded-none md:rounded-xl border-b md:border-b-0 border-[#E2E8F0] divide-y divide-[#E2E8F0] md:divide-y-0 md:space-y-3">
             {ejercicios.map((ex, i) => {
-              const numSeries = ex.num_series || 3;
               const isExpanded = expandedEx === i;
 
               const varData = getVariantObj(ex);
               const activeObj = varData.obj;
               const activeVarId = varData.variantId;
+              const numSeries = parseInt(activeObj?.num_series || ex.num_series, 10) || 3;
               const exPR = getExercisePRData(ex, activeVarId, activeObj);
+              const visualLabels = getSeriesVisualLabels(activeObj, numSeries);
+              const currGroup = ex.bloque_grupo || null;
+              const prevGroup = i > 0 ? (ejercicios[i - 1]?.bloque_grupo || null) : null;
+              const nextGroup = i < ejercicios.length - 1 ? (ejercicios[i + 1]?.bloque_grupo || null) : null;
+              const isSupersetStart = Boolean(currGroup && currGroup !== prevGroup);
+              const isSupersetMember = Boolean(currGroup && (currGroup === prevGroup || currGroup === nextGroup));
+              const restSeg = activeObj?.descanso_seg ?? ex.descanso_seg;
+              const restNum = restSeg ? parseInt(restSeg, 10) : 0;
+              const restLabel = restNum > 0 ? formatRestLabel(restNum) : "";
+              const rirTarget = activeObj?.rir_objetivo ?? ex.rir_objetivo;
+              const techNote = activeObj?.nota_tecnica ?? ex.nota_tecnica;
 
               const otherVariants = [];
               if (activeVarId !=="original") {
@@ -945,11 +961,19 @@ export default function Training({
                 <div
                   key={ex.id || i}
                   className={`bg-white rounded-none md:rounded-xl border-0 md:border overflow-hidden transition-all ${
+                    isSupersetMember ? "border-l-4 border-l-[var(--brand-primary)]" : ""
+                  } ${
                     isExpanded
                       ? "bg-white md:border-[var(--brand-primary)] md:shadow-sm"
                       : "bg-white md:border-[#E2E8F0]"
                   }`}
                 >
+                  {isSupersetStart && (
+                    <div className="px-4 md:px-5 py-1.5 bg-[var(--brand-secondary)]/70 border-b border-[var(--brand-primary)]/15 flex items-center gap-1.5 text-[11px] font-bold text-[var(--brand-primary)]">
+                      <Link2 size={12} className="shrink-0" />
+                      <span>Biserie {currGroup} · Alterna este bloque antes de descansar</span>
+                    </div>
+                  )}
               <button
                 className="w-full flex items-center gap-3.5 md:gap-4 px-4 md:px-5 py-3.5 md:py-4 text-left"
                 onClick={() => setExpandedEx(isExpanded ? null : i)}
@@ -959,7 +983,24 @@ export default function Training({
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-[#0B1929]">{activeObj.nombre}</p>
-                  <p className="text-xs text-[#6B7A8D]">{GRUPO_LABELS[normalizeMuscleGroup(activeObj.grupo_muscular)] || activeObj.grupo_muscular || activeObj.musculo || "General"}</p>
+                  <div className="flex items-center flex-wrap gap-1.5 mt-0.5">
+                    <span className="text-xs text-[#6B7A8D]">{GRUPO_LABELS[normalizeMuscleGroup(activeObj.grupo_muscular)] || activeObj.grupo_muscular || activeObj.musculo || "General"}</span>
+                    {isSupersetMember && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[var(--brand-secondary)] text-[var(--brand-primary)]">
+                        Biserie {currGroup}
+                      </span>
+                    )}
+                    {restLabel && (
+                      <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[#F1F5F9] text-[#475569]">
+                        <Timer size={10} /> {restLabel}
+                      </span>
+                    )}
+                    {rirTarget && (
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[#F8FAFC] border border-[#E2E8F0] text-[#475569]">
+                        RIR {rirTarget}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 {exPR.isPR && (
                   <span className="inline-flex items-center gap-1 text-[11px] bg-amber-50 text-amber-700 px-2.5 py-0.5 rounded-full font-bold border border-amber-200 shadow-sm">
@@ -1039,6 +1080,42 @@ export default function Training({
                     </div>
                   </div>
 
+                  {/* Prescripción opcional: Descanso rápido, RIR y Nota técnica */}
+                  {(restLabel || rirTarget || techNote) && (
+                    <div className="mb-4 flex flex-col gap-2">
+                      {(restLabel || rirTarget) && (
+                        <div className="flex items-center flex-wrap gap-2">
+                          {restLabel && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                timerStore.stopAndReset();
+                                timerStore.setSeconds(restNum, true);
+                                timerStore.start();
+                              }}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--brand-secondary)] hover:bg-[var(--brand-primary)] text-[var(--brand-primary)] hover:text-white border border-[var(--brand-primary)]/30 text-xs font-bold transition-colors cursor-pointer"
+                              title="Iniciar cronómetro con el descanso sugerido"
+                            >
+                              <Timer size={13} />
+                              <span>Iniciar descanso · {restLabel}</span>
+                            </button>
+                          )}
+                          {rirTarget && (
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-[#F8FAFC] border border-[#E2E8F0] text-[#0B1929] text-xs font-bold">
+                              RIR Objetivo: {rirTarget}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {techNote && (
+                        <div className="px-3 py-2 rounded-xl bg-[var(--brand-secondary)]/55 border border-[var(--brand-primary)]/20 text-xs text-[#0B1929] flex items-start gap-2">
+                          <StickyNote size={14} className="text-[var(--brand-primary)] shrink-0 mt-0.5" />
+                          <span className="leading-snug">{techNote}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Tabla de Series */}
                   <div>
                     {(() => {
@@ -1047,7 +1124,7 @@ export default function Training({
                       return (
                         <>
                           <div className="flex gap-2 mb-2 px-1 items-center">
-                            <div className="w-8 text-center text-[10px] font-mono text-[#6B7A8D] uppercase">Serie</div>
+                            <div className="w-9 text-center text-[10px] font-mono text-[#6B7A8D] uppercase">Serie</div>
                             <div className="flex-1 text-center text-[10px] font-mono text-[#6B7A8D] uppercase">Reps</div>
                             <div className="flex-1 flex items-center justify-center gap-1.5 text-[10px] font-mono text-[#6B7A8D] uppercase">
                               <span>Peso</span>
@@ -1098,12 +1175,29 @@ export default function Training({
                             const avancePct = calcularAvance(kgVal, repVal, prevKg, prevReps);
                             const isSetPR = exPR.isPR && exPR.bestSetIdx === si;
                             const isFalta = repVal === "Falta";
+                            const sMeta = visualLabels[si] || { label: String(si + 1), isWarmup: false, tipo: "normal", shortTag: "" };
 
                             return (
                               <div key={si} className="flex flex-col mb-3">
                                 <div className="flex gap-2 items-center">
-                                  <div className="w-8 text-center text-xs font-mono text-[#0B1929] font-bold">
-                                    {si + 1}
+                                  <div className="w-9 flex flex-col items-center justify-center shrink-0">
+                                    <span
+                                      className={`inline-flex items-center justify-center min-w-[26px] px-1 py-0.5 rounded text-[11px] font-mono font-bold ${
+                                        sMeta.isWarmup
+                                          ? "bg-amber-50 text-amber-700 border border-amber-200"
+                                          : sMeta.tipo === "dropset"
+                                          ? "bg-purple-50 text-purple-700 border border-purple-200"
+                                          : sMeta.tipo === "failure"
+                                          ? "bg-rose-50 text-rose-700 border border-rose-200"
+                                          : "text-[#0B1929]"
+                                      }`}
+                                      title={sMeta.shortTag || `Serie ${sMeta.label}`}
+                                    >
+                                      {sMeta.label}
+                                    </span>
+                                    {sMeta.shortTag && (
+                                      <span className="text-[8px] font-bold text-[#6B7A8D] leading-none mt-0.5">{sMeta.shortTag}</span>
+                                    )}
                                   </div>
 
                                   <div className="flex-1">
@@ -1122,6 +1216,8 @@ export default function Training({
                                           ? "border-red-300 bg-red-50/70 text-red-600 font-bold"
                                           : inputsDisabled
                                           ? "border-[#E2E8F0] bg-[#F8FAFC] text-[#475569] cursor-not-allowed"
+                                          : sMeta.isWarmup
+                                          ? "border-amber-200/80 bg-amber-50/20 text-[#0B1929] placeholder-[#9BA5B0] focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] outline-none"
                                           : "border-[#E2E8F0] bg-white text-[#0B1929] placeholder-[#9BA5B0] focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] outline-none"
                                       }`}
                                     />
@@ -1172,6 +1268,8 @@ export default function Training({
                                           ? "border-red-200 bg-red-50/30 text-red-400"
                                           : inputsDisabled
                                           ? "border-[#E2E8F0] bg-[#F8FAFC] text-[#475569] cursor-not-allowed"
+                                          : sMeta.isWarmup
+                                          ? "border-amber-200/80 bg-amber-50/20 text-[#0B1929] placeholder-[#9BA5B0] focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] outline-none"
                                           : "border-[#E2E8F0] bg-white text-[#0B1929] placeholder-[#9BA5B0] focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] outline-none"
                                       }`}
                                     />
@@ -1269,6 +1367,8 @@ export default function Training({
                     const exGraphData = getExerciseGraphData(ex, activeObj, activeVarId);
                     if (!exGraphData || exGraphData.length === 0) return null;
                     const exNumSeries = parseInt(activeObj?.num_series || ex.num_series) || 4;
+                    const graphSeries = getSeriesVisualLabels(activeObj, exNumSeries).filter((l) => !l.isWarmup);
+                    if (graphSeries.length === 0) return null;
                     const seriesColors = ["#0ea5e9", "#10b981", "#f59e0b", "#8b5cf6", "#ef4444", "#14b8a6"];
                     return (
                       <div className="mt-4 pt-4 border-t border-[#F0F4FA]">
@@ -1295,15 +1395,15 @@ export default function Training({
                                 }}
                                 formatter={(value, name) => [`${value} kg`, name]}
                               />
-                              {Array.from({ length: exNumSeries }).map((_, s) => (
+                              {graphSeries.map((gl, idx) => (
                                 <Line
-                                  key={s}
+                                  key={gl.si}
                                   type="monotone"
-                                  dataKey={`serie_${s}`}
-                                  stroke={seriesColors[s % seriesColors.length]}
+                                  dataKey={`serie_${gl.si}`}
+                                  stroke={seriesColors[idx % seriesColors.length]}
                                   strokeWidth={2}
-                                  dot={{ fill: seriesColors[s % seriesColors.length], r: 3 }}
-                                  name={`Serie ${s + 1}`}
+                                  dot={{ fill: seriesColors[idx % seriesColors.length], r: 3 }}
+                                  name={`Serie ${gl.label}`}
                                   connectNulls={true}
                                 />
                               ))}
