@@ -42,6 +42,7 @@ import {
   computeWeeklyMuscleVolume,
   parseRecommendedVolumeRange,
   normalizeSupersetBlocks,
+  computeSupersetMetadata,
   formatRestLabel,
 } from "../../utils/routineHelpers";
 import { useBrand } from "../BrandContext";
@@ -723,6 +724,29 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     return selected?.id ? peekClinicalRecord(selected.id) : null;
   });
 
+  const biblioMap = useMemo(() => {
+    const byId = new Map();
+    const byName = new Map();
+    (biblioteca || []).forEach((b) => {
+      if (b?.id) byId.set(String(b.id), b);
+      if (b?.nombre) byName.set(normalizeMuscleGroup(b.nombre), b);
+    });
+    return { byId, byName };
+  }, [biblioteca]);
+
+  const resolveCanonicalExercise = useCallback((e) => {
+    if (!e) return e;
+    const match = (e.biblioteca_id && biblioMap.byId.get(String(e.biblioteca_id))) ||
+      (e.nombre && biblioMap.byName.get(normalizeMuscleGroup(e.nombre)));
+    if (!match) return e;
+    return {
+      ...e,
+      grupo_muscular: match.grupo_muscular || e.grupo_muscular,
+      biblioteca_id: e.biblioteca_id || match.id || null,
+      gif_url: e.gif_url || match.gif_url || "",
+    };
+  }, [biblioMap]);
+
   const cycleMetrica = useMemo(() => {
     if (!Array.isArray(allMetricas) || allMetricas.length === 0) return null;
     const linked = linkMetricasToCiclos(allMetricas, ciclos);
@@ -1171,16 +1195,17 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
   /** Convierte un registro de ejercicio (BD o historial) al formato editable del modal híbrido. */
   const exerciseToFormItem = (x, { clearIds = false } = {}) => {
-    const unit = x.unidad || "kg";
-    const numSeries = parseInt(x.num_series, 10) || 4;
-    const scalarPesoInput = formatWeightForInput(x.peso_sugerido, unit);
-    const normDetalle = normalizeSeriesDetalle(x.series_detalle);
+    const resolved = resolveCanonicalExercise(x);
+    const unit = resolved.unidad || x.unidad || "kg";
+    const numSeries = parseInt(resolved.num_series || x.num_series, 10) || 4;
+    const scalarPesoInput = formatWeightForInput(resolved.peso_sugerido || x.peso_sugerido, unit);
+    const normDetalle = normalizeSeriesDetalle(resolved.series_detalle || x.series_detalle);
     const seriesForm =
       normDetalle.length > 0
-        ? seriesDetalleToForm(normDetalle, numSeries, x.reps_sugeridas || 10, scalarPesoInput, unit)
+        ? seriesDetalleToForm(normDetalle, numSeries, resolved.reps_sugeridas || x.reps_sugeridas || 10, scalarPesoInput, unit)
         : [];
     const copy = {
-      ...x,
+      ...resolved,
       peso_sugerido: scalarPesoInput,
       unidad: unit,
       series_detalle: normDetalle,
@@ -1190,11 +1215,14 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       nota_tecnica: x.nota_tecnica || "",
       bloque_grupo: x.bloque_grupo || null,
       _showOptions: false,
-      alternativas: (x.alternativas || []).map((alt) => ({
-        ...alt,
-        peso_sugerido: formatWeightForInput(alt.peso_sugerido, alt.unidad || unit),
-        series_detalle: normalizeSeriesDetalle(alt.series_detalle),
-      })),
+      alternativas: (x.alternativas || []).map((alt) => {
+        const altResolved = resolveCanonicalExercise(alt);
+        return {
+          ...altResolved,
+          peso_sugerido: formatWeightForInput(alt.peso_sugerido, alt.unidad || unit),
+          series_detalle: normalizeSeriesDetalle(alt.series_detalle),
+        };
+      }),
       _dndId: String((!clearIds && x.id) || Math.random().toString(36).slice(2, 9)),
     };
     if (clearIds) {
@@ -1454,13 +1482,15 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       if (rs) {
         setRutinas(prev => {
           const mapped = rs.map(r => {
-            const sortedEjercicios = (r.ejercicios || []).sort((a,b) => a.orden - b.orden);
+            const sortedEjercicios = (r.ejercicios || [])
+              .sort((a,b) => a.orden - b.orden)
+              .map(resolveCanonicalExercise);
             // Si el servidor aún no tiene los ejercicios porque se están guardando en segundo plano,
             // pero en el estado local ya los tenemos, preservarlos para que nunca se muestre "0 ejercicios"
             if (sortedEjercicios.length === 0) {
               const localMatch = prev.find(p => p.id === r.id || (p.nombre === r.nombre && (p.ejercicios || []).length > 0));
               if (localMatch && (localMatch.ejercicios || []).length > 0) {
-                return { ...r, ejercicios: localMatch.ejercicios };
+                return { ...r, ejercicios: localMatch.ejercicios.map(resolveCanonicalExercise) };
               }
             }
             return { ...r, ejercicios: sortedEjercicios };
@@ -3502,12 +3532,13 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       seriesDetalle = normalizeSeriesDetalle(e.series_detalle);
     }
 
+    const resolved = resolveCanonicalExercise(e);
     return {
       rutina_id: rid,
-      biblioteca_id: e.biblioteca_id || null,
-      nombre: e.nombre,
-      gif_url: e.gif_url || "",
-      grupo_muscular: e.grupo_muscular || "",
+      biblioteca_id: resolved.biblioteca_id || null,
+      nombre: resolved.nombre || e.nombre,
+      gif_url: resolved.gif_url || e.gif_url || "",
+      grupo_muscular: resolved.grupo_muscular || e.grupo_muscular || "",
       tipo_movimiento: e.tipo_movimiento || "",
       num_series: numSeries,
       reps_sugeridas: repsSug,
@@ -3515,11 +3546,18 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       unidad: unit,
       series_detalle: seriesDetalle,
       ...extractOptionalExerciseFields(e),
-      alternativas: (e.alternativas || []).map((alt) => ({
-        ...alt,
-        peso_sugerido: convertInputWeightToKg(alt.peso_sugerido, alt.unidad || unit),
-        series_detalle: normalizeSeriesDetalle(alt.series_detalle),
-      })),
+      alternativas: (e.alternativas || []).map((alt) => {
+        const altResolved = resolveCanonicalExercise(alt);
+        return {
+          ...alt,
+          nombre: altResolved.nombre || alt.nombre,
+          grupo_muscular: altResolved.grupo_muscular || alt.grupo_muscular || "",
+          biblioteca_id: altResolved.biblioteca_id || null,
+          gif_url: altResolved.gif_url || alt.gif_url || "",
+          peso_sugerido: convertInputWeightToKg(alt.peso_sugerido, alt.unidad || unit),
+          series_detalle: normalizeSeriesDetalle(alt.series_detalle),
+        };
+      }),
       orden,
     };
   };
@@ -3904,6 +3942,23 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       es[i].bloque_grupo = null;
     }
 
+    return { ...p, ejercicios: normalizeSupersetBlocks(es) };
+  });
+
+  const ungroupSupersetBlock = (groupCode) => setRutinaForm(p => {
+    if (!groupCode) return p;
+    const es = (p.ejercicios || []).map(item =>
+      String(item?.bloque_grupo || "").trim() === String(groupCode).trim()
+        ? { ...item, bloque_grupo: null }
+        : item
+    );
+    return { ...p, ejercicios: normalizeSupersetBlocks(es) };
+  });
+
+  const detachFromSuperset = (i) => setRutinaForm(p => {
+    const es = [...(p.ejercicios || [])].map((item, idx) =>
+      idx === i ? { ...item, bloque_grupo: null } : item
+    );
     return { ...p, ejercicios: normalizeSupersetBlocks(es) };
   });
 
@@ -7991,116 +8046,149 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                   </div>
                     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndEjercicios}>
                       <SortableContext items={rutinaForm.ejercicios.map(e => String(e._dndId))} strategy={verticalListSortingStrategy}>
-                        {rutinaForm.ejercicios.map((e, i) => {
-                          const hMark = lookupExerciseHistory(patientHistoryMarks, e);
-                          const u = e.unidad || "kg";
-                          const wLbl = hMark?.bestWeightKg != null && hMark.bestWeightKg > 0 ? `${convertWeightToInput(hMark.bestWeightKg, u)} ${u}` : null;
-                          const rLbl = hMark?.bestReps != null ? `${hMark.bestReps} reps` : null;
-                          const markSummaryLabel = [wLbl, rLbl].filter(Boolean).join(" × ");
-                          const isPerSeriesOpen = Array.isArray(e.seriesForm) && e.seriesForm.length > 0;
-                          const visualLabels = isPerSeriesOpen ? getSeriesVisualLabels(e, e.seriesForm.length) : [];
-                          const nextEx = rutinaForm.ejercicios[i + 1];
-                          const isLinkedWithNext = Boolean(e.bloque_grupo && nextEx?.bloque_grupo === e.bloque_grupo);
-                          const hasOptValues = Boolean(
-                            (e.descanso_seg && parseInt(e.descanso_seg, 10) > 0) ||
-                            (e.rir_objetivo && String(e.rir_objetivo).trim()) ||
-                            (e.nota_tecnica && String(e.nota_tecnica).trim())
-                          );
-                          const effSetsCount = countEffectiveSeries(e);
-                          const totalSetsCount = parseInt(e.num_series, 10) || 4;
-                          const warmSetsCount = Math.max(0, totalSetsCount - effSetsCount);
+                        {(() => {
+                          const supersetMeta = computeSupersetMetadata(rutinaForm.ejercicios);
+                          return rutinaForm.ejercicios.map((e, i) => {
+                            const hMark = lookupExerciseHistory(patientHistoryMarks, e);
+                            const u = e.unidad || "kg";
+                            const wLbl = hMark?.bestWeightKg != null && hMark.bestWeightKg > 0 ? `${convertWeightToInput(hMark.bestWeightKg, u)} ${u}` : null;
+                            const rLbl = hMark?.bestReps != null ? `${hMark.bestReps} reps` : null;
+                            const markSummaryLabel = [wLbl, rLbl].filter(Boolean).join(" × ");
+                            const isPerSeriesOpen = Array.isArray(e.seriesForm) && e.seriesForm.length > 0;
+                            const visualLabels = isPerSeriesOpen ? getSeriesVisualLabels(e, e.seriesForm.length) : [];
+                            const ssMeta = supersetMeta[i] || {};
+                            const nextSsMeta = supersetMeta[i + 1] || null;
+                            const isSameBlockAsNext = Boolean(ssMeta.isMember && nextSsMeta?.isMember && ssMeta.groupCode === nextSsMeta.groupCode);
+                            const isGapBetweenDistinctBlocks = Boolean(ssMeta.isMember && ssMeta.isEnd && nextSsMeta?.isMember && !isSameBlockAsNext);
+                            const hasOptValues = Boolean(
+                              (e.descanso_seg && parseInt(e.descanso_seg, 10) > 0) ||
+                              (e.rir_objetivo && String(e.rir_objetivo).trim()) ||
+                              (e.nota_tecnica && String(e.nota_tecnica).trim())
+                            );
+                            const effSetsCount = countEffectiveSeries(e);
+                            const totalSetsCount = parseInt(e.num_series, 10) || 4;
+                            const warmSetsCount = Math.max(0, totalSetsCount - effSetsCount);
 
-                          return (
-                          <SortableItem key={e._dndId} id={e._dndId}>
-                            {({ dragHandle, isDragging }) => (
-                              <div className={`mb-2.5 sm:mb-2 p-2.5 sm:p-2 bg-[#F8FAFC] sm:bg-transparent rounded-xl sm:rounded-lg border sm:border-b sm:border-t-0 sm:border-x-0 ${
-                                e.bloque_grupo ? "border-l-4 border-l-[var(--brand-primary)] sm:pl-2.5" : ""
-                              } ${isDragging ? 'bg-white shadow-md border-[#E2E8F0] z-10' : 'border-[#E2E8F0]'}`}>
-                                {/* MAIN EXERCISE */}
-                                <div className="grid grid-cols-[24px_40px_1fr_auto] sm:grid-cols-[24px_40px_1fr_56px_56px_76px_100px] gap-2 sm:gap-1.5 items-center">
-                                  <div className="flex items-center justify-center">{dragHandle}</div>
-                                  <div className="w-9 h-9 rounded-md overflow-hidden bg-white sm:bg-gray-50 border border-[#E2E8F0] flex items-center justify-center shrink-0">
-                                    {e.gif_url ? (
-                                      /\.(mp4|webm|mov)($|\?)/i.test(e.gif_url) ? (
-                                        <video src={e.gif_url} autoPlay loop muted playsInline className="w-full h-full object-cover" />
-                                      ) : (
-                                        <img src={e.gif_url} alt="" className="w-full h-full object-cover"/>
-                                      )
-                                    ) : <Dumbbell className="w-[18px] h-[18px] text-[#6B7A8D]" />}
-                                  </div>
-                                  <div className="text-[13px] font-semibold text-[#0B1929] leading-tight min-w-0 pr-1">
-                                    <div className="flex items-center gap-1.5 min-w-0">
-                                      {e.bloque_grupo && (
-                                        <span className="px-1.5 py-0.5 rounded bg-[var(--brand-secondary)] text-[var(--brand-primary)] border border-[var(--brand-primary)]/30 text-[9px] font-extrabold uppercase shrink-0">
-                                          Biserie {e.bloque_grupo}
+                            const cardShellCls = ssMeta.isMember
+                              ? `bg-white border-x border-[var(--brand-primary)]/40 border-l-4 border-l-[var(--brand-primary)] sm:pl-2.5 ${
+                                  ssMeta.isStart
+                                    ? "border-t border-[var(--brand-primary)]/20 rounded-t-none"
+                                    : "border-t border-dashed border-[#CBD5E1]/90 rounded-t-none"
+                                } ${
+                                  ssMeta.isEnd
+                                    ? "border-b border-[var(--brand-primary)]/40 rounded-b-xl mb-0"
+                                    : "border-b-0 rounded-b-none mb-0"
+                                }`
+                              : `bg-[#F8FAFC] sm:bg-white rounded-xl border border-[#E2E8F0] mb-0`;
+
+                            return (
+                            <SortableItem key={e._dndId} id={e._dndId}>
+                              {({ dragHandle, isDragging }) => (
+                                <div>
+                                  {ssMeta.isStart && (
+                                    <div className="mt-1 px-3 py-1.5 rounded-t-xl border border-b-0 border-[var(--brand-primary)]/40 border-l-4 border-l-[var(--brand-primary)] bg-[var(--brand-secondary)]/85 flex items-center justify-between gap-2">
+                                      <div className="flex items-center gap-1.5 min-w-0">
+                                        <Link2 className="w-3.5 h-3.5 text-[var(--brand-primary)] shrink-0" />
+                                        <span className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--brand-primary)]">
+                                          {ssMeta.blockTitle}
                                         </span>
-                                      )}
-                                      <span className="truncate">{e.nombre}</span>
-                                    </div>
-                                    <div className="flex items-center flex-wrap gap-1.5 mt-1">
-                                      <span className="text-[10px] text-[#6B7A8D] font-normal">
-                                        {GRUPO_LABELS[normalizeMuscleGroup(e.grupo_muscular)] || e.grupo_muscular}
-                                        {warmSetsCount > 0 ? ` · ${effSetsCount} ef. / ${warmSetsCount} cal.` : ""}
-                                      </span>
-                                      {hMark ? (
-                                        <button
-                                          type="button"
-                                          onClick={() => applyHistoryMarksToExercise(i)}
-                                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold border transition-colors cursor-pointer ${
-                                            e._historyApplied
-                                              ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-2xs"
-                                              : "bg-[var(--brand-secondary)] text-[var(--brand-primary)] border-[var(--brand-primary)]/35 hover:bg-[var(--brand-primary)] hover:text-white"
-                                          }`}
-                                          title="Importar la mejor marca histórica registrada por este paciente en este ejercicio"
-                                        >
-                                          {e._historyApplied ? <CheckCircle2 className="w-3 h-3 shrink-0" /> : <Trophy className="w-3 h-3 shrink-0" />}
-                                          <span>
-                                            {e._historyApplied
-                                              ? `Mejor marca aplicada${markSummaryLabel ? ` · ${markSummaryLabel}` : ""}`
-                                              : `Importar mejor marca${markSummaryLabel ? ` · ${markSummaryLabel}` : ""}`}
-                                          </span>
-                                        </button>
-                                      ) : !loadingPatientHistory ? (
-                                        <span className="text-[10px] text-[#94A3B8] font-normal">• Sin marcas previas</span>
-                                      ) : null}
+                                        <span className="text-[10px] font-medium text-[#475569] hidden sm:inline truncate">
+                                          · Alterna {ssMeta.blockCodesJoined} antes de descansar
+                                        </span>
+                                      </div>
                                       <button
                                         type="button"
-                                        onClick={() => toggleExerciseOptions(i)}
-                                        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold border transition-colors cursor-pointer ${
-                                          e._showOptions || hasOptValues
-                                            ? "bg-[var(--brand-secondary)] text-[var(--brand-primary)] border-[var(--brand-primary)]/30"
-                                            : "bg-white text-[#6B7A8D] border-[#E2E8F0] hover:text-[var(--brand-primary)]"
-                                        }`}
-                                        title="Opcional: Descanso, RIR objetivo o nota técnica"
+                                        onClick={() => ungroupSupersetBlock(ssMeta.groupCode)}
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/95 hover:bg-red-50 text-[#475569] hover:text-red-600 border border-[#E2E8F0] hover:border-red-200 text-[10px] font-bold transition-colors cursor-pointer shrink-0"
+                                        title={`Desagrupar ${ssMeta.blockTitle}`}
                                       >
-                                        <SlidersHorizontal className="w-2.5 h-2.5 shrink-0" />
-                                        <span>
-                                          {hasOptValues
-                                            ? [
-                                                e.descanso_seg ? formatRestLabel(e.descanso_seg) : "",
-                                                e.rir_objetivo ? `RIR ${e.rir_objetivo}` : "",
-                                                e.nota_tecnica ? "Nota" : "",
-                                              ].filter(Boolean).join(" · ")
-                                            : "+ Descanso / RIR / Nota"}
-                                        </span>
+                                        <Unlink2 className="w-2.5 h-2.5 shrink-0" />
+                                        <span>Desagrupar</span>
                                       </button>
-                                      {(i < rutinaForm.ejercicios.length - 1 || e.bloque_grupo) && (
+                                    </div>
+                                  )}
+                                  <div className={`p-2.5 sm:p-2 ${cardShellCls} ${isDragging ? 'bg-white shadow-md z-10' : ''}`}>
+                                  {/* MAIN EXERCISE */}
+                                  <div className="grid grid-cols-[24px_40px_1fr_auto] sm:grid-cols-[24px_40px_1fr_56px_56px_76px_100px] gap-2 sm:gap-1.5 items-center">
+                                    <div className="flex items-center justify-center">{dragHandle}</div>
+                                    <div className="w-9 h-9 rounded-md overflow-hidden bg-white sm:bg-gray-50 border border-[#E2E8F0] flex items-center justify-center shrink-0">
+                                      {e.gif_url ? (
+                                        /\.(mp4|webm|mov)($|\?)/i.test(e.gif_url) ? (
+                                          <video src={e.gif_url} autoPlay loop muted playsInline className="w-full h-full object-cover" />
+                                        ) : (
+                                          <img src={e.gif_url} alt="" className="w-full h-full object-cover"/>
+                                        )
+                                      ) : <Dumbbell className="w-[18px] h-[18px] text-[#6B7A8D]" />}
+                                    </div>
+                                    <div className="text-[13px] font-semibold text-[#0B1929] leading-tight min-w-0 pr-1">
+                                      <div className="flex items-center gap-1.5 min-w-0">
+                                        {ssMeta.isMember && (
+                                          <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded-md bg-[var(--brand-secondary)] text-[var(--brand-primary)] border border-[var(--brand-primary)]/30 text-[10px] font-mono font-extrabold shrink-0">
+                                            {ssMeta.codeLabel}
+                                          </span>
+                                        )}
+                                        <span className="truncate">{e.nombre}</span>
+                                      </div>
+                                      <div className="flex items-center flex-wrap gap-1.5 mt-1">
+                                        <span className="text-[10px] text-[#6B7A8D] font-normal">
+                                          {GRUPO_LABELS[normalizeMuscleGroup(resolveCanonicalExercise(e).grupo_muscular)] || resolveCanonicalExercise(e).grupo_muscular || e.grupo_muscular}
+                                          {warmSetsCount > 0 ? ` · ${effSetsCount} ef. / ${warmSetsCount} cal.` : ""}
+                                        </span>
+                                        {hMark ? (
+                                          <button
+                                            type="button"
+                                            onClick={() => applyHistoryMarksToExercise(i)}
+                                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold border transition-colors cursor-pointer ${
+                                              e._historyApplied
+                                                ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-2xs"
+                                                : "bg-[var(--brand-secondary)] text-[var(--brand-primary)] border-[var(--brand-primary)]/35 hover:bg-[var(--brand-primary)] hover:text-white"
+                                            }`}
+                                            title="Importar la mejor marca histórica registrada por este paciente en este ejercicio"
+                                          >
+                                            {e._historyApplied ? <CheckCircle2 className="w-3 h-3 shrink-0" /> : <Trophy className="w-3 h-3 shrink-0" />}
+                                            <span>
+                                              {e._historyApplied
+                                                ? `Mejor marca aplicada${markSummaryLabel ? ` · ${markSummaryLabel}` : ""}`
+                                                : `Importar mejor marca${markSummaryLabel ? ` · ${markSummaryLabel}` : ""}`}
+                                            </span>
+                                          </button>
+                                        ) : !loadingPatientHistory ? (
+                                          <span className="text-[10px] text-[#94A3B8] font-normal">• Sin marcas previas</span>
+                                        ) : null}
                                         <button
                                           type="button"
-                                          onClick={() => toggleSupersetWithNext(i)}
+                                          onClick={() => toggleExerciseOptions(i)}
                                           className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold border transition-colors cursor-pointer ${
-                                            isLinkedWithNext || e.bloque_grupo
-                                              ? "bg-[var(--brand-secondary)] text-[var(--brand-primary)] border-[var(--brand-primary)]/35 hover:bg-red-50 hover:text-red-600 hover:border-red-200"
+                                            e._showOptions || hasOptValues
+                                              ? "bg-[var(--brand-secondary)] text-[var(--brand-primary)] border-[var(--brand-primary)]/30"
                                               : "bg-white text-[#6B7A8D] border-[#E2E8F0] hover:text-[var(--brand-primary)]"
                                           }`}
-                                          title={isLinkedWithNext ? "Desenlazar biserie" : e.bloque_grupo ? "Quitar de biserie" : "Enlazar como biserie con el siguiente ejercicio"}
+                                          title="Opcional: Descanso, RIR objetivo o nota técnica"
                                         >
-                                          {isLinkedWithNext || e.bloque_grupo ? <Unlink2 className="w-2.5 h-2.5 shrink-0" /> : <Link2 className="w-2.5 h-2.5 shrink-0" />}
-                                          <span>{isLinkedWithNext ? `Desenlazar ${e.bloque_grupo}` : e.bloque_grupo ? `Quitar ${e.bloque_grupo}` : "+ Biserie"}</span>
+                                          <SlidersHorizontal className="w-2.5 h-2.5 shrink-0" />
+                                          <span>
+                                            {hasOptValues
+                                              ? [
+                                                  e.descanso_seg ? formatRestLabel(e.descanso_seg) : "",
+                                                  e.rir_objetivo ? `RIR ${e.rir_objetivo}` : "",
+                                                  e.nota_tecnica ? "Nota" : "",
+                                                ].filter(Boolean).join(" · ")
+                                              : "+ Descanso / RIR / Nota"}
+                                          </span>
                                         </button>
-                                      )}
+                                        {ssMeta.isMember && ssMeta.blockSize >= 3 && (
+                                          <button
+                                            type="button"
+                                            onClick={() => detachFromSuperset(i)}
+                                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold border bg-white text-[#64748B] border-[#E2E8F0] hover:text-red-600 hover:bg-red-50 hover:border-red-200 transition-colors cursor-pointer"
+                                            title={`Sacar ${ssMeta.codeLabel} de ${ssMeta.blockTitle}`}
+                                          >
+                                            <Unlink2 className="w-2.5 h-2.5 shrink-0" />
+                                            <span>Salir del bloque</span>
+                                          </button>
+                                        )}
+                                      </div>
                                     </div>
-                                  </div>
                                   
                                   <div className="col-span-4 sm:col-span-3 sm:col-start-4 sm:row-start-1 grid grid-cols-3 gap-2 sm:grid-cols-[56px_56px_76px] sm:gap-1.5 mt-1.5 sm:mt-0 pt-2 sm:pt-0 border-t border-[#E2E8F0] sm:border-none">
                                     <div className="flex flex-col gap-0.5 sm:block">
@@ -8349,11 +8437,37 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                     </div>
                                   </div>
                                 ))}
-                              </div>
-                            )}
-                          </SortableItem>
-                          );
-                        })}
+                                  </div>
+                                  {i < rutinaForm.ejercicios.length - 1 && !isSameBlockAsNext && (
+                                    isGapBetweenDistinctBlocks ? (
+                                      <div className="h-2.5" />
+                                    ) : (
+                                      <div className="relative flex items-center justify-center py-1.5">
+                                        <div className="absolute inset-x-4 top-1/2 -translate-y-1/2 border-t border-dashed border-[#E2E8F0]" />
+                                        <button
+                                          type="button"
+                                          onClick={() => toggleSupersetWithNext(i)}
+                                          className="relative z-10 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white border border-[#E2E8F0] hover:border-[var(--brand-primary)]/50 text-[10px] font-bold text-[#64748B] hover:text-[var(--brand-primary)] hover:bg-[var(--brand-secondary)]/55 transition-colors cursor-pointer shadow-2xs"
+                                          title="Unir este ejercicio con el siguiente en una biserie"
+                                        >
+                                          <Link2 className="w-2.5 h-2.5 shrink-0" />
+                                          <span>
+                                            {ssMeta.isMember
+                                              ? `Sumar siguiente a ${ssMeta.blockTitle}`
+                                              : nextSsMeta?.isMember
+                                              ? `Unir a ${nextSsMeta.blockTitle}`
+                                              : "Unir en biserie"}
+                                          </span>
+                                        </button>
+                                      </div>
+                                    )
+                                  )}
+                                </div>
+                              )}
+                            </SortableItem>
+                            );
+                          });
+                        })()}
                       </SortableContext>
                     </DndContext>
                 </div>

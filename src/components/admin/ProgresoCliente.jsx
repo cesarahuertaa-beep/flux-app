@@ -41,7 +41,7 @@ import {
 import { EvolutionCharts } from "../ui/EvolutionCharts";
 import { BeforeAfterComparator } from "../ui/BeforeAfterComparator";
 import { GRUPO_LABELS, normalizeMuscleGroup } from "../../lib/constants";
-import { getSeriesVisualLabels } from "../../utils/routineHelpers";
+import { getSeriesVisualLabels, computeSupersetMetadata } from "../../utils/routineHelpers";
 import { ListSkeleton } from "../ui/Skeleton";
 import { ConfirmModal } from "../ui/ConfirmModal";
 import ExpedienteClinicoModal from "../clinical/ExpedienteClinicoModal";
@@ -3630,80 +3630,90 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                         </tr>
                       </thead>
                       <tbody>
-                        {r.ejercicios.map((ej, eji) => {
-                          const variantsWithData = new Set(["original"]);
-                          for (const key in progreso) {
-                            if (key.startsWith(`${ej.id}-`) && progreso[key] !== "" && progreso[key] != null) {
-                              const match = key.match(/-(?:peso|reps)-(.+)$/);
-                              if (match && match[1]) {
-                                variantsWithData.add(match[1]);
+                        {(() => {
+                          const supersetMetaList = computeSupersetMetadata(r.ejercicios || []);
+                          return (r.ejercicios || []).map((ej, eji) => {
+                            const ssMeta = supersetMetaList[eji] || {};
+                            const variantsWithData = new Set(["original"]);
+                            for (const key in progreso) {
+                              if (key.startsWith(`${ej.id}-`) && progreso[key] !== "" && progreso[key] != null) {
+                                const match = key.match(/-(?:peso|reps)-(.+)$/);
+                                if (match && match[1]) {
+                                  variantsWithData.add(match[1]);
+                                }
                               }
                             }
-                          }
-                          const activeVariants = Array.from(variantsWithData).sort();
+                            const activeVariants = Array.from(variantsWithData).sort();
 
-                          const variantWorkedWeek = (targetVid, targetWi) => {
-                            const isTgtOrig = targetVid === "original";
-                            const tgtAltIdx = isTgtOrig ? -1 : parseInt(targetVid.replace("alt_", ""), 10);
-                            const tgtObj = isTgtOrig ? ej : (ej.alternativas || [])[tgtAltIdx] || ej;
-                            const maxSets = Math.max(tgtObj.num_series || 0, ej.num_series || 4);
-                            for (let k = 0; k < maxSets; k++) {
-                              const pv = progreso[`${ej.id}-${targetWi}-${k}-peso-${targetVid}`];
-                              const rv = progreso[`${ej.id}-${targetWi}-${k}-reps-${targetVid}`];
-                              if ((pv !== undefined && pv !== null && pv !== "") || (rv !== undefined && rv !== null && rv !== "")) {
-                                return true;
+                            const variantWorkedWeek = (targetVid, targetWi) => {
+                              const isTgtOrig = targetVid === "original";
+                              const tgtAltIdx = isTgtOrig ? -1 : parseInt(targetVid.replace("alt_", ""), 10);
+                              const tgtObj = isTgtOrig ? ej : (ej.alternativas || [])[tgtAltIdx] || ej;
+                              const maxSets = Math.max(tgtObj.num_series || 0, ej.num_series || 4);
+                              for (let k = 0; k < maxSets; k++) {
+                                const pv = progreso[`${ej.id}-${targetWi}-${k}-peso-${targetVid}`];
+                                const rv = progreso[`${ej.id}-${targetWi}-${k}-reps-${targetVid}`];
+                                if ((pv !== undefined && pv !== null && pv !== "") || (rv !== undefined && rv !== null && rv !== "")) {
+                                  return true;
+                                }
                               }
-                            }
-                            return false;
-                          };
+                              return false;
+                            };
 
-                          return activeVariants.map((vid) => {
-                            const isOriginal = vid ==="original";
-                            const altIdx = isOriginal ? -1 : parseInt(vid.replace("alt_",""));
-                            const exObj = isOriginal ? ej : (ej.alternativas || [])[altIdx] || ej;
-                            const rowSeriesCount = exObj.num_series || ej.num_series || 4;
-                            const seriesVisualLabels = getSeriesVisualLabels(exObj, rowSeriesCount);
-                            
-                            const rowBg = eji % 2 === 0 ?"bg-white" :"bg-gray-50/30";
-                            const highlight = !isOriginal ?"bg-[var(--brand-primary)]/5" : rowBg;
+                            return activeVariants.map((vid) => {
+                              const isOriginal = vid ==="original";
+                              const altIdx = isOriginal ? -1 : parseInt(vid.replace("alt_",""));
+                              const exObj = isOriginal ? ej : (ej.alternativas || [])[altIdx] || ej;
+                              const rowSeriesCount = exObj.num_series || ej.num_series || 4;
+                              const seriesVisualLabels = getSeriesVisualLabels(exObj, rowSeriesCount);
+                              
+                              const rowBg = eji % 2 === 0 ?"bg-white" :"bg-gray-50/30";
+                              const highlight = !isOriginal ?"bg-[var(--brand-primary)]/5" : rowBg;
 
-                            return Array.from({length: rowSeriesCount}, (_, si) => {
-                              const sLbl = seriesVisualLabels[si] || { label: String(si + 1), isWarmup: false, tipo: "normal" };
-                              return (
-                              <tr key={`${ej.id}-${vid}-${si}`} className={sLbl.isWarmup ? "bg-slate-50/80 opacity-85" : highlight}>
-                                {si === 0 && (
-                                  <td 
-                                    rowSpan={rowSeriesCount} 
-                                    style={{ width: "32%" }}
-                                    className={`px-3 py-2 border border-[#E2E8F0] font-bold align-middle sticky left-0 z-20 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)] w-[32%] ${
-                                      !isOriginal ? "bg-[#f0f9ff]" : (eji % 2 === 0 ? "bg-white" : "bg-[#F8FAFC]")
-                                    }`}
-                                  >
-                                    <div className="flex items-center gap-2.5 min-w-0">
-                                      <div 
-                                        onClick={() => exObj.gif_url && setLightbox(exObj.gif_url)}
-                                        className={`w-9 h-9 rounded-lg overflow-hidden shrink-0 bg-slate-100 border border-slate-200 flex items-center justify-center ${exObj.gif_url ? "cursor-pointer hover:opacity-90 transition-opacity" : ""}`}
-                                        title={exObj.gif_url ? "Ver demostración en grande" : ""}
-                                      >
-                                        {exObj.gif_url ? (
-                                          /\.(mp4|webm|mov)($|\?)/i.test(exObj.gif_url) ? (
-                                            <video src={exObj.gif_url} autoPlay loop muted playsInline className="w-full h-full object-cover pointer-events-none" />
+                              return Array.from({length: rowSeriesCount}, (_, si) => {
+                                const sLbl = seriesVisualLabels[si] || { label: String(si + 1), isWarmup: false, tipo: "normal" };
+                                return (
+                                <tr key={`${ej.id}-${vid}-${si}`} className={sLbl.isWarmup ? "bg-slate-50/80 opacity-85" : highlight}>
+                                  {si === 0 && (
+                                    <td 
+                                      rowSpan={rowSeriesCount} 
+                                      style={{ width: "32%" }}
+                                      className={`px-3 py-2 border border-[#E2E8F0] font-bold align-middle sticky left-0 z-20 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)] w-[32%] ${
+                                        ssMeta.isMember ? "border-l-4 border-l-[var(--brand-primary)]" : ""
+                                      } ${
+                                        !isOriginal ? "bg-[#f0f9ff]" : (eji % 2 === 0 ? "bg-white" : "bg-[#F8FAFC]")
+                                      }`}
+                                    >
+                                      <div className="flex items-center gap-2.5 min-w-0">
+                                        <div 
+                                          onClick={() => exObj.gif_url && setLightbox(exObj.gif_url)}
+                                          className={`w-9 h-9 rounded-lg overflow-hidden shrink-0 bg-slate-100 border border-slate-200 flex items-center justify-center ${exObj.gif_url ? "cursor-pointer hover:opacity-90 transition-opacity" : ""}`}
+                                          title={exObj.gif_url ? "Ver demostración en grande" : ""}
+                                        >
+                                          {exObj.gif_url ? (
+                                            /\.(mp4|webm|mov)($|\?)/i.test(exObj.gif_url) ? (
+                                              <video src={exObj.gif_url} autoPlay loop muted playsInline className="w-full h-full object-cover pointer-events-none" />
+                                            ) : (
+                                              <img src={exObj.gif_url} alt="" className="w-full h-full object-cover pointer-events-none" />
+                                            )
                                           ) : (
-                                            <img src={exObj.gif_url} alt="" className="w-full h-full object-cover pointer-events-none" />
-                                          )
-                                        ) : (
-                                          <Dumbbell className="w-4 h-4 text-slate-400" />
-                                        )}
-                                      </div>
-
-                                      <div className="min-w-0 flex-1">
-                                        <div className="flex items-center flex-wrap gap-1.5 min-w-0">
-                                          {ej.bloque_grupo && (
-                                            <span className="text-[9px] bg-[var(--brand-secondary)] text-[var(--brand-primary)] border border-[var(--brand-primary)]/30 px-1.5 py-0.5 rounded font-extrabold uppercase shrink-0">
-                                              Biserie {ej.bloque_grupo}
-                                            </span>
+                                            <Dumbbell className="w-4 h-4 text-slate-400" />
                                           )}
-                                          <span className="text-[#0B1929] leading-tight break-words">{exObj.nombre}</span>
+                                        </div>
+
+                                        <div className="min-w-0 flex-1">
+                                          {ssMeta.isStart && (
+                                            <div className="text-[9px] font-extrabold uppercase tracking-wider text-[var(--brand-primary)] mb-0.5">
+                                              {ssMeta.blockTitle} · {ssMeta.blockCodesJoined}
+                                            </div>
+                                          )}
+                                          <div className="flex items-center flex-wrap gap-1.5 min-w-0">
+                                            {ssMeta.isMember && (
+                                              <span className="text-[10px] font-mono bg-[var(--brand-secondary)] text-[var(--brand-primary)] border border-[var(--brand-primary)]/30 px-1.5 py-0.5 rounded font-extrabold shrink-0">
+                                                {ssMeta.codeLabel}
+                                              </span>
+                                            )}
+                                            <span className="text-[#0B1929] leading-tight break-words">{exObj.nombre}</span>
                                           {!isOriginal && (
                                             <div className="inline-flex items-center gap-1 shrink-0">
                                               <span className="text-[9px] bg-[var(--brand-primary)] text-white px-1 py-0.5 rounded font-bold">ALT</span>
@@ -3811,7 +3821,8 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                               );
                             });
                           });
-                        })}
+                        });
+                        })()}
                       </tbody>
                     </table>
                   </div>

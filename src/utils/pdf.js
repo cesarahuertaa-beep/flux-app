@@ -4,6 +4,7 @@ import { registerBackAction } from "../lib/backButtonHandler";
 import { parseDiaMetadata } from "../lib/mealOptions";
 import { GRUPO_LABELS, normalizeMuscleGroup } from "../lib/constants";
 import {
+  computeSupersetMetadata,
   computeWeeklyMuscleVolume,
   convertWeightToInput,
   formatRestLabel,
@@ -1761,16 +1762,13 @@ export const generateRutinaPDF = (cliente, rutinas = [], cycleInfo = {}, brand =
         .join(" · ");
 
       const ejs = Array.isArray(r.ejercicios) ? r.ejercicios : [];
-      const blockSubIndex = {};
+      const supersetMeta = computeSupersetMetadata(ejs);
 
       const rowsHtml = ejs
         .map((ej, idx) => {
-          const blk = ej.bloque_grupo ? String(ej.bloque_grupo).trim() : "";
-          let orderLabel = String(idx + 1);
-          if (blk) {
-            blockSubIndex[blk] = (blockSubIndex[blk] || 0) + 1;
-            orderLabel = `${blk}${blockSubIndex[blk]}`;
-          }
+          const ss = supersetMeta[idx] || {};
+          const blk = ss.isMember ? ss.groupCode : "";
+          const orderLabel = ss.codeLabel || String(idx + 1);
           const grpLabel = GRUPO_LABELS[normalizeMuscleGroup(ej.grupo_muscular)] || ej.grupo_muscular || "—";
           const alts = Array.isArray(ej.alternativas) ? ej.alternativas : [];
           const altsHtml =
@@ -1795,7 +1793,7 @@ export const generateRutinaPDF = (cliente, rutinas = [], cycleInfo = {}, brand =
             .join("");
 
           return `<tr style="${blk ? `border-left:3px solid ${accent};` : ""}">
-            <td style="text-align:center;font-weight:800;color:${blk ? accent : "#475569"};white-space:nowrap;">${escapeHtml(orderLabel)}${blk ? `<div style="font-size:8px;text-transform:uppercase;">Biserie</div>` : ""}</td>
+            <td style="text-align:center;font-weight:800;color:${blk ? accent : "#475569"};white-space:nowrap;">${escapeHtml(orderLabel)}${blk ? `<div style="font-size:8px;text-transform:uppercase;">${escapeHtml(ss.shortKind || "Biserie")}</div>` : ""}</td>
             <td><strong>${escapeHtml(ej.nombre || "")}</strong>${altsHtml}</td>
             <td style="color:#475569;font-size:10px;">${escapeHtml(grpLabel)}</td>
             <td>${formatPrescriptionHtml(ej)}</td>

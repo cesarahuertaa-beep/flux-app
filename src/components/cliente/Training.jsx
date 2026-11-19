@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { Play, Pause, RotateCcw, Save, ChevronDown, TrendingUp, TrendingDown, Minus, Plus, Dumbbell, Check, CheckCheck, X, Square, Trophy, Sparkles, Flame, Lock, Unlock, CheckCircle2, Timer, Link2, StickyNote } from "lucide-react";
+import { Play, Pause, RotateCcw, Save, ChevronDown, TrendingUp, TrendingDown, Minus, Plus, Dumbbell, Check, CheckCheck, X, Square, Trophy, Sparkles, Flame, Lock, Unlock, CheckCircle2, Timer, Link2, StickyNote, ArrowLeft, ArrowRight } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { useBackButton } from "../../lib/backButtonHandler";
 import { CachedImage } from "../../lib/mediaCache";
 import { timerStore } from "../../lib/timerStore";
 import { GRUPO_LABELS, normalizeMuscleGroup } from "../../lib/constants";
 import { ConfirmModal } from "../ui/ConfirmModal";
-import { getSeriesSuggestion, lookupExerciseHistory, getSeriesVisualLabels, getEffectiveSeriesIndices, isWarmupSeries, formatRestLabel } from "../../utils/routineHelpers";
+import { dbPeek } from "../../lib/supabase";
+import { getSeriesSuggestion, lookupExerciseHistory, getSeriesVisualLabels, getEffectiveSeriesIndices, isWarmupSeries, groupExercisesIntoBlocks, formatRestLabel } from "../../utils/routineHelpers";
 
 function TimerCard({ brandColor }) {
   const [tState, setTState] = useState(() => timerStore.getState());
@@ -461,6 +462,31 @@ export default function Training({
   // Semana actual (índice 0-based para leer de progreso)
   const wi = Math.max(0, semanaActualCiclo - 1);
 
+  const biblioMap = useMemo(() => {
+    const raw = dbPeek("biblioteca_ejercicios?order=nombre.asc") || [];
+    const byId = new Map();
+    const byName = new Map();
+    if (Array.isArray(raw)) {
+      raw.forEach((b) => {
+        if (b?.id) byId.set(String(b.id), b);
+        if (b?.nombre) byName.set(normalizeMuscleGroup(b.nombre), b);
+      });
+    }
+    return { byId, byName };
+  }, []);
+
+  const resolveCanonicalGroup = useCallback((exObj) => {
+    if (!exObj) return "General";
+    if (exObj.biblioteca_id && biblioMap.byId.has(String(exObj.biblioteca_id))) {
+      return biblioMap.byId.get(String(exObj.biblioteca_id)).grupo_muscular || exObj.grupo_muscular;
+    }
+    const norm = normalizeMuscleGroup(exObj.nombre);
+    if (norm && biblioMap.byName.has(norm)) {
+      return biblioMap.byName.get(norm).grupo_muscular || exObj.grupo_muscular;
+    }
+    return exObj.grupo_muscular || exObj.musculo || "General";
+  }, [biblioMap]);
+
   const [activeRutinaIdx, setActiveRutinaIdx] = useState(0);
   const [expandedEx,      setExpandedEx]      = useState(0); // Primer ejercicio abierto por defecto
   const [activeVariant,   setActiveVariant]   = useState({}); // { [exId]: 'original' | 'alt_0' }
@@ -749,13 +775,13 @@ export default function Training({
       sessionPRs.push({
         id: ex.id,
         nombre: activeObj.nombre,
-        grupo: activeObj.grupo_muscular || ex.grupo_muscular || "General",
+        grupo: resolveCanonicalGroup(activeObj),
         ...prInfo,
       });
     }
 
     if (exHasCompletedSet) {
-      const grp = activeObj.grupo_muscular || ex.grupo_muscular || "General";
+      const grp = resolveCanonicalGroup(activeObj);
       if (!musclesTrainedMap[grp]) {
         musclesTrainedMap[grp] = { baseXP: 10, bonusXP: 0 };
       }
@@ -925,98 +951,82 @@ export default function Training({
           </div>
         ) : (
           <div className="bg-white md:bg-transparent rounded-none md:rounded-xl border-b md:border-b-0 border-[#E2E8F0] divide-y divide-[#E2E8F0] md:divide-y-0 md:space-y-3">
-            {ejercicios.map((ex, i) => {
-              const isExpanded = expandedEx === i;
+            {(() => {
+              const exerciseBlocks = groupExercisesIntoBlocks(ejercicios);
+              const renderExerciseRow = (ex, i, { ssMeta = null, block = null, posInBlock = 0 } = {}) => {
+                const isExpanded = expandedEx === i;
+                const isSupersetItem = Boolean(ssMeta?.isMember && block);
 
-              const varData = getVariantObj(ex);
-              const activeObj = varData.obj;
-              const activeVarId = varData.variantId;
-              const numSeries = parseInt(activeObj?.num_series || ex.num_series, 10) || 3;
-              const exPR = getExercisePRData(ex, activeVarId, activeObj);
-              const visualLabels = getSeriesVisualLabels(activeObj, numSeries);
-              const currGroup = ex.bloque_grupo || null;
-              const prevGroup = i > 0 ? (ejercicios[i - 1]?.bloque_grupo || null) : null;
-              const nextGroup = i < ejercicios.length - 1 ? (ejercicios[i + 1]?.bloque_grupo || null) : null;
-              const isSupersetStart = Boolean(currGroup && currGroup !== prevGroup);
-              const isSupersetMember = Boolean(currGroup && (currGroup === prevGroup || currGroup === nextGroup));
-              const restSeg = activeObj?.descanso_seg ?? ex.descanso_seg;
-              const restNum = restSeg ? parseInt(restSeg, 10) : 0;
-              const restLabel = restNum > 0 ? formatRestLabel(restNum) : "";
-              const rirTarget = activeObj?.rir_objetivo ?? ex.rir_objetivo;
-              const techNote = activeObj?.nota_tecnica ?? ex.nota_tecnica;
+                const varData = getVariantObj(ex);
+                const activeObj = varData.obj;
+                const activeVarId = varData.variantId;
+                const numSeries = parseInt(activeObj?.num_series || ex.num_series, 10) || 3;
+                const exPR = getExercisePRData(ex, activeVarId, activeObj);
+                const visualLabels = getSeriesVisualLabels(activeObj, numSeries);
+                const restSeg = activeObj?.descanso_seg ?? ex.descanso_seg;
+                const restNum = restSeg ? parseInt(restSeg, 10) : 0;
+                const restLabel = restNum > 0 ? formatRestLabel(restNum) : "";
+                const rirTarget = activeObj?.rir_objetivo ?? ex.rir_objetivo;
+                const techNote = activeObj?.nota_tecnica ?? ex.nota_tecnica;
 
-              const otherVariants = [];
-              if (activeVarId !=="original") {
-                otherVariants.push({ obj: ex, variantId:"original" });
-              }
-              (ex.alternativas || []).forEach((alt, altIdx) => {
-                const vid = `alt_${altIdx}`;
-                if (vid !== activeVarId) otherVariants.push({ obj: alt, variantId: vid });
-              });
+                const otherVariants = [];
+                if (activeVarId !=="original") {
+                  otherVariants.push({ obj: ex, variantId:"original" });
+                }
+                (ex.alternativas || []).forEach((alt, altIdx) => {
+                  const vid = `alt_${altIdx}`;
+                  if (vid !== activeVarId) otherVariants.push({ obj: alt, variantId: vid });
+                });
 
-              // Check if there is data this week for any variant of this exercise
-              const isSaved = ["original","alt_0","alt_1"].some(vid => progreso[`${ex.id}-${wi}-0-reps-${vid}`] !== undefined);
+                // Check if there is data this week for any variant of this exercise
+                const isSaved = ["original","alt_0","alt_1"].some(vid => progreso[`${ex.id}-${wi}-0-reps-${vid}`] !== undefined);
 
-              return (
-                <div
-                  key={ex.id || i}
-                  className={`bg-white rounded-none md:rounded-xl border-0 md:border overflow-hidden transition-all ${
-                    isSupersetMember ? "border-l-4 border-l-[var(--brand-primary)]" : ""
-                  } ${
-                    isExpanded
-                      ? "bg-white md:border-[var(--brand-primary)] md:shadow-sm"
-                      : "bg-white md:border-[#E2E8F0]"
-                  }`}
+                const rowContent = (
+                  <>
+                <button
+                  className="w-full flex items-center gap-3.5 md:gap-4 px-4 md:px-5 py-3.5 md:py-4 text-left"
+                  onClick={() => setExpandedEx(isExpanded ? null : i)}
                 >
-                  {isSupersetStart && (
-                    <div className="px-4 md:px-5 py-1.5 bg-[var(--brand-secondary)]/70 border-b border-[var(--brand-primary)]/15 flex items-center gap-1.5 text-[11px] font-bold text-[var(--brand-primary)]">
-                      <Link2 size={12} className="shrink-0" />
-                      <span>Biserie {currGroup} · Alterna este bloque antes de descansar</span>
-                    </div>
-                  )}
-              <button
-                className="w-full flex items-center gap-3.5 md:gap-4 px-4 md:px-5 py-3.5 md:py-4 text-left"
-                onClick={() => setExpandedEx(isExpanded ? null : i)}
-              >
-                <div className="w-8 h-8 rounded-lg bg-[#E8F1FB] flex items-center justify-center flex-shrink-0">
-                  <span className="text-xs font-mono font-bold text-[var(--brand-primary)]">{i + 1}</span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-[#0B1929]">{activeObj.nombre}</p>
-                  <div className="flex items-center flex-wrap gap-1.5 mt-0.5">
-                    <span className="text-xs text-[#6B7A8D]">{GRUPO_LABELS[normalizeMuscleGroup(activeObj.grupo_muscular)] || activeObj.grupo_muscular || activeObj.musculo || "General"}</span>
-                    {isSupersetMember && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[var(--brand-secondary)] text-[var(--brand-primary)]">
-                        Biserie {currGroup}
-                      </span>
-                    )}
-                    {restLabel && (
-                      <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[#F1F5F9] text-[#475569]">
-                        <Timer size={10} /> {restLabel}
-                      </span>
-                    )}
-                    {rirTarget && (
-                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[#F8FAFC] border border-[#E2E8F0] text-[#475569]">
-                        RIR {rirTarget}
-                      </span>
-                    )}
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                    isSupersetItem
+                      ? "bg-[var(--brand-secondary)] border border-[var(--brand-primary)]/30"
+                      : "bg-[#E8F1FB]"
+                  }`}>
+                    <span className="text-xs font-mono font-bold text-[var(--brand-primary)]">
+                      {isSupersetItem ? ssMeta.codeLabel : i + 1}
+                    </span>
                   </div>
-                </div>
-                {exPR.isPR && (
-                  <span className="inline-flex items-center gap-1 text-[11px] bg-amber-50 text-amber-700 px-2.5 py-0.5 rounded-full font-bold border border-amber-200 shadow-sm">
-                    <Trophy size={12} className="text-amber-500" /> Nuevo PR
-                  </span>
-                )}
-                {isSaved && (
-                  <span className="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded font-medium border border-green-100 hidden md:block">
-                    ✓ Guardado
-                  </span>
-                )}
-                <ChevronDown
-                  size={16}
-                  className={`text-[#CBD5E1] transition-transform flex-shrink-0 ${isExpanded ?"rotate-180" :""}`}
-                />
-              </button>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-[#0B1929]">{activeObj.nombre}</p>
+                    <div className="flex items-center flex-wrap gap-1.5 mt-0.5">
+                      <span className="text-xs text-[#6B7A8D]">{GRUPO_LABELS[normalizeMuscleGroup(resolveCanonicalGroup(activeObj))] || resolveCanonicalGroup(activeObj) || "General"}</span>
+                      {restLabel && (
+                        <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[#F1F5F9] text-[#475569]">
+                          <Timer size={10} /> {restLabel}
+                        </span>
+                      )}
+                      {rirTarget && (
+                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[#F8FAFC] border border-[#E2E8F0] text-[#475569]">
+                          RIR {rirTarget}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {exPR.isPR && (
+                    <span className="inline-flex items-center gap-1 text-[11px] bg-amber-50 text-amber-700 px-2.5 py-0.5 rounded-full font-bold border border-amber-200 shadow-sm">
+                      <Trophy size={12} className="text-amber-500" /> Nuevo PR
+                    </span>
+                  )}
+                  {isSaved && (
+                    <span className="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded font-medium border border-green-100 hidden md:block">
+                      ✓ Guardado
+                    </span>
+                  )}
+                  <ChevronDown
+                    size={16}
+                    className={`text-[#CBD5E1] transition-transform flex-shrink-0 ${isExpanded ?"rotate-180" :""}`}
+                  />
+                </button>
 
               {isExpanded && (
                 <div className="px-4 md:px-5 pb-4 md:pb-5 border-t border-[#F0F4FA] pt-4">
@@ -1414,6 +1424,60 @@ export default function Training({
                     );
                   })()}
 
+                  {isSupersetItem && (() => {
+                    const hasNext = posInBlock < block.items.length - 1;
+                    const nextItem = hasNext ? block.items[posInBlock + 1] : null;
+                    const firstItem = block.items[0];
+                    const blockRestSecs = restNum > 0
+                      ? restNum
+                      : (parseInt(firstItem?.ex?.descanso_seg, 10) || 0);
+                    return (
+                      <div className="mt-4 pt-3 border-t border-[#F0F4FA] flex items-center justify-between gap-2 flex-wrap">
+                        {hasNext ? (
+                          <>
+                            <span className="text-[11px] text-[#6B7A8D] font-semibold">
+                              Siguiente en {block.blockTitle}:
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setExpandedEx(nextItem.index)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--brand-primary)] text-white hover:opacity-90 text-xs font-bold shadow-2xs transition-opacity cursor-pointer"
+                            >
+                              <span>Pasar a {nextItem.meta.codeLabel} · {nextItem.ex.nombre}</span>
+                              <ArrowRight size={13} className="shrink-0" />
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => setExpandedEx(firstItem.index)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--brand-secondary)] text-[var(--brand-primary)] border border-[var(--brand-primary)]/30 hover:bg-[var(--brand-primary)] hover:text-white text-xs font-bold transition-colors cursor-pointer"
+                            >
+                              <ArrowLeft size={13} className="shrink-0" />
+                              <span>Volver a {firstItem.meta.codeLabel} ({firstItem.ex.nombre})</span>
+                            </button>
+                            {blockRestSecs > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  timerStore.stopAndReset();
+                                  timerStore.setSeconds(blockRestSecs, true);
+                                  timerStore.start();
+                                  setExpandedEx(firstItem.index);
+                                }}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--brand-primary)] text-white hover:opacity-90 text-xs font-bold shadow-2xs transition-opacity cursor-pointer"
+                              >
+                                <Timer size={13} className="shrink-0" />
+                                <span>Descansar ({formatRestLabel(blockRestSecs)}) e ir a {firstItem.meta.codeLabel}</span>
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    );
+                  })()}
+
                   <div className="flex items-center justify-end gap-1.5 mt-4 text-[11px] font-medium text-[#6B7A8D]">
                     {syncStatus ==="saving" && <RotateCcw size={14} className="animate-spin text-[var(--brand-primary)]" />}
                     {syncStatus ==="local" && <Check size={14} />}
@@ -1424,10 +1488,87 @@ export default function Training({
                   </div>
                 </div>
               )}
-              </div>
-            );
-          })}
-        </div>
+                  </>
+                );
+
+                if (isSupersetItem) {
+                  return (
+                    <div
+                      key={ex.id || i}
+                      className={isExpanded ? "bg-white" : "bg-white hover:bg-[#F8FAFC]/40 transition-colors"}
+                    >
+                      {rowContent}
+                    </div>
+                  );
+                }
+
+                return (
+                  <div
+                    key={ex.id || i}
+                    className={`bg-white rounded-none md:rounded-xl border-0 md:border overflow-hidden transition-all ${
+                      isExpanded
+                        ? "bg-white md:border-[var(--brand-primary)] md:shadow-sm"
+                        : "bg-white md:border-[#E2E8F0]"
+                    }`}
+                  >
+                    {rowContent}
+                  </div>
+                );
+              };
+
+              return exerciseBlocks.map((block, bIdx) => {
+                if (block.type === "superset") {
+                  return (
+                    <div
+                      key={`block-${block.groupCode}-${bIdx}`}
+                      className="bg-white rounded-none md:rounded-2xl border-y md:border border-[var(--brand-primary)]/40 border-l-4 border-l-[var(--brand-primary)] overflow-hidden md:shadow-xs"
+                    >
+                      <div className="px-4 md:px-5 py-2 bg-[var(--brand-secondary)]/75 border-b border-[var(--brand-primary)]/20 flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <Link2 size={14} className="text-[var(--brand-primary)] shrink-0" />
+                          <span className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--brand-primary)]">
+                            {block.blockTitle}
+                          </span>
+                          <span className="text-[11px] text-[#475569] font-medium hidden sm:inline">
+                            · Alterna antes de descansar
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          {block.items.map((it) => {
+                            const active = expandedEx === it.index;
+                            const itemSaved = ["original", "alt_0", "alt_1"].some((vid) => progreso[`${it.ex.id}-${wi}-0-reps-${vid}`] !== undefined);
+                            return (
+                              <button
+                                key={it.ex.id || it.index}
+                                type="button"
+                                onClick={() => setExpandedEx(active ? null : it.index)}
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-mono font-extrabold border transition-colors cursor-pointer ${
+                                  active
+                                    ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-2xs"
+                                    : "bg-white text-[var(--brand-primary)] border-[var(--brand-primary)]/30 hover:bg-[var(--brand-secondary)]"
+                                }`}
+                                title={it.ex.nombre}
+                              >
+                                <span>{it.meta.codeLabel}</span>
+                                {itemSaved && <Check size={10} className={active ? "text-white" : "text-emerald-600"} />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      <div className="divide-y divide-[#E2E8F0]">
+                        {block.items.map((it, posInBlock) =>
+                          renderExerciseRow(it.ex, it.index, { ssMeta: it.meta, block, posInBlock })
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
+                const singleItem = block.items[0];
+                return renderExerciseRow(singleItem.ex, singleItem.index, { ssMeta: singleItem.meta, block: null, posInBlock: 0 });
+              });
+            })()}
+          </div>
       )}
 
         {/* Botón para abrir Resumen y Finalizar Entrenamiento */}
@@ -1699,7 +1840,7 @@ export default function Training({
             </div>
             <div className="flex gap-1.5 justify-center mb-4">
               <span className="px-2.5 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-600">
-                {GRUPO_LABELS[normalizeMuscleGroup(previewEx.grupo_muscular)] || previewEx.grupo_muscular}
+                {GRUPO_LABELS[normalizeMuscleGroup(resolveCanonicalGroup(previewEx))] || resolveCanonicalGroup(previewEx)}
               </span>
             </div>
             <button

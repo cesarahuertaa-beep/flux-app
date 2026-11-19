@@ -910,3 +910,110 @@ export function formatRestLabel(seconds) {
   const rem = s % 60;
   return rem === 0 ? `${m} min` : `${m}m ${rem}s`;
 }
+
+/** Devuelve el nombre legible de un bloque según cantidad de ejercicios contiguos. */
+export function getSupersetShortKind(size) {
+  if (size >= 4) return "Circuito";
+  if (size === 3) return "Triserie";
+  return "Biserie";
+}
+
+/** Calcula metadatos de bloques contiguos (A1, A2, cabecera de bloque, límites) alineados con `ejercicios`. */
+export function computeSupersetMetadata(ejercicios = []) {
+  if (!Array.isArray(ejercicios) || ejercicios.length === 0) return [];
+  const meta = new Array(ejercicios.length);
+  let idx = 0;
+
+  while (idx < ejercicios.length) {
+    const rawGroup = ejercicios[idx]?.bloque_grupo ? String(ejercicios[idx].bloque_grupo).trim() : "";
+    let end = idx;
+    if (rawGroup) {
+      while (
+        end + 1 < ejercicios.length &&
+        String(ejercicios[end + 1]?.bloque_grupo || "").trim() === rawGroup
+      ) {
+        end++;
+      }
+    }
+    const len = rawGroup ? end - idx + 1 : 1;
+    if (rawGroup && len >= 2) {
+      const shortKind = getSupersetShortKind(len);
+      const blockTitle = `${shortKind} ${rawGroup}`;
+      const blockCodesJoined = Array.from({ length: len }, (_, k) => `${rawGroup}${k + 1}`).join(" \u2194 ");
+      for (let k = idx; k <= end; k++) {
+        const pos = k - idx;
+        meta[k] = {
+          isMember: true,
+          groupCode: rawGroup,
+          isStart: k === idx,
+          isEnd: k === end,
+          posInBlock: pos,
+          blockSize: len,
+          codeLabel: `${rawGroup}${pos + 1}`,
+          shortKind,
+          blockTitle,
+          blockCodesJoined,
+          blockStartIdx: idx,
+          blockEndIdx: end,
+        };
+      }
+    } else {
+      meta[idx] = {
+        isMember: false,
+        groupCode: null,
+        isStart: false,
+        isEnd: false,
+        posInBlock: 0,
+        blockSize: 1,
+        codeLabel: String(idx + 1),
+        shortKind: "",
+        blockTitle: "",
+        blockCodesJoined: "",
+        blockStartIdx: idx,
+        blockEndIdx: idx,
+      };
+    }
+    idx = end + 1;
+  }
+
+  return meta;
+}
+
+/** Agrupa una lista de ejercicios en tarjetas únicas (`superset` o `single`) preservando su orden. */
+export function groupExercisesIntoBlocks(ejercicios = []) {
+  if (!Array.isArray(ejercicios) || ejercicios.length === 0) return [];
+  const metaList = computeSupersetMetadata(ejercicios);
+  const blocks = [];
+  let i = 0;
+
+  while (i < ejercicios.length) {
+    const m = metaList[i];
+    if (m?.isMember) {
+      const items = [];
+      for (let k = m.blockStartIdx; k <= m.blockEndIdx; k++) {
+        items.push({ ex: ejercicios[k], index: k, meta: metaList[k] });
+      }
+      blocks.push({
+        type: "superset",
+        groupCode: m.groupCode,
+        shortKind: m.shortKind,
+        blockTitle: m.blockTitle,
+        blockCodesJoined: m.blockCodesJoined,
+        items,
+      });
+      i = m.blockEndIdx + 1;
+    } else {
+      blocks.push({
+        type: "single",
+        groupCode: null,
+        shortKind: "",
+        blockTitle: "",
+        blockCodesJoined: "",
+        items: [{ ex: ejercicios[i], index: i, meta: m }],
+      });
+      i++;
+    }
+  }
+
+  return blocks;
+}
