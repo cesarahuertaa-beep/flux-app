@@ -3281,6 +3281,7 @@ REGLAS ESTRICTAS:
  */
 export async function auditTrainingWeekWithAi({
   rutinas = [],
+  focusRoutine = null,
   smartTraining = null,
   clinicalRec = null,
   cliente = {},
@@ -3290,9 +3291,13 @@ export async function auditTrainingWeekWithAi({
     throw new Error("Agrega al menos una rutina al ciclo para poder auditar la semana.");
   }
 
+  const focusRoutineName = focusRoutine
+    ? String(focusRoutine.nombre || "Sesión actual").replace("|", " · ").trim()
+    : "";
   const anamnesis = clinicalRec?.anamnesis || {};
   const lesionesRaw = smartTraining?.lesionesRaw || anamnesis?.cirugias_lesiones || "";
   const weeklyVol = computeWeeklyMuscleVolume(safeRutinas);
+  const focusVol = focusRoutine ? computeWeeklyMuscleVolume([focusRoutine]) : null;
   const recRange = parseRecommendedVolumeRange(smartTraining);
 
   let empujeSeries = 0;
@@ -3336,9 +3341,11 @@ export async function auditTrainingWeekWithAi({
   const weekSummaryText = safeRutinas
     .map((r) => {
       const ejsTxt = (r.ejercicios || [])
-        .map((e) => `  - ${e.nombre} (${GRUPO_LABELS[normalizeMuscleGroup(e.grupo_muscular)] || e.grupo_muscular || "general"}): ${e.num_series}x${e.reps_sugeridas}${e.rir_objetivo ? ` RIR ${e.rir_objetivo}` : ""}${e.descanso_seg ? ` Desc ${e.descanso_seg}s` : ""}`)
+        .map((e) => `  - ${e.nombre} (${GRUPO_LABELS[normalizeMuscleGroup(e.grupo_muscular)] || e.grupo_muscular || "general"}${e.tipo_movimiento ? `, ${e.tipo_movimiento}` : ""}): ${e.num_series}x${e.reps_sugeridas}${e.rir_objetivo ? ` RIR ${e.rir_objetivo}` : ""}${e.descanso_seg ? ` Desc ${e.descanso_seg}s` : ""}`)
         .join("\n");
-      return `[${String(r.nombre || "Rutina").replace("|", " - ")}]\n${ejsTxt || "  (vacía)"}`;
+      const label = String(r.nombre || "Rutina").replace("|", " · ");
+      const isFocus = focusRoutine && r === focusRoutine;
+      return `[${isFocus ? `SESIÓN EN EDICIÓN: ` : ""}${label}]\n${ejsTxt || "  (vacía)"}`;
     })
     .join("\n\n");
 
@@ -3360,6 +3367,7 @@ export async function auditTrainingWeekWithAi({
       recRange,
       balanceResumen,
       weekSummaryText,
+      focusRoutineName,
       localAlerts,
       geminiKey: apiKey,
     });
@@ -3382,14 +3390,17 @@ export async function auditTrainingWeekWithAi({
   // Tier 2: Gemini Direct
   if (apiKey) {
     const promptAudit = `Eres un Director de Biomecánica Clínica y Metodología del Entrenamiento en FLUX.
-Audita la semana completa de entrenamiento programada del paciente.
+${focusRoutineName
+  ? `Audita prioritariamente la sesión "${focusRoutineName}" (orden de ejercicios, volumen por sesión y seguridad biomecánica) considerando además su impacto en la semana completa del paciente.`
+  : "Audita la semana completa de entrenamiento programada del paciente."}
 
 CONTEXTO CLÍNICO Y PRESCRIPCIÓN:
 - Objetivo: ${smartTraining?.enfoqueFisiologico || smartTraining?.goalTitle || "Recomp / Hipertrofia"}
+${focusRoutineName ? `- Sesión en edición prioritaria: ${focusRoutineName}` : ""}
 - Frecuencia recomendada: ${smartTraining?.diasSugeridos || safeRutinas.length} días/sem | Rango óptimo por músculo: ${recRange.min}-${recRange.max} series efectivas
 - Lesiones reportadas: ${lesionesRaw || "Ninguna"}
-- Balance actual: ${balanceResumen.ratioTexto} | Total efectivo: ${weeklyVol.totalEffectiveSets} series (+${weeklyVol.totalWarmupSets} calentamiento)
-- Músculos programados: ${weeklyVol.muscleList.map((m) => `${m.label}: ${m.sets}`).join(", ")}
+- Balance actual semanal: ${balanceResumen.ratioTexto} | Total efectivo semanal: ${weeklyVol.totalEffectiveSets} series (+${weeklyVol.totalWarmupSets} calentamiento)
+- Músculos programados en la semana: ${weeklyVol.muscleList.map((m) => `${m.label}: ${m.sets}`).join(", ")}
 
 RUTINAS PROGRAMADAS:
 ${weekSummaryText}
@@ -3451,24 +3462,49 @@ Responde ÚNICAMENTE con JSON válido:
 
   // Tier 3: Auditoría Analítica y Biomecánica Local
   const recs = [];
+  if (focusRoutine && focusVol) {
+    const highSessionMuscles = (focusVol.muscleList || []).filter((m) => m.sets > 10);
+    if (highSessionMuscles.length > 0) {
+      recs.push(
+        `Alta densidad en esta sesión para: ${highSessionMuscles.map((m) => `${m.label} (${m.sets} ser.)`).join(", ")}. Evalúa si conviene repartir series en otro día.`
+      );
+    }
+    const ejList = Array.isArray(focusRoutine.ejercicios) ? focusRoutine.ejercicios : [];
+    const seenIsoByGroup = new Set();
+    let orderFlagged = false;
+    for (const ej of ejList) {
+      const grp = normalizeMuscleGroup(ej.grupo_muscular);
+      const mov = String(ej.tipo_movimiento || "").toLowerCase();
+      if (mov.includes("aisl")) seenIsoByGroup.add(grp);
+      else if (mov.includes("comp") && seenIsoByGroup.has(grp) && !orderFlagged) {
+        orderFlagged = true;
+        recs.push(
+          `Orden sugerido en sesión: ubicaste un ejercicio compuesto (${ej.nombre}) después de aislamiento para ${GRUPO_LABELS[grp] || grp}.`
+        );
+      }
+    }
+  }
   if (pushPullImbalance) recs.push(`${pushPullImbalance}. Considera equilibrar remos/jalones respecto a presses.`);
   if (gruposBajos.length > 0) {
-    recs.push(`Volumen debajo de ${recRange.min} series/sem en: ${gruposBajos.slice(0, 4).map((g) => `${g.label} (${g.sets})`).join(", ")}.`);
+    recs.push(`Volumen semanal debajo de ${recRange.min} series en: ${gruposBajos.slice(0, 4).map((g) => `${g.label} (${g.sets})`).join(", ")}.`);
   }
   if (gruposAltos.length > 0) {
-    recs.push(`Posible exceso de fatiga (>${recRange.max + 2} series/sem) en: ${gruposAltos.map((g) => `${g.label} (${g.sets})`).join(", ")}.`);
+    recs.push(`Posible exceso semanal (>${recRange.max + 2} series) en: ${gruposAltos.map((g) => `${g.label} (${g.sets})`).join(", ")}.`);
   }
   if (piernaSeries === 0 && safeRutinas.length >= 2) {
     recs.push("No se detectan series efectivas asignadas a tren inferior en la semana.");
   }
 
   const estado = localAlerts.length > 0 ? "critico" : recs.length > 0 ? "advertencia" : "aprobado";
+  const scopePrefix = focusRoutine && focusVol
+    ? `Sesión (${focusVol.totalEffectiveSets} ser. ef.) + semana (${weeklyVol.totalEffectiveSets} ser./sem):`
+    : `Semana (${weeklyVol.totalEffectiveSets} series efectivas):`;
   const dictamenGeneral =
     localAlerts.length > 0
-      ? `Se detectaron ${localAlerts.length} conflicto(s) biomecánico(s) respecto a las lesiones reportadas y ${weeklyVol.totalEffectiveSets} series efectivas semanales.`
+      ? `${scopePrefix} se detectaron ${localAlerts.length} conflicto(s) biomecánico(s) respecto a las lesiones reportadas.`
       : recs.length > 0
-      ? `Semana con ${weeklyVol.totalEffectiveSets} series efectivas (${weeklyVol.totalWarmupSets} calent.) y observaciones de balance/volumen a revisar.`
-      : `Semana bien equilibrada con ${weeklyVol.totalEffectiveSets} series efectivas semanales (${balanceResumen.ratioTexto}) y libre de conflictos con lesiones.`;
+      ? `${scopePrefix} estructura sólida con ${recs.length} observación(es) de orden, balance o volumen.`
+      : `${scopePrefix} bien equilibrada (${balanceResumen.ratioTexto}) y libre de conflictos con lesiones.`;
 
   return {
     estado,

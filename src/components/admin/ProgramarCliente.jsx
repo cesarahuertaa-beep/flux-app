@@ -54,7 +54,7 @@ import { calcEdadFromBirthdate, normalizeSexo, enrichMetrica, linkMetricasToCicl
 import { peekClinicalRecord, fetchClinicalRecord, saveClinicalRecord, hasAnamnesisData, EMPTY_ANAMNESIS } from "../../lib/clinicalRecord";
 import { parseMealOptions, parseMealOptionsStructured, formatMealOptions, formatMealOptionsKeepSmae, parseDiaMetadata, formatDiaMetadata } from "../../lib/mealOptions";
 import { SMAE_GROUPS, SMAE_GROUPS_MAP, SMAE_FOODS_BY_GROUP, calculateSmaeTotals, autoDistributeSmaeFromMacros, serializeSmaeMap, parseSmaeString, formatScaledSmaePortion, estimateMealSmaeMap, estimateDaySmaeUsage, suggestMealSmaeSplit, extractSmaeMapFromMealText, embedSmaeMapInMealText, embedMealIngredientsInText, extractMealIngredientsFromText } from "../../lib/smaeData";
-import { optimizeMealWithAi, generateMealFromPantryWithAi, generateDishFromIngredientsWithAi, generateBatchDishesFromIngredientsWithAi, auditFullDayWithAi, generateRoutineDraftFromPrescription, auditTrainingWeekWithAi, computeDualSummarySourceHash, buildFallbackDualSummaries, syncDualDomainSummariesInBackground } from "../../lib/clinicalAi";
+import { optimizeMealWithAi, generateMealFromPantryWithAi, generateDishFromIngredientsWithAi, generateBatchDishesFromIngredientsWithAi, auditFullDayWithAi, auditTrainingWeekWithAi, computeDualSummarySourceHash, buildFallbackDualSummaries, syncDualDomainSummariesInBackground } from "../../lib/clinicalAi";
 import { buscarIngredientes, CATEGORIAS_INGREDIENTES, INGREDIENTES_CATALOGO, getIngredientesCatalog, formatIngredientSmaePortion, evaluateIngredientForPatient, resolveDishStructuredIngredients, computeSmaeFromIngredientItems } from "../../lib/ingredientsCatalog";
 import { searchDishPhotoInCatalog, registerDishPhotoInCatalog, CATALOGO_PLATILLOS_BASE, getPlatillosCatalog, CATEGORIAS_PLATILLOS, buscarPlatillosCatalogo } from "../../lib/foodPhotoCatalog";
 
@@ -244,9 +244,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     if (entrenoView === "tracking") setVisitedEntrenoTracking(true);
   }, [entrenoView]);
 
-  const [isGeneratingTrainingAi, setIsGeneratingTrainingAi] = useState(false);
-  const [trainingDraftModal, setTrainingDraftModal] = useState(null);
-  const [applyingTrainingDraft, setApplyingTrainingDraft] = useState(false);
   const [isAuditingTrainingWeek, setIsAuditingTrainingWeek] = useState(false);
   const [trainingWeekAuditResult, setTrainingWeekAuditResult] = useState(null);
 
@@ -254,7 +251,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     setVisitedNutriTracking(false);
     setVisitedEntrenoTracking(false);
     setTrainingWeekAuditResult(null);
-    setTrainingDraftModal(null);
   }, [selected?.id, cicloSel?.id]);
   const [showDiaModal, setShowDiaModal] = useState(false);
   const [editDia, setEditDia] = useState(null);
@@ -3315,141 +3311,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     }
   };
 
-  const handleGenerateTrainingDraftWithAi = async () => {
-    if (isEstandar) {
-      openPaywall("ia");
-      return;
-    }
-    if (!biblioteca || biblioteca.length === 0) {
-      setMsg(<div className="text-amber-600 text-xs">⚠️ Agrega ejercicios a la biblioteca antes de generar con IA.</div>);
-      return;
-    }
-    setIsGeneratingTrainingAi(true);
-    setMsg(
-      <div className="flex items-center gap-2 text-purple-700">
-        <Sparkles className="w-4 h-4 animate-spin text-purple-600" />
-        <span>Diseñando borrador de rutinas según prescripción clínica y lesiones...</span>
-      </div>
-    );
-    try {
-      const res = await generateRoutineDraftFromPrescription({
-        biblioteca,
-        smartTraining: smartTrainingPrescription,
-        clinicalRec,
-        cliente: selected,
-      });
-      setTrainingDraftModal(res);
-      setMsg(null);
-    } catch (err) {
-      setMsg(<div className="text-amber-600 text-xs">⚠️ {err?.message || "No se pudo generar el borrador de rutinas."}</div>);
-    } finally {
-      setIsGeneratingTrainingAi(false);
-    }
-  };
-
-  const handleConfirmApplyTrainingDraft = async (mode = "append") => {
-    if (!trainingDraftModal?.rutinasSugeridas?.length || !selected?.id) return;
-    const activeCiclo = cicloSel;
-    const draft = trainingDraftModal;
-    setApplyingTrainingDraft(true);
-    savingRutinaRef.current = true;
-    try {
-      let baseOrder = rutinas.length;
-      if (mode === "replace" && rutinas.length > 0) {
-        const oldIds = rutinas.map((r) => r.id).filter((id) => id && !String(id).startsWith("temp_"));
-        if (oldIds.length > 0) {
-          await dbDel(`rutinas?id=in.(${oldIds.join(",")})`).catch(() => {});
-        }
-        baseOrder = 0;
-      }
-
-      const weeks = activeCiclo ? getCycleWeeks(activeCiclo) : 4;
-      const rutinasPayload = draft.rutinasSugeridas.map((r, idx) => ({
-        cliente_id: selected.id,
-        ciclo_id: activeCiclo?.id || null,
-        nombre: r.dayCode && r.dayCode !== "S/D" ? `${r.dayCode}|${r.titulo}` : r.titulo,
-        semanas: weeks,
-        orden: baseOrder + idx,
-      }));
-      const creadas = await dbPost("rutinas", rutinasPayload);
-
-      const allEjerciciosPayload = [];
-      (creadas || []).forEach((nuevaR, rIdx) => {
-        const src = draft.rutinasSugeridas[rIdx];
-        if (!nuevaR?.id || !src?.ejercicios?.length) return;
-        src.ejercicios.forEach((ej, ejIdx) => {
-          allEjerciciosPayload.push({
-            rutina_id: nuevaR.id,
-            biblioteca_id: ej.biblioteca_id || null,
-            nombre: ej.nombre,
-            gif_url: ej.gif_url || "",
-            grupo_muscular: ej.grupo_muscular || "",
-            tipo_movimiento: ej.tipo_movimiento || "",
-            num_series: +ej.num_series || 3,
-            reps_sugeridas: +ej.reps_sugeridas || 10,
-            peso_sugerido: null,
-            unidad: "kg",
-            series_detalle: normalizeSeriesDetalle(ej.series_detalle),
-            ...extractOptionalExerciseFields(ej),
-            alternativas: [],
-            orden: ejIdx,
-          });
-        });
-      });
-
-      if (allEjerciciosPayload.length > 0) {
-        await persistEjerciciosSafe(allEjerciciosPayload);
-      }
-
-      setTrainingDraftModal(null);
-      setTrainingWeekAuditResult(null);
-      savingRutinaRef.current = false;
-      await loadData(activeCiclo, { silent: true, forceFresh: true });
-      notifyPlanUpdate("rutinas");
-      setMsg(
-        <div className="flex items-center gap-1.5 text-emerald-700">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-          <span>Se crearon {(creadas || []).length} rutinas desde la prescripción IA</span>
-        </div>
-      );
-    } catch (err) {
-      savingRutinaRef.current = false;
-      setMsg(<div className="text-red-600 text-xs">❌ Error aplicando borrador: {err?.message || err}</div>);
-    } finally {
-      setApplyingTrainingDraft(false);
-      savingRutinaRef.current = false;
-    }
-  };
-
-  const handleAuditTrainingWeek = async () => {
-    if (isEstandar) {
-      openPaywall("ia");
-      return;
-    }
-    if (!rutinas || rutinas.length === 0) return;
-    setIsAuditingTrainingWeek(true);
-    setMsg(
-      <div className="flex items-center gap-2 text-purple-700">
-        <Sparkles className="w-4 h-4 animate-spin text-purple-600" />
-        <span>Auditando volumen, balance y seguridad biomecánica de la semana...</span>
-      </div>
-    );
-    try {
-      const res = await auditTrainingWeekWithAi({
-        rutinas,
-        smartTraining: smartTrainingPrescription,
-        clinicalRec,
-        cliente: selected,
-      });
-      setTrainingWeekAuditResult(res);
-      setMsg(null);
-    } catch (err) {
-      setMsg(<div className="text-amber-600 text-xs">⚠️ {err?.message || "No se pudo auditar la semana."}</div>);
-    } finally {
-      setIsAuditingTrainingWeek(false);
-    }
-  };
-
   const handleOptimizeComidaWithAi = async (mealIdx) => {
     const meal = diaForm.comidas[mealIdx];
     const mainText = meal?.opciones?.[0] || meal?.opcion1 || "";
@@ -3630,6 +3491,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     if (selected?.id) loadPatientExerciseHistory(selected.id, { force: true });
     setEditRutina(null); 
     setActiveAltSlot(null);
+    setTrainingWeekAuditResult(null);
     setRutinaForm({ diasSeleccionados:[], tituloPersonalizado:"", ejercicios:[] }); 
     setShowRutinaModal(true); 
   };
@@ -3647,6 +3509,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     }
     setEditRutina(r); 
     setActiveAltSlot(null);
+    setTrainingWeekAuditResult(null);
     setRutinaForm({ 
       diasSeleccionados: dSel,
       tituloPersonalizado: tPers,
@@ -3705,6 +3568,42 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       }),
       orden,
     };
+  };
+
+  const handleAuditTrainingRoutine = async () => {
+    if (isEstandar) {
+      openPaywall("ia");
+      return;
+    }
+    const ejList = rutinaForm?.ejercicios || [];
+    if (ejList.length === 0) {
+      alert("Agrega al menos un ejercicio a esta rutina para poder auditarla.");
+      return;
+    }
+    setIsAuditingTrainingWeek(true);
+    try {
+      const dayTag = (rutinaForm.diasSeleccionados || [])[0] || "";
+      const titleTag = (rutinaForm.tituloPersonalizado || "").trim();
+      const liveNombre = dayTag ? `${dayTag}|${titleTag || "Sesión"}` : (titleTag || "Sesión actual");
+      const liveFocusRoutine = {
+        id: editRutina?.id || "live_routine",
+        nombre: liveNombre,
+        ejercicios: ejList.map((e, idx) => serializeExerciseForDb(e, editRutina?.id || "live_routine", idx)),
+      };
+      const otherRutinas = (rutinas || []).filter((r) => !editRutina?.id || r.id !== editRutina.id);
+      const res = await auditTrainingWeekWithAi({
+        rutinas: [liveFocusRoutine, ...otherRutinas],
+        focusRoutine: liveFocusRoutine,
+        smartTraining: smartTrainingPrescription,
+        clinicalRec,
+        cliente: selected,
+      });
+      setTrainingWeekAuditResult(res);
+    } catch (err) {
+      alert(err?.message || "No se pudo auditar la rutina con IA.");
+    } finally {
+      setIsAuditingTrainingWeek(false);
+    }
   };
 
   const saveRutina = async () => {
@@ -5116,6 +5015,101 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                 )}
               </div>
             </div>
+
+            {/* Monitor homólogo de Equivalentes SMAE Promedio por Día del Plan */}
+            {dias.length > 0 && (() => {
+              const smaeSumMap = {};
+              let smaeDaysCount = 0;
+              let totalKcalPlan = 0;
+              dias.forEach((d) => {
+                totalKcalPlan += (d.comidas || []).reduce((s, c) => s + (Number(c.calorias) || 0), 0);
+                const meta = parseDiaMetadata(d.dia || "");
+                const usedFromMeals = estimateDaySmaeUsage(d.comidas || []);
+                const daySmae = Object.values(usedFromMeals).some((v) => Number(v) > 0)
+                  ? usedFromMeals
+                  : (meta.smae ? parseSmaeString(meta.smae) : {});
+                const dayHasSmae = Object.values(daySmae).some((v) => Number(v) > 0);
+                if (dayHasSmae) {
+                  smaeDaysCount++;
+                  Object.entries(daySmae).forEach(([gId, val]) => {
+                    const n = Number(val) || 0;
+                    if (n > 0) smaeSumMap[gId] = (smaeSumMap[gId] || 0) + n;
+                  });
+                }
+              });
+              if (smaeDaysCount === 0) return null;
+
+              const avgSmaeMap = {};
+              Object.entries(smaeSumMap).forEach(([gId, sumVal]) => {
+                avgSmaeMap[gId] = Math.round((sumVal / smaeDaysCount) * 10) / 10;
+              });
+              const activeSmaeGroups = SMAE_GROUPS.filter((g) => (avgSmaeMap[g.id] || 0) > 0);
+              if (activeSmaeGroups.length === 0) return null;
+
+              const avgTotalEq = Math.round(activeSmaeGroups.reduce((s, g) => s + (avgSmaeMap[g.id] || 0), 0) * 10) / 10;
+              const avgKcal = Math.round(totalKcalPlan / dias.length);
+
+              const evalMetricaForSmae = cycleMetrica || latestMetrica || null;
+              const savedEvalSmae =
+                evalMetricaForSmae?.prescribed_macros?.smaeDistribution ||
+                smartPrescription?.smaeDistribution ||
+                null;
+              const hasSavedSmae =
+                savedEvalSmae &&
+                typeof savedEvalSmae === "object" &&
+                Object.values(savedEvalSmae).some((v) => Number(v) > 0);
+              const targetSmaeMap = hasSavedSmae
+                ? savedEvalSmae
+                : (smartPrescription?.targetKcal > 0
+                    ? autoDistributeSmaeFromMacros({
+                        calorias: smartPrescription.targetKcal,
+                        proteina: smartPrescription.proteinG,
+                        carbohidratos: smartPrescription.carbsG,
+                        grasas: smartPrescription.fatsG,
+                      })
+                    : null);
+              const targetSmaeTotals = targetSmaeMap ? calculateSmaeTotals(targetSmaeMap) : null;
+
+              return (
+                <div className="mb-3 bg-white rounded-none md:rounded-xl border-y md:border border-[#E2E8F0] px-4 py-3">
+                  <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-[#0B1929]">
+                      <BarChart2 className="w-3.5 h-3.5 text-[var(--brand-primary)] shrink-0" />
+                      <span>Equivalentes SMAE Promedio</span>
+                      <span className="text-[11px] font-semibold text-[#6B7A8D]">
+                        ({avgTotalEq} eq/día{avgKcal > 0 ? ` · ~${avgKcal} kcal/día` : ""})
+                      </span>
+                    </div>
+                    {targetSmaeTotals && targetSmaeTotals.totalEquivalentes > 0 && (
+                      <span className="text-[10px] font-semibold text-[#6B7A8D] bg-[#F8FAFC] border border-[#E2E8F0] px-2 py-0.5 rounded-full">
+                        Ref. Meta {targetSmaeTotals.totalEquivalentes} eq/día
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {activeSmaeGroups.map((g) => {
+                      const avgVal = avgSmaeMap[g.id] || 0;
+                      const targetVal = targetSmaeMap ? (Number(targetSmaeMap[g.id]) || 0) : 0;
+                      const isAbove = targetVal > 0 && avgVal > targetVal + 0.5;
+                      const isOptimal = targetVal > 0 && Math.abs(avgVal - targetVal) <= 0.5;
+                      const badgeCls = isAbove
+                        ? "bg-amber-50 text-amber-800 border-amber-200"
+                        : isOptimal
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                        : "bg-[#F8FAFC] text-[#475569] border-[#E2E8F0]";
+                      return (
+                        <span key={g.id} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border text-[11px] font-semibold ${badgeCls}`}>
+                          <span>{g.icono}</span>
+                          <span>{g.corto}</span>
+                          <span className="font-mono font-bold">{avgVal}</span>
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndDias}>
               <SortableContext items={dias.map(d => String(d.id))} strategy={verticalListSortingStrategy}>
                 {dias.map((d) => {
@@ -5488,49 +5482,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 flex-wrap justify-end">
-                {!isReadOnly && biblioteca?.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={handleGenerateTrainingDraftWithAi}
-                    disabled={isGeneratingTrainingAi}
-                    className={`w-8 h-8 sm:w-auto sm:px-3 sm:py-1.5 rounded-xl text-xs sm:text-sm font-bold shadow-2xs transition-colors flex items-center justify-center sm:gap-1.5 cursor-pointer ${
-                      isEstandar
-                        ? "border border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200"
-                        : "border border-purple-200/90 bg-purple-50 text-purple-700 hover:bg-purple-100 disabled:opacity-50"
-                    }`}
-                    title={isEstandar ? "Generación IA exclusiva FLUX Pro" : "Generar borrador semanal desde prescripción y biblioteca"}
-                  >
-                    {isGeneratingTrainingAi ? (
-                      <Loader2 className="w-4 h-4 animate-spin text-purple-600 shrink-0" />
-                    ) : isEstandar ? (
-                      <Lock className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                    ) : (
-                      <Sparkles className="w-4 h-4 text-purple-600 shrink-0" />
-                    )}
-                    <span className="hidden sm:inline">{isGeneratingTrainingAi ? "Diseñando..." : "Generar IA"}</span>
-                  </button>
-                )}
-                {rutinas.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={handleAuditTrainingWeek}
-                    disabled={isAuditingTrainingWeek}
-                    className={`w-8 h-8 sm:w-auto sm:px-3 sm:py-1.5 rounded-xl text-xs sm:text-sm font-bold shadow-2xs transition-colors flex items-center justify-center sm:gap-1.5 cursor-pointer ${
-                      isEstandar
-                        ? "border border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200"
-                        : "border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 disabled:opacity-50"
-                    }`}
-                    title={isEstandar ? "Auditoría IA exclusiva FLUX Pro" : "Auditar volumen, balance empuje/tracción y lesiones con IA"}
-                  >
-                    {isAuditingTrainingWeek ? (
-                      <Loader2 className="w-4 h-4 animate-spin text-indigo-600 shrink-0" />
-                    ) : (
-                      <ShieldAlert className="w-4 h-4 text-indigo-600 shrink-0" />
-                    )}
-                    <span className="hidden sm:inline">{isAuditingTrainingWeek ? "Auditando..." : "Auditar IA"}</span>
-                  </button>
-                )}
+              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                 {rutinas.length > 0 && (
                   <button
                     onClick={() => generateRutinaPDF(selected, rutinas, parsedActiveCycle, brand, smartTrainingPrescription)}
@@ -5571,75 +5523,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                 )}
               </div>
             </div>
-
-            {/* Dictamen de Auditoría Semanal de Entrenamiento (IA FLUX) */}
-            {trainingWeekAuditResult && (
-              <div className={`mb-3 p-3.5 rounded-none md:rounded-xl border-y md:border transition-all ${
-                trainingWeekAuditResult.estado === "critico"
-                  ? "bg-rose-50/85 border-rose-200 text-rose-950"
-                  : trainingWeekAuditResult.estado === "advertencia"
-                  ? "bg-amber-50/85 border-amber-200 text-amber-950"
-                  : "bg-indigo-50/75 border-indigo-200 text-indigo-950"
-              }`}>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="space-y-1.5 min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs font-black uppercase tracking-wider">
-                        Auditoría Semanal de Entrenamiento (IA)
-                      </span>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase ${
-                        trainingWeekAuditResult.estado === "aprobado"
-                          ? "bg-emerald-100 text-emerald-800"
-                          : trainingWeekAuditResult.estado === "critico"
-                          ? "bg-rose-100 text-rose-800"
-                          : "bg-amber-100 text-amber-800"
-                      }`}>
-                        {trainingWeekAuditResult.estado === "aprobado"
-                          ? "Alineado"
-                          : trainingWeekAuditResult.estado === "critico"
-                          ? "Alerta Biomecánica"
-                          : "Con Observaciones"}
-                      </span>
-                      {trainingWeekAuditResult.balanceResumen?.ratioTexto && (
-                        <span className="text-[11px] font-semibold text-[#475569]">
-                          {trainingWeekAuditResult.balanceResumen.ratioTexto}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs leading-relaxed text-[#1E293B]">
-                      {trainingWeekAuditResult.dictamenGeneral}
-                    </p>
-                    {Array.isArray(trainingWeekAuditResult.alertasBiomecanicas) && trainingWeekAuditResult.alertasBiomecanicas.length > 0 && (
-                      <div className="space-y-1 mt-1.5">
-                        {trainingWeekAuditResult.alertasBiomecanicas.map((al, aIdx) => (
-                          <div key={aIdx} className="bg-white/85 rounded-lg border border-rose-200 px-2.5 py-1.5 text-[11px]">
-                            <strong className="text-rose-900">{al.ejercicio}</strong>
-                            {al.rutinaNombre ? <span className="text-[#64748B]"> ({al.rutinaNombre})</span> : null}:{" "}
-                            <span>{al.riesgo}</span>
-                            {al.sugerencia ? <span className="block text-emerald-800 font-semibold mt-0.5">↳ Sugerencia: {al.sugerencia}</span> : null}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {Array.isArray(trainingWeekAuditResult.recomendaciones) && trainingWeekAuditResult.recomendaciones.length > 0 && (
-                      <ul className="text-[11px] text-[#334155] list-disc list-inside space-y-0.5 mt-1">
-                        {trainingWeekAuditResult.recomendaciones.map((rec, rIdx) => (
-                          <li key={rIdx}>{rec}</li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setTrainingWeekAuditResult(null)}
-                    className="p-1 rounded-lg text-[#64748B] hover:text-[#0B1929] hover:bg-white/70 shrink-0 cursor-pointer"
-                    title="Cerrar dictamen"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            )}
 
             {/* Monitor en vivo de Volumen Semanal por Grupo Muscular (solo series efectivas) */}
             {rutinas.length > 0 && (() => {
@@ -5697,16 +5580,23 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                           <div className="flex items-center gap-2.5 flex-1 min-w-0">
                             {!isReadOnly && <div className="shrink-0">{dragHandle}</div>}
                             <div className="flex flex-col min-w-0">
-                              <div className="flex items-center flex-wrap gap-1.5 leading-tight">
+                              <div className="flex items-center flex-wrap gap-2 leading-tight">
                                 {tab !== 'S/D' && (
-                                  <span className="font-semibold px-2 py-0.5 bg-[var(--brand-primary)] text-white text-[10px] rounded shrink-0 uppercase">{tab}</span>
+                                  <span className="font-bold px-2 py-0.5 bg-[var(--brand-primary)] text-white text-[11px] rounded-md shrink-0 uppercase tracking-wide shadow-2xs">{tab}</span>
                                 )}
-                                <span className="font-semibold text-[14px] text-[#0B1929] break-words line-clamp-2">{title || "Sin título"}</span>
+                                <span className="font-bold text-[14px] text-[#0B1929] break-words line-clamp-2">{title || "Sin título"}</span>
                               </div>
-                              <div className="flex items-center flex-wrap gap-1.5 mt-1">
-                                <span className="text-xs text-[#6B7A8D] shrink-0">
-                                  {(r.ejercicios || []).length} ej • {dayVol.totalEffectiveSets} series ef.{dayVol.totalWarmupSets > 0 ? ` (+${dayVol.totalWarmupSets} cal.)` : ""} • {r.semanas} sem
+                              <div className="flex items-center flex-wrap gap-1.5 mt-1 text-xs font-medium">
+                                <span className="text-[#6B7A8D] shrink-0">
+                                  {(r.ejercicios || []).length} ej
                                 </span>
+                                <span className="text-[#CBD5E1]">•</span>
+                                <span className="text-[#0B1929] font-bold shrink-0">
+                                  {dayVol.totalEffectiveSets} series ef.
+                                </span>
+                                {dayVol.totalWarmupSets > 0 && (
+                                  <span className="text-[#6B7A8D] shrink-0">(+{dayVol.totalWarmupSets} cal.)</span>
+                                )}
                                 {dayVol.muscleList.slice(0, 3).map((m) => (
                                   <span key={m.id} className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[var(--brand-secondary)]/80 text-[var(--brand-primary)]">
                                     {m.label} {m.sets}
@@ -8304,23 +8194,57 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                         </h3>
                         <p className="text-xs text-[#6B7A8D] mt-0.5">Arrastra para reordenar, abre &ldquo;Por serie&rdquo; si varía cada serie o pulsa (+) para alternativas</p>
                       </div>
-                      {loadingPatientHistory && matchedHistoryCount === 0 && (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[var(--brand-secondary)]/70 border border-[var(--brand-primary)]/20 text-[var(--brand-primary)] text-[11px] font-semibold">
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                          <span>Buscando mejores marcas...</span>
-                        </span>
-                      )}
-                      {matchedHistoryCount > 0 && (
+                      <div className="flex items-center gap-2 flex-wrap justify-end">
+                        {loadingPatientHistory && matchedHistoryCount === 0 && (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[var(--brand-secondary)]/70 border border-[var(--brand-primary)]/20 text-[var(--brand-primary)] text-[11px] font-semibold">
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            <span>Buscando mejores marcas...</span>
+                          </span>
+                        )}
+                        {matchedHistoryCount > 0 && (
+                          <button
+                            type="button"
+                            onClick={applyAllHistoryMarksToRoutine}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--brand-secondary)] hover:bg-[var(--brand-primary)] border border-[var(--brand-primary)]/40 text-[var(--brand-primary)] hover:text-white text-xs font-bold transition-colors cursor-pointer shrink-0 shadow-2xs"
+                            title="Rellenar peso y repeticiones con las mejores marcas históricas registradas por este paciente"
+                          >
+                            <Trophy className="w-3.5 h-3.5 shrink-0" />
+                            <span>Importar mejores marcas ({matchedHistoryCount})</span>
+                          </button>
+                        )}
                         <button
                           type="button"
-                          onClick={applyAllHistoryMarksToRoutine}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--brand-secondary)] hover:bg-[var(--brand-primary)] border border-[var(--brand-primary)]/40 text-[var(--brand-primary)] hover:text-white text-xs font-bold transition-colors cursor-pointer shrink-0 shadow-2xs"
-                          title="Rellenar peso y repeticiones con las mejores marcas históricas registradas por este paciente"
+                          onClick={handleAuditTrainingRoutine}
+                          disabled={isAuditingTrainingWeek || rutinaForm.ejercicios.length === 0}
+                          className={`text-xs font-bold flex items-center gap-2 px-3.5 py-1.5 rounded-xl transition-all shadow-xs cursor-pointer shrink-0 ${
+                            isEstandar
+                              ? "bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-200 hover:text-slate-900"
+                              : "bg-purple-50 text-purple-700 border border-purple-200/80 hover:bg-purple-100 hover:text-purple-800 disabled:opacity-50"
+                          }`}
+                          title={isEstandar ? "Función exclusiva de FLUX Pro" : "Auditar rutina, lesiones y balance semanal con IA Clínica"}
                         >
-                          <Trophy className="w-3.5 h-3.5 shrink-0" />
-                          <span>Importar mejores marcas ({matchedHistoryCount})</span>
+                          {isAuditingTrainingWeek ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-600" />
+                              <span>Auditando rutina...</span>
+                            </>
+                          ) : (
+                            <>
+                              {isEstandar ? (
+                                <Lock className="w-3.5 h-3.5 text-slate-500" />
+                              ) : (
+                                <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                              )}
+                              <span>Auditar con IA</span>
+                              {isEstandar && (
+                                <span className="text-[9px] bg-slate-200 text-slate-700 border border-slate-300 px-1.5 py-0.5 rounded-full font-black ml-0.5">
+                                  PRO
+                                </span>
+                              )}
+                            </>
+                          )}
                         </button>
-                      )}
+                      </div>
                     </div>
                     {rutinaForm.ejercicios.length > 0 && (
                       <div className="flex items-center flex-wrap gap-1.5 px-2.5 py-2 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0]">
@@ -8333,6 +8257,73 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                             {m.label} <strong className="text-[var(--brand-primary)]">{m.sets}</strong>
                           </span>
                         ))}
+                      </div>
+                    )}
+                    {trainingWeekAuditResult && (
+                      <div className={`p-3.5 sm:p-4 rounded-2xl border transition-all animate-in fade-in ${
+                        trainingWeekAuditResult.estado === "critico"
+                          ? "bg-rose-50/80 border-rose-200/90 text-rose-950"
+                          : trainingWeekAuditResult.estado === "advertencia"
+                          ? "bg-amber-50/80 border-amber-200/90 text-amber-950"
+                          : "bg-indigo-50/70 border-indigo-200/80 text-indigo-950"
+                      }`}>
+                        <div className="flex items-start justify-between gap-2.5">
+                          <div className="space-y-1.5 min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs font-black uppercase tracking-wider">
+                                Auditoría IA Clínica · Rutina &amp; Semana
+                              </span>
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase ${
+                                trainingWeekAuditResult.estado === "aprobado"
+                                  ? "bg-emerald-100 text-emerald-800"
+                                  : trainingWeekAuditResult.estado === "critico"
+                                  ? "bg-rose-100 text-rose-800"
+                                  : "bg-amber-100 text-amber-800"
+                              }`}>
+                                {trainingWeekAuditResult.estado === "aprobado"
+                                  ? "Alineado"
+                                  : trainingWeekAuditResult.estado === "critico"
+                                  ? "Alerta Biomecánica"
+                                  : "Con Observaciones"}
+                              </span>
+                              {trainingWeekAuditResult.balanceResumen?.ratioTexto && (
+                                <span className="text-[11px] font-semibold text-[#475569]">
+                                  {trainingWeekAuditResult.balanceResumen.ratioTexto}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs leading-relaxed text-[#1E293B]">
+                              {trainingWeekAuditResult.dictamenGeneral}
+                            </p>
+                            {Array.isArray(trainingWeekAuditResult.alertasBiomecanicas) && trainingWeekAuditResult.alertasBiomecanicas.length > 0 && (
+                              <div className="space-y-1 mt-1.5">
+                                {trainingWeekAuditResult.alertasBiomecanicas.map((al, aIdx) => (
+                                  <div key={aIdx} className="bg-white/85 rounded-lg border border-rose-200 px-2.5 py-1.5 text-[11px]">
+                                    <strong className="text-rose-900">{al.ejercicio}</strong>
+                                    {al.rutinaNombre ? <span className="text-[#64748B]"> ({al.rutinaNombre})</span> : null}:{" "}
+                                    <span>{al.riesgo}</span>
+                                    {al.sugerencia ? <span className="block text-emerald-800 font-semibold mt-0.5">↳ Sugerencia: {al.sugerencia}</span> : null}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {Array.isArray(trainingWeekAuditResult.recomendaciones) && trainingWeekAuditResult.recomendaciones.length > 0 && (
+                              <ul className="text-[11px] text-[#334155] list-disc list-inside space-y-0.5 mt-1">
+                                {trainingWeekAuditResult.recomendaciones.map((rec, rIdx) => (
+                                  <li key={rIdx}>{rec}</li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setTrainingWeekAuditResult(null)}
+                            className="p-1 rounded-lg text-[#64748B] hover:text-[#0B1929] hover:bg-white/70 shrink-0 cursor-pointer"
+                            title="Cerrar dictamen"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -8979,109 +8970,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           ciclos={ciclos}
           brand={brand}
         />
-      )}
-
-      {/* ── Modal Previa de Borrador Semanal de Rutinas con IA ── */}
-      {trainingDraftModal && (
-        <div
-          className="fixed inset-0 bg-[#0B1929]/60 backdrop-blur-xs flex items-center justify-center z-[110] p-0 sm:p-4"
-          onClick={() => !applyingTrainingDraft && setTrainingDraftModal(null)}
-        >
-          <div
-            className="bg-white rounded-none sm:rounded-2xl border border-[#E2E8F0] w-full max-w-3xl max-h-[100dvh] sm:max-h-[90vh] flex flex-col overflow-hidden shadow-2xl"
-            onClick={(ev) => ev.stopPropagation()}
-          >
-            <div className="px-5 py-4 border-b border-[#E2E8F0] flex items-center justify-between gap-3 bg-[#F8FAFC]">
-              <div className="flex items-center gap-2 min-w-0">
-                <Sparkles className="w-5 h-5 text-purple-600 shrink-0" />
-                <div className="min-w-0">
-                  <h3 className="text-sm sm:text-base font-extrabold text-[#0B1929] truncate">
-                    Borrador de Rutinas desde Prescripción Clínica
-                  </h3>
-                  <p className="text-xs text-[#6B7A8D] truncate">
-                    {trainingDraftModal.resumenPlan}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                disabled={applyingTrainingDraft}
-                onClick={() => setTrainingDraftModal(null)}
-                className="p-1.5 rounded-lg text-[#6B7A8D] hover:bg-gray-200/70 hover:text-[#0B1929] shrink-0"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3">
-              {(trainingDraftModal.rutinasSugeridas || []).map((rDraft, dIdx) => (
-                <div key={dIdx} className="rounded-xl border border-[#E2E8F0] overflow-hidden bg-white">
-                  <div className="px-3.5 py-2.5 bg-[#F8FAFC] border-b border-[#E2E8F0] flex items-center justify-between gap-2 flex-wrap">
-                    <div className="flex items-center gap-2">
-                      <span className="px-2 py-0.5 rounded bg-[var(--brand-primary)] text-white text-[10px] font-bold uppercase">
-                        {rDraft.dayCode}
-                      </span>
-                      <span className="text-xs sm:text-sm font-bold text-[#0B1929]">{rDraft.titulo}</span>
-                    </div>
-                    <span className="text-[11px] font-semibold text-[#6B7A8D]">
-                      {rDraft.ejercicios.length} ejercicios
-                    </span>
-                  </div>
-                  <div className="divide-y divide-[#F1F5F9]">
-                    {rDraft.ejercicios.map((ej, eIdx) => (
-                      <div key={eIdx} className="px-3.5 py-2 flex items-center justify-between gap-2 text-xs">
-                        <div className="min-w-0">
-                          <div className="font-semibold text-[#0B1929] truncate">{ej.nombre}</div>
-                          <div className="text-[10px] text-[#6B7A8D] flex items-center flex-wrap gap-1.5">
-                            <span>{GRUPO_LABELS[normalizeMuscleGroup(ej.grupo_muscular)] || ej.grupo_muscular}</span>
-                            {ej.descanso_seg ? <span>· {formatRestLabel(ej.descanso_seg)}</span> : null}
-                            {ej.rir_objetivo ? <span>· RIR {ej.rir_objetivo}</span> : null}
-                            {Array.isArray(ej.series_detalle) && ej.series_detalle.some((s) => s.tipo === "warmup") && (
-                              <span className="text-amber-700 font-semibold">· Incluye 1 calent.</span>
-                            )}
-                          </div>
-                        </div>
-                        <span className="font-mono font-bold text-[var(--brand-primary)] shrink-0">
-                          {ej.num_series}×{ej.reps_sugeridas}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="px-5 py-3.5 border-t border-[#E2E8F0] bg-[#F8FAFC] flex items-center justify-end gap-2 flex-wrap">
-              <button
-                type="button"
-                disabled={applyingTrainingDraft}
-                onClick={() => setTrainingDraftModal(null)}
-                className="px-3.5 py-2 rounded-xl border border-[#E2E8F0] bg-white text-xs font-bold text-[#6B7A8D] hover:text-[#0B1929] cursor-pointer"
-              >
-                Cancelar
-              </button>
-              {rutinas.length > 0 && (
-                <button
-                  type="button"
-                  disabled={applyingTrainingDraft}
-                  onClick={() => handleConfirmApplyTrainingDraft("replace")}
-                  className="px-3.5 py-2 rounded-xl border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 text-xs font-bold cursor-pointer disabled:opacity-50"
-                >
-                  Reemplazar rutinas actuales
-                </button>
-              )}
-              <button
-                type="button"
-                disabled={applyingTrainingDraft}
-                onClick={() => handleConfirmApplyTrainingDraft("append")}
-                className="px-4 py-2 rounded-xl bg-[var(--brand-primary)] text-white hover:opacity-90 text-xs font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-              >
-                {applyingTrainingDraft ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-                <span>{rutinas.length > 0 ? "Añadir al ciclo" : "Crear rutinas en el ciclo"}</span>
-              </button>
-            </div>
-          </div>
-        </div>
       )}
 
       {/* ── Modal de Confirmación Estilizado ── */}

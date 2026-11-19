@@ -639,8 +639,22 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     return {};
   });
   const [finalizedSessions, setFinalizedSessions] = useState({});
-  const [showTrainingCharts, setShowTrainingCharts] = useState(false);
-  const [selectedChartExKey, setSelectedChartExKey] = useState("");
+  const trackingScopeKey = `${selected?.id || ""}:${cicloSel?.id || ""}`;
+  const [selectedTrackingState, setSelectedTrackingState] = useState({ scope: "", routineId: "all" });
+  const selectedTrackingRoutineId =
+    selectedTrackingState.scope === trackingScopeKey ? selectedTrackingState.routineId : "all";
+  const setSelectedTrackingRoutineId = (nextId) =>
+    setSelectedTrackingState({ scope: trackingScopeKey, routineId: nextId });
+  const [exerciseChartState, setExerciseChartState] = useState(null);
+  const exerciseChartModal =
+    exerciseChartState?.scope === trackingScopeKey ? exerciseChartState.payload : null;
+  const setExerciseChartModal = (updater) => {
+    setExerciseChartState((prev) => {
+      const prevPayload = prev?.scope === trackingScopeKey ? prev.payload : null;
+      const nextPayload = typeof updater === "function" ? updater(prevPayload) : updater;
+      return nextPayload ? { scope: trackingScopeKey, payload: nextPayload } : null;
+    });
+  };
   const [chartMetricMode, setChartMetricMode] = useState("1rm"); // "1rm" | "volume"
 
   useEffect(() => {
@@ -1035,6 +1049,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
   };
 
   useBackButton(!!lightbox, () => setLightbox(null), 100);
+  useBackButton(!!exerciseChartModal, () => setExerciseChartModal(null), 65);
   useBackButton(!!nutriEditModal, () => !savingTracking && setNutriEditModal(null), 60);
   useBackButton(!!rutinaEditModal, () => !savingTracking && setRutinaEditModal(null), 60);
   useBackButton(showModal, () => setShowModal(false), 20);
@@ -3581,60 +3596,15 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
             const displayMovedVol = Math.round(
               kpis.totalVolumeKg * (trackingWeightUnit === "lb" ? 2.20462262 : 1)
             );
-
-            // Opciones para gráficas del especialista (excluyendo calentamiento vía helper compartido)
-            const chartExerciseOptions = [];
-            rutinas.forEach((rItem) => {
-              const rSems = getSemanasConFecha(rItem, cicloSel);
-              const totalSem = Math.max(1, rSems.length || rItem.semanas || 4);
-              const dayName = String(rItem.nombre || "").replace("|", " · ");
-              (rItem.ejercicios || []).forEach((ejItem) => {
-                const vidList = ["original", ...(ejItem.alternativas || []).map((_, aIdx) => `alt_${aIdx}`)];
-                let chosenVid = "original";
-                let chosenObj = ejItem;
-                let bestSeries = buildExerciseChartSeries({
-                  ex: ejItem,
-                  activeObj: ejItem,
-                  variantId: "original",
-                  progreso,
-                  totalSemanas: totalSem,
-                  weightUnit: trackingWeightUnit,
-                });
-                if (!bestSeries.hasData) {
-                  for (const altVid of vidList.slice(1)) {
-                    const altIdxNum = parseInt(altVid.replace("alt_", ""), 10);
-                    const altObjItem = (ejItem.alternativas || [])[altIdxNum] || ejItem;
-                    const candidate = buildExerciseChartSeries({
-                      ex: ejItem,
-                      activeObj: altObjItem,
-                      variantId: altVid,
-                      progreso,
-                      totalSemanas: totalSem,
-                      weightUnit: trackingWeightUnit,
-                    });
-                    if (candidate.hasData) {
-                      chosenVid = altVid;
-                      chosenObj = altObjItem;
-                      bestSeries = candidate;
-                      break;
-                    }
-                  }
-                }
-                chartExerciseOptions.push({
-                  key: String(ejItem.id),
-                  label: `${chosenObj.nombre} (${dayName})`,
-                  ex: ejItem,
-                  activeObj: chosenObj,
-                  variantId: chosenVid,
-                  series: bestSeries,
-                });
-              });
-            });
-            const activeChartOption =
-              chartExerciseOptions.find((o) => o.key === String(selectedChartExKey)) ||
-              chartExerciseOptions.find((o) => o.series.hasData) ||
-              chartExerciseOptions[0] ||
-              null;
+            const activeRoutineFilter =
+              selectedTrackingRoutineId === "all" ||
+              rutinas.some((rItem) => String(rItem.id) === String(selectedTrackingRoutineId))
+                ? selectedTrackingRoutineId
+                : "all";
+            const visibleRutinas =
+              activeRoutineFilter === "all"
+                ? rutinas
+                : rutinas.filter((rItem) => String(rItem.id) === String(activeRoutineFilter));
 
             return (
               <>
@@ -3702,9 +3672,9 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                     </div>
                   </div>
 
-                  {/* Distribución muscular + Toggle de Gráficas de 1RM/Volumen */}
-                  <div className="bg-white rounded-xl border border-[#E2E8F0] px-3.5 py-2.5 flex items-center justify-between gap-2 flex-wrap">
-                    <div className="flex items-center flex-wrap gap-1.5 min-w-0">
+                  {/* Distribución muscular + Filtro por Día (estilo paciente) */}
+                  {kpis.weeklyVol.muscleList.length > 0 && (
+                    <div className="bg-white rounded-xl border border-[#E2E8F0] px-3.5 py-2.5 flex items-center flex-wrap gap-1.5 min-w-0">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-[#6B7A8D] mr-1">
                         Series ef./músculo:
                       </span>
@@ -3714,102 +3684,58 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                         </span>
                       ))}
                     </div>
-                    {chartExerciseOptions.length > 0 && (
+                  )}
+
+                  {rutinas.length > 1 && (
+                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scroll-hide">
                       <button
                         type="button"
-                        onClick={() => setShowTrainingCharts((v) => !v)}
-                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold border transition-colors cursor-pointer shrink-0 ${
-                          showTrainingCharts
-                            ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)]"
-                            : "bg-[var(--brand-secondary)] text-[var(--brand-primary)] border-[var(--brand-primary)]/30 hover:bg-[var(--brand-primary)] hover:text-white"
+                        onClick={() => setSelectedTrackingRoutineId("all")}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all whitespace-nowrap shrink-0 cursor-pointer ${
+                          activeRoutineFilter === "all"
+                            ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-xs"
+                            : "bg-white text-[#6B7A8D] border-[#E2E8F0] hover:text-[#0B1929] hover:bg-gray-50"
                         }`}
                       >
-                        <TrendingUp className="w-3.5 h-3.5" />
-                        <span>{showTrainingCharts ? "Ocultar gráficas 1RM" : "Ver gráficas 1RM / Volumen"}</span>
+                        Todos ({rutinas.length})
                       </button>
-                    )}
-                  </div>
-
-                  {/* Panel de Gráficas de Progresión 1RM / Volumen para el Especialista */}
-                  {showTrainingCharts && activeChartOption && (
-                    <div className="bg-white rounded-xl border border-[#E2E8F0] p-3.5 sm:p-4 shadow-2xs space-y-3">
-                      <div className="flex items-center justify-between gap-2 flex-wrap">
-                        <div className="flex items-center gap-2 flex-wrap min-w-0 flex-1">
-                          <BarChart2 className="w-4 h-4 text-[var(--brand-primary)] shrink-0" />
-                          <select
-                            value={activeChartOption.key}
-                            onChange={(ev) => setSelectedChartExKey(ev.target.value)}
-                            className="px-2.5 py-1.5 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] text-xs font-bold text-[#0B1929] max-w-full sm:max-w-xs focus:outline-none focus:border-[var(--brand-primary)]"
-                          >
-                            {chartExerciseOptions.map((opt) => (
-                              <option key={opt.key} value={opt.key}>
-                                {opt.label}{opt.series.hasData ? "" : " (sin datos)"}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div className="inline-flex items-center p-0.5 bg-[#F1F5F9] rounded-lg border border-[#E2E8F0]">
+                      {rutinas.map((rTab) => {
+                        const parts = String(rTab.nombre || "").split("|");
+                        const dayTag = parts.length > 1 ? parts[0].trim() : "";
+                        const titleTag = parts.length > 1 ? parts.slice(1).join("|").trim() : parts[0];
+                        const isTabActive = String(activeRoutineFilter) === String(rTab.id);
+                        const tabSummary = kpis.routineSummaries[rTab.id];
+                        const hasActivity = Boolean(tabSummary?.completedSets > 0 || tabSummary?.sealedWeeks?.length > 0);
+                        return (
                           <button
+                            key={rTab.id}
                             type="button"
-                            onClick={() => setChartMetricMode("1rm")}
-                            className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-colors cursor-pointer ${
-                              chartMetricMode === "1rm" ? "bg-white text-[var(--brand-primary)] shadow-2xs" : "text-[#64748B]"
+                            onClick={() => setSelectedTrackingRoutineId(String(rTab.id))}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 cursor-pointer ${
+                              isTabActive
+                                ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-xs"
+                                : "bg-white text-[#6B7A8D] border-[#E2E8F0] hover:text-[#0B1929] hover:bg-gray-50"
                             }`}
                           >
-                            1RM Est. ({trackingWeightUnit})
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setChartMetricMode("volume")}
-                            className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-colors cursor-pointer ${
-                              chartMetricMode === "volume" ? "bg-white text-[var(--brand-primary)] shadow-2xs" : "text-[#64748B]"
-                            }`}
-                          >
-                            Volumen ({trackingWeightUnit})
-                          </button>
-                        </div>
-                      </div>
-
-                      {!activeChartOption.series.hasData ? (
-                        <div className="py-8 text-center text-xs text-[#6B7A8D] bg-[#F8FAFC] rounded-xl border border-dashed border-[#E2E8F0]">
-                          Sin series efectivas registradas todavía para {activeChartOption.activeObj.nombre}.
-                        </div>
-                      ) : (
-                        <div className="bg-[#F8FAFC] rounded-xl p-3 border border-[#E2E8F0] h-[200px] w-full">
-                          <ResponsiveContainer width="100%" height="100%">
-                            {chartMetricMode === "1rm" ? (
-                              <LineChart data={activeChartOption.series.points} margin={{ top: 6, right: 12, left: -16, bottom: 0 }}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
-                                <XAxis dataKey="week" tick={{ fontSize: 10, fill: "#6B7A8D" }} axisLine={{ stroke: "#CBD5E1" }} tickLine={false} />
-                                <YAxis tick={{ fontSize: 10, fill: "#6B7A8D" }} axisLine={false} tickLine={false} />
-                                <Tooltip formatter={(v) => [`${v} ${trackingWeightUnit}`, "1RM Est."]} />
-                                <Line
-                                  type="monotone"
-                                  dataKey="max1RM"
-                                  stroke="var(--brand-primary)"
-                                  strokeWidth={2.5}
-                                  dot={{ fill: "var(--brand-primary)", r: 4 }}
-                                  name="Mejor 1RM"
-                                  connectNulls={true}
-                                />
-                              </LineChart>
-                            ) : (
-                              <BarChart data={activeChartOption.series.points} margin={{ top: 6, right: 12, left: -10, bottom: 0 }}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
-                                <XAxis dataKey="week" tick={{ fontSize: 10, fill: "#6B7A8D" }} axisLine={{ stroke: "#CBD5E1" }} tickLine={false} />
-                                <YAxis tick={{ fontSize: 10, fill: "#6B7A8D" }} axisLine={false} tickLine={false} />
-                                <Tooltip formatter={(v) => [`${v} ${trackingWeightUnit}`, "Volumen efectivo"]} />
-                                <Bar dataKey="totalVolume" fill="var(--brand-primary)" radius={[6, 6, 0, 0]} name="Volumen" />
-                              </BarChart>
+                            {dayTag && (
+                              <span className={`text-[10px] font-extrabold uppercase px-1.5 py-0.2 rounded ${
+                                isTabActive ? "bg-white/20 text-white" : "bg-[var(--brand-secondary)] text-[var(--brand-primary)]"
+                              }`}>
+                                {dayTag}
+                              </span>
                             )}
-                          </ResponsiveContainer>
-                        </div>
-                      )}
+                            <span>{titleTag || "Rutina"}</span>
+                            {hasActivity && (
+                              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isTabActive ? "bg-emerald-300" : "bg-emerald-500"}`} />
+                            )}
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
 
-                {rutinas.map(r=>{
+                {visibleRutinas.map(r=>{
             const semanas = getSemanasConFecha(r, cicloSel);
             const startRaw = r?.fecha_inicio || cicloSel?.fecha_inicio || cicloSel?.created_at || r?.created_at;
             const { currentCycleWeek, isFuture: isCycleFuture } = getCurrentCycleWeekInfo(startRaw);
@@ -4060,6 +3986,25 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                                 <span className="px-1.5 py-0.2 rounded bg-[var(--brand-secondary)]/70 text-[var(--brand-primary)] font-bold">
                                                   Últ: {lastPt.bestReps}{lastPt.bestWeightDisplay ? `×${lastPt.bestWeightDisplay}${trackingWeightUnit}` : " reps"}
                                                 </span>
+                                              )}
+                                              {exSeriesInfo.hasData && (
+                                                <button
+                                                  type="button"
+                                                  onClick={() => {
+                                                    setChartMetricMode("1rm");
+                                                    setExerciseChartModal({
+                                                      routineId: r.id,
+                                                      routineNombre: String(r.nombre || "").replace("|", " · "),
+                                                      exId: ej.id,
+                                                      variantId: vid,
+                                                    });
+                                                  }}
+                                                  className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-white border border-[var(--brand-primary)]/35 text-[var(--brand-primary)] hover:bg-[var(--brand-primary)] hover:text-white font-bold transition-colors cursor-pointer"
+                                                  title="Ver gráfica de progresión 1RM / Volumen"
+                                                >
+                                                  <TrendingUp className="w-2.5 h-2.5" />
+                                                  <span>Gráfica</span>
+                                                </button>
                                               )}
                                             </div>
                                           );
@@ -7474,6 +7419,193 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
         </div>,
         document.body
       )}
+
+      {/* Modal limpio de Gráfica de Progresión por Ejercicio */}
+      {exerciseChartModal && (() => {
+        const modalRutina = rutinas.find((rt) => String(rt.id) === String(exerciseChartModal.routineId));
+        if (!modalRutina) return null;
+        const modalSems = getSemanasConFecha(modalRutina, cicloSel);
+        const totalModalSems = Math.max(1, modalSems.length || modalRutina.semanas || 4);
+        const dayExerciseTabs = [];
+
+        (modalRutina.ejercicios || []).forEach((ejItem) => {
+          const vidList = ["original", ...(ejItem.alternativas || []).map((_, aIdx) => `alt_${aIdx}`)];
+          vidList.forEach((vid) => {
+            const altIdxNum = vid === "original" ? -1 : parseInt(vid.replace("alt_", ""), 10);
+            const obj = vid === "original" ? ejItem : (ejItem.alternativas || [])[altIdxNum] || ejItem;
+            const series = buildExerciseChartSeries({
+              ex: ejItem,
+              activeObj: obj,
+              variantId: vid,
+              progreso,
+              totalSemanas: totalModalSems,
+              weightUnit: trackingWeightUnit,
+            });
+            if (series.hasData) {
+              dayExerciseTabs.push({
+                tabKey: `${ejItem.id}__${vid}`,
+                ex: ejItem,
+                activeObj: obj,
+                variantId: vid,
+                series,
+              });
+            }
+          });
+        });
+
+        const activeTab =
+          dayExerciseTabs.find(
+            (t) => String(t.ex.id) === String(exerciseChartModal.exId) && t.variantId === exerciseChartModal.variantId
+          ) ||
+          dayExerciseTabs.find((t) => String(t.ex.id) === String(exerciseChartModal.exId)) ||
+          dayExerciseTabs[0];
+
+        if (!activeTab) return null;
+
+        const best1RMDisp = activeTab.series.best1RMKg > 0
+          ? `${convertWeightToInput(activeTab.series.best1RMKg, trackingWeightUnit)} ${trackingWeightUnit}`
+          : "—";
+        const latest1RMDisp = activeTab.series.latest1RMKg > 0
+          ? `${convertWeightToInput(activeTab.series.latest1RMKg, trackingWeightUnit)} ${trackingWeightUnit}`
+          : "—";
+        const movedVolDisp = Math.round(
+          (activeTab.series.totalVolumeKg || 0) * (trackingWeightUnit === "lb" ? 2.20462262 : 1)
+        );
+
+        return createPortal(
+          <div
+            onClick={() => setExerciseChartModal(null)}
+            className="fixed inset-0 bg-[#0B1929]/55 backdrop-blur-xs flex items-center justify-center z-[9998] p-3 sm:p-4 animate-in fade-in duration-150"
+          >
+            <div
+              onClick={(ev) => ev.stopPropagation()}
+              className="bg-white rounded-2xl border border-[#E2E8F0] w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col"
+            >
+              <div className="px-4 sm:px-5 py-3.5 border-b border-[#E2E8F0] bg-[#F8FAFC] flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-xl bg-[var(--brand-secondary)] text-[var(--brand-primary)] flex items-center justify-center shrink-0">
+                    <TrendingUp className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-sm sm:text-base font-bold text-[#0B1929] truncate">
+                      {activeTab.activeObj.nombre}
+                    </h3>
+                    <p className="text-[11px] text-[#6B7A8D] truncate">
+                      {exerciseChartModal.routineNombre || String(modalRutina.nombre || "").replace("|", " · ")}
+                      {activeTab.variantId !== "original" ? " · Variante ALT" : ""}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setExerciseChartModal(null)}
+                  className="p-1.5 rounded-lg text-[#6B7A8D] hover:bg-gray-200/70 hover:text-[#0B1929] cursor-pointer shrink-0"
+                  title="Cerrar"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="p-4 sm:p-5 overflow-y-auto space-y-3.5">
+                {dayExerciseTabs.length > 1 && (
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scroll-hide">
+                    {dayExerciseTabs.map((t) => {
+                      const isSel = t.tabKey === activeTab.tabKey;
+                      return (
+                        <button
+                          key={t.tabKey}
+                          type="button"
+                          onClick={() =>
+                            setExerciseChartModal((prev) => ({
+                              ...prev,
+                              exId: t.ex.id,
+                              variantId: t.variantId,
+                            }))
+                          }
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border whitespace-nowrap shrink-0 transition-colors cursor-pointer ${
+                            isSel
+                              ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)]"
+                              : "bg-[#F8FAFC] text-[#475569] border-[#E2E8F0] hover:border-[var(--brand-primary)]/40 hover:text-[#0B1929]"
+                          }`}
+                        >
+                          {t.activeObj.nombre}
+                          {t.variantId !== "original" ? " (ALT)" : ""}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="px-2.5 py-1 rounded-lg bg-[#F8FAFC] border border-[#E2E8F0] text-[11px] font-semibold text-[#475569]">
+                      Mejor 1RM: <strong className="font-mono text-[#0B1929]">{best1RMDisp}</strong>
+                    </span>
+                    <span className="px-2.5 py-1 rounded-lg bg-[#F8FAFC] border border-[#E2E8F0] text-[11px] font-semibold text-[#475569]">
+                      Último: <strong className="font-mono text-[var(--brand-primary)]">{latest1RMDisp}</strong>
+                    </span>
+                    <span className="px-2.5 py-1 rounded-lg bg-[#F8FAFC] border border-[#E2E8F0] text-[11px] font-semibold text-[#475569]">
+                      Vol. ciclo: <strong className="font-mono text-[#0B1929]">{movedVolDisp.toLocaleString()} {trackingWeightUnit}</strong>
+                    </span>
+                  </div>
+
+                  <div className="inline-flex items-center p-0.5 bg-[#F1F5F9] rounded-lg border border-[#E2E8F0]">
+                    <button
+                      type="button"
+                      onClick={() => setChartMetricMode("1rm")}
+                      className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-colors cursor-pointer ${
+                        chartMetricMode === "1rm" ? "bg-white text-[var(--brand-primary)] shadow-2xs" : "text-[#64748B]"
+                      }`}
+                    >
+                      1RM Est. ({trackingWeightUnit})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setChartMetricMode("volume")}
+                      className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-colors cursor-pointer ${
+                        chartMetricMode === "volume" ? "bg-white text-[var(--brand-primary)] shadow-2xs" : "text-[#64748B]"
+                      }`}
+                    >
+                      Volumen ({trackingWeightUnit})
+                    </button>
+                  </div>
+                </div>
+
+                <div className="bg-[#F8FAFC] rounded-xl p-3 border border-[#E2E8F0] h-[230px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    {chartMetricMode === "1rm" ? (
+                      <LineChart data={activeTab.series.points} margin={{ top: 8, right: 12, left: -14, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
+                        <XAxis dataKey="week" tick={{ fontSize: 10, fill: "#6B7A8D" }} axisLine={{ stroke: "#CBD5E1" }} tickLine={false} />
+                        <YAxis tick={{ fontSize: 10, fill: "#6B7A8D" }} axisLine={false} tickLine={false} />
+                        <Tooltip formatter={(v) => [`${v} ${trackingWeightUnit}`, "1RM Est."]} />
+                        <Line
+                          type="monotone"
+                          dataKey="max1RM"
+                          stroke="var(--brand-primary)"
+                          strokeWidth={2.5}
+                          dot={{ fill: "var(--brand-primary)", r: 4 }}
+                          name="Mejor 1RM"
+                          connectNulls={true}
+                        />
+                      </LineChart>
+                    ) : (
+                      <BarChart data={activeTab.series.points} margin={{ top: 8, right: 12, left: -10, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
+                        <XAxis dataKey="week" tick={{ fontSize: 10, fill: "#6B7A8D" }} axisLine={{ stroke: "#CBD5E1" }} tickLine={false} />
+                        <YAxis tick={{ fontSize: 10, fill: "#6B7A8D" }} axisLine={false} tickLine={false} />
+                        <Tooltip formatter={(v) => [`${v} ${trackingWeightUnit}`, "Volumen efectivo"]} />
+                        <Bar dataKey="totalVolume" fill="var(--brand-primary)" radius={[6, 6, 0, 0]} name="Volumen" />
+                      </BarChart>
+                    )}
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+          </div>,
+          document.body
+        );
+      })()}
 
       {/* Lightbox */}
       {lightbox&&createPortal(

@@ -1573,16 +1573,20 @@ Responde ÚNICAMENTE con JSON válido:
       const recRange = body.recRange || { min: 10, max: 16 };
       const balanceResumen = body.balanceResumen || {};
       const weekSummaryText = body.weekSummaryText || "";
+      const focusRoutineName = String(body.focusRoutineName || "").trim();
       const lesionesRaw = smartTraining?.lesionesRaw || anamnesis?.cirugias_lesiones || "Ninguna";
 
       const promptAudit = `Eres el Director de Biomecánica Clínica y Metodología del Entrenamiento en FLUX.
-Audita la semana completa programada para el paciente.
+${focusRoutineName
+  ? `Audita prioritariamente la sesión "${focusRoutineName}" (orden de ejercicios, volumen por sesión y seguridad biomecánica) considerando además su impacto en la semana completa.`
+  : "Audita la semana completa programada para el paciente."}
 
 CONTEXTO:
 - Objetivo: ${smartTraining?.enfoqueFisiologico || smartTraining?.goalTitle || "Hipertrofia"}
-- Rango óptimo: ${recRange.min}-${recRange.max} series efectivas/músculo
+${focusRoutineName ? `- Sesión prioritaria en revisión: ${focusRoutineName}` : ""}
+- Rango óptimo semanal: ${recRange.min}-${recRange.max} series efectivas/músculo
 - Lesiones: ${lesionesRaw}
-- Balance: ${balanceResumen.ratioTexto || ""} | Total efectivo: ${weeklyVol.totalEffectiveSets || 0} series (+${weeklyVol.totalWarmupSets || 0} calent.)
+- Balance semanal: ${balanceResumen.ratioTexto || ""} | Total efectivo: ${weeklyVol.totalEffectiveSets || 0} series (+${weeklyVol.totalWarmupSets || 0} calent.)
 
 RUTINAS:
 ${weekSummaryText}
