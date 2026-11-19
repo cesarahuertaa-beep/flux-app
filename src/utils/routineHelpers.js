@@ -1017,3 +1017,274 @@ export function groupExercisesIntoBlocks(ejercicios = []) {
 
   return blocks;
 }
+
+/** Construye serie semanal (1RM Epley máximo y volumen efectivo) por ejercicio excluyendo calentamientos. */
+export function buildExerciseChartSeries({
+  ex,
+  activeObj = null,
+  variantId = "original",
+  progreso = {},
+  totalSemanas = 4,
+  weightUnit = "kg",
+}) {
+  if (!ex) return { points: [], hasData: false, best1RMKg: 0, latest1RMKg: 0, totalVolumeKg: 0 };
+  const targetObj = activeObj || ex;
+  const nSeries = parseInt(targetObj?.num_series || ex.num_series, 10) || 4;
+  const effectiveIdx = getEffectiveSeriesIndices(targetObj, nSeries);
+  const factor = weightUnit === "lb" ? KG_TO_LB : 1;
+
+  const rawPoints = [];
+  let best1RMKg = 0;
+  let latest1RMKg = 0;
+  let totalVolumeKgAll = 0;
+  let lastValidWeekIdx = -1;
+
+  for (let w = 0; w < Math.max(1, totalSemanas); w++) {
+    let weekMax1RMKg = 0;
+    let weekVolumeKg = 0;
+    let weekSets = 0;
+    let weekBestWeightKg = 0;
+    let weekBestReps = 0;
+    const set1RMMap = {};
+
+    for (const s of effectiveIdx) {
+      const pRaw = progreso[`${ex.id}-${w}-${s}-peso-${variantId}`];
+      const rRaw = progreso[`${ex.id}-${w}-${s}-reps-${variantId}`];
+      const rStr = String(rRaw ?? "").trim();
+      if (!rStr || rStr === "Falta") continue;
+      const reps = parseFloat(rStr);
+      const pesoKg = parseRawWeightToKg(pRaw);
+      if (isNaN(reps) || reps <= 0 || pesoKg === null || pesoKg < 0) continue;
+
+      weekSets++;
+      if (pesoKg > 0) {
+        weekVolumeKg += pesoKg * reps;
+        const e1rm = calcEpley1RM(pesoKg, reps);
+        if (e1rm > 0) {
+          set1RMMap[`serie_${s}`] = Math.round(e1rm * factor * 10) / 10;
+          if (e1rm > weekMax1RMKg) {
+            weekMax1RMKg = e1rm;
+            weekBestWeightKg = pesoKg;
+            weekBestReps = reps;
+          }
+        }
+      }
+    }
+
+    if (weekSets > 0) {
+      lastValidWeekIdx = w;
+      totalVolumeKgAll += weekVolumeKg;
+      if (weekMax1RMKg > best1RMKg) best1RMKg = weekMax1RMKg;
+      if (weekMax1RMKg > 0) latest1RMKg = weekMax1RMKg;
+    }
+
+    rawPoints.push({
+      week: `Sem ${w + 1}`,
+      weekIdx: w,
+      hasData: weekSets > 0,
+      max1RM: weekMax1RMKg > 0 ? Math.round(weekMax1RMKg * factor * 10) / 10 : null,
+      max1RMKg: weekMax1RMKg,
+      totalVolume: weekVolumeKg > 0 ? Math.round(weekVolumeKg * factor) : 0,
+      totalVolumeKg: Math.round(weekVolumeKg),
+      setsCount: weekSets,
+      bestWeightDisplay: weekBestWeightKg > 0 ? Number((weekBestWeightKg * factor).toFixed(1)) : null,
+      bestReps: weekBestReps || null,
+      ...set1RMMap,
+    });
+  }
+
+  const trimmed = lastValidWeekIdx === -1 ? [] : rawPoints.slice(0, lastValidWeekIdx + 1);
+  return {
+    points: trimmed,
+    hasData: trimmed.length > 0,
+    best1RMKg: Number(best1RMKg.toFixed(2)),
+    latest1RMKg: Number(latest1RMKg.toFixed(2)),
+    totalVolumeKg: Math.round(totalVolumeKgAll),
+  };
+}
+
+/** Calcula KPIs globales del ciclo y por rutina para la vista Tracking del especialista. */
+export function computeCycleTrainingKpis({
+  rutinas = [],
+  progreso = {},
+  finalizedSessions = {},
+  currentWeekIdx = 0,
+  totalSemanas = 4,
+}) {
+  const safeRutinas = Array.isArray(rutinas) ? rutinas : [];
+  const weeklyVol = computeWeeklyMuscleVolume(safeRutinas);
+  const variantsList = ["original", "alt_0", "alt_1"];
+
+  let expectedSetsToDate = 0;
+  let completedSetsToDate = 0;
+  let totalVolumeKg = 0;
+  let activeSessionsCount = 0;
+  let sealedSessionsCount = 0;
+  let expectedSessions = 0;
+  let prsCount = 0;
+  const routineSummaries = {};
+
+  for (const r of safeRutinas) {
+    const ejs = Array.isArray(r?.ejercicios) ? r.ejercicios : [];
+    const weeksLen = Math.max(1, parseInt(r?.semanas || totalSemanas, 10) || 4);
+
+    // Detectar última semana con algún dato registrado en esta rutina
+    let maxLoggedW = -1;
+    for (const ej of ejs) {
+      const nSeries = parseInt(ej?.num_series, 10) || 4;
+      for (let w = 0; w < weeksLen; w++) {
+        for (let s = 0; s < nSeries; s++) {
+          for (const vid of variantsList) {
+            const rv = String(progreso[`${ej.id}-${w}-${s}-reps-${vid}`] ?? "").trim();
+            if (rv && rv !== "Falta") {
+              if (w > maxLoggedW) maxLoggedW = w;
+            }
+          }
+        }
+      }
+    }
+
+    const elapsedWeeks =
+      currentWeekIdx < 0
+        ? maxLoggedW >= 0
+          ? maxLoggedW + 1
+          : 0
+        : Math.min(weeksLen, Math.max(currentWeekIdx + 1, maxLoggedW + 1));
+
+    let rExpectedSets = 0;
+    let rCompletedSets = 0;
+    const sealedWeeks = [];
+
+    for (let w = 0; w < weeksLen; w++) {
+      const isSealed = Boolean(finalizedSessions?.[`${r.id}-${w + 1}`]?.finalizada);
+      if (isSealed) {
+        sealedSessionsCount++;
+        sealedWeeks.push(w + 1);
+      }
+
+      const countsInExpected = w < elapsedWeeks;
+      if (countsInExpected && ejs.length > 0) expectedSessions++;
+
+      let sessionHasCompleted = false;
+      for (const ej of ejs) {
+        const nSeries = parseInt(ej?.num_series, 10) || 4;
+        const effIdx = getEffectiveSeriesIndices(ej, nSeries);
+        if (countsInExpected) rExpectedSets += effIdx.length;
+
+        for (const s of effIdx) {
+          let setCompleted = false;
+          let setMaxVol = 0;
+          for (const vid of variantsList) {
+            const rRaw = progreso[`${ej.id}-${w}-${s}-reps-${vid}`];
+            const pRaw = progreso[`${ej.id}-${w}-${s}-peso-${vid}`];
+            const rStr = String(rRaw ?? "").trim();
+            if (!rStr || rStr === "Falta") continue;
+            const rNum = parseFloat(rStr);
+            const pKg = parseRawWeightToKg(pRaw);
+            if (!isNaN(rNum) && rNum > 0 && pKg !== null && pKg >= 0) {
+              setCompleted = true;
+              if (pKg > 0) setMaxVol = Math.max(setMaxVol, pKg * rNum);
+            }
+          }
+          if (setCompleted) {
+            sessionHasCompleted = true;
+            rCompletedSets++;
+            totalVolumeKg += setMaxVol;
+          }
+        }
+      }
+      if (sessionHasCompleted) activeSessionsCount++;
+    }
+
+    // Contar mejoras de 1RM dentro del ciclo para ejercicios con >=2 semanas con datos
+    for (const ej of ejs) {
+      const series = buildExerciseChartSeries({
+        ex: ej,
+        progreso,
+        totalSemanas: weeksLen,
+        weightUnit: "kg",
+      });
+      const valid1RMs = series.points.filter((pt) => pt.max1RMKg > 0).map((pt) => pt.max1RMKg);
+      if (valid1RMs.length >= 2 && Math.max(...valid1RMs.slice(1)) > valid1RMs[0] + 0.1) {
+        prsCount++;
+      }
+    }
+
+    expectedSetsToDate += rExpectedSets;
+    completedSetsToDate += rCompletedSets;
+    routineSummaries[r.id] = {
+      expectedSets: rExpectedSets,
+      completedSets: rCompletedSets,
+      adherencePct: rExpectedSets > 0 ? Math.min(100, Math.round((rCompletedSets / rExpectedSets) * 100)) : 0,
+      sealedWeeks,
+    };
+  }
+
+  const adherenceSetsPct =
+    expectedSetsToDate > 0
+      ? Math.min(100, Math.round((completedSetsToDate / expectedSetsToDate) * 100))
+      : 0;
+
+  return {
+    weeklyVol,
+    expectedSetsToDate,
+    completedSetsToDate,
+    adherenceSetsPct,
+    expectedSessions,
+    activeSessionsCount,
+    sealedSessionsCount,
+    totalVolumeKg: Math.round(totalVolumeKg),
+    prsCount,
+    routineSummaries,
+  };
+}
+
+/** Calcula peso objetivo desde un 1RM histórico (kg) redondeado a incrementos prácticos de gimnasio. */
+export function calculateWeightFrom1RM({ best1RMKg, targetPct = 75, unit = "kg" }) {
+  const rm = parseFloat(best1RMKg);
+  const pct = Math.max(30, Math.min(100, parseFloat(targetPct) || 75));
+  if (!rm || isNaN(rm) || rm <= 0) return null;
+
+  const targetKg = rm * (pct / 100);
+  let displayNum;
+  if (unit === "lb") {
+    const rawLb = targetKg * KG_TO_LB;
+    displayNum = Math.max(5, Math.round(rawLb / 5) * 5);
+  } else {
+    displayNum = Math.max(2.5, Math.round(targetKg / 2.5) * 2.5);
+  }
+
+  const estReps = pct >= 98 ? 1 : Math.max(1, Math.min(20, Math.round(30 * (100 / pct - 1))));
+  return {
+    pesoInput: String(displayNum),
+    estReps,
+    pct,
+    unit,
+  };
+}
+
+/** Genera micro-sugerencia de doble progresión a partir de la mejor marca histórica del paciente. */
+export function computeDoubleProgressionSuggestion({ hMark, targetReps = 10, unit = "kg" }) {
+  if (!hMark || !hMark.bestWeightKg || hMark.bestWeightKg <= 0) return null;
+  const bestReps = parseInt(hMark.bestReps, 10) || 0;
+  const target = parseInt(targetReps, 10) || 10;
+
+  if (bestReps >= target + 2) {
+    const stepKg = unit === "lb" ? 5 * LB_TO_KG : 2.5;
+    const nextInput = convertWeightToInput(hMark.bestWeightKg + stepKg, unit);
+    return {
+      type: "weight_up",
+      label: `Subir a ${nextInput} ${unit}`,
+      nextPesoInput: nextInput,
+      nextReps: String(target),
+    };
+  }
+  const curInput = convertWeightToInput(hMark.bestWeightKg, unit);
+  const nextR = Math.min(target + 2, bestReps + 1);
+  return {
+    type: "reps_up",
+    label: `Buscar ${nextR} reps (${curInput} ${unit})`,
+    nextPesoInput: curInput,
+    nextReps: String(nextR),
+  };
+}

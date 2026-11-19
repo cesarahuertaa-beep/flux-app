@@ -1472,6 +1472,159 @@ Devuelve EXCLUSIVAMENTE un objeto JSON válido con los siguientes campos (si alg
       );
     }
 
+    // =========================================================================
+    // ACCIÓN: GENERAR BORRADOR DE RUTINA SEMANAL DESDE BIBLIOTECA Y PRESCRIPCIÓN
+    // =========================================================================
+    if (action === "generate-training-plan") {
+      if (!geminiKey || geminiKey.trim().length < 20) {
+        return new Response(
+          JSON.stringify({ error: "NO_GEMINI_KEY", message: "API Key de Gemini no configurada en secrets." }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const anamnesis = body.anamnesis || {};
+      const smartTraining = body.smartTraining || {};
+      const catalogo = Array.isArray(body.catalogo) ? body.catalogo.slice(0, 140) : [];
+      const diasCount = Math.max(2, Math.min(6, parseInt(smartTraining?.diasSugeridos, 10) || 4));
+      const lesionesRaw = smartTraining?.lesionesRaw || anamnesis?.cirugias_lesiones || "Ninguna";
+      const catalogListText = catalogo
+        .map((b: any) => `${b.id}|${b.nombre}|${b.grupo_muscular || "general"}`)
+        .join("\n");
+
+      const promptGen = `Eres un entrenador clínico y preparador físico de élite en FLUX.
+Diseña un borrador de semana de ${diasCount} rutinas eligiendo ÚNICAMENTE ejercicios del CATÁLOGO proporcionado (usando su ID exacto antes de "|").
+
+PERFIL DEL PACIENTE:
+- Enfoque: ${smartTraining?.enfoqueFisiologico || smartTraining?.goalTitle || "Hipertrofia"}
+- Split sugerido: ${smartTraining?.splitSugerido || "Balanceado"}
+- Volumen/RPE objetivo: ${smartTraining?.volumenRpe || "10-14 series/grupo"}
+- Lesiones y adaptaciones: ${lesionesRaw} ${smartTraining?.precaucionesLesion ? `(${smartTraining.precaucionesLesion})` : ""}
+
+CATÁLOGO (id|nombre|musculo):
+${catalogListText}
+
+Responde ÚNICAMENTE con JSON válido:
+{
+  "resumenPlan": "string breve",
+  "rutinasSugeridas": [
+    {
+      "dayCode": "LUN",
+      "titulo": "string",
+      "rationaleDia": "string breve",
+      "ejercicios": [
+        {
+          "biblioteca_id": "id_exacto",
+          "nombre": "nombre_exacto",
+          "num_series": 3,
+          "reps_sugeridas": 10,
+          "descanso_seg": 90,
+          "rir_objetivo": "2",
+          "nota_tecnica": "cue breve o vacío",
+          "warmup_primer_serie": true
+        }
+      ]
+    }
+  ]
+}`;
+
+      for (const model of CANDIDATE_MODELS) {
+        try {
+          const genCfg = getGenerationConfig(model, true, 0.25);
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`;
+          const res = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: promptGen }] }],
+              generationConfig: genCfg,
+            }),
+          });
+          if (!res.ok) continue;
+          const resData = await res.json();
+          const rawTxt = extractGeminiText(resData).replace(/```json\s*|```/gi, "").trim();
+          const parsed = JSON.parse(rawTxt);
+          return new Response(
+            JSON.stringify({ ...parsed, origen: "edge_function", model }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        } catch {}
+      }
+      return new Response(
+        JSON.stringify({ error: "TRAIN_GEN_FAILED", message: "No se pudo generar el borrador con IA." }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // =========================================================================
+    // ACCIÓN: AUDITAR SEMANA DE ENTRENAMIENTO CON IA CLÍNICA
+    // =========================================================================
+    if (action === "audit-training-week") {
+      if (!geminiKey || geminiKey.trim().length < 20) {
+        return new Response(
+          JSON.stringify({ error: "NO_GEMINI_KEY", message: "API Key de Gemini no configurada en secrets." }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const anamnesis = body.anamnesis || {};
+      const smartTraining = body.smartTraining || {};
+      const weeklyVol = body.weeklyVol || {};
+      const recRange = body.recRange || { min: 10, max: 16 };
+      const balanceResumen = body.balanceResumen || {};
+      const weekSummaryText = body.weekSummaryText || "";
+      const lesionesRaw = smartTraining?.lesionesRaw || anamnesis?.cirugias_lesiones || "Ninguna";
+
+      const promptAudit = `Eres el Director de Biomecánica Clínica y Metodología del Entrenamiento en FLUX.
+Audita la semana completa programada para el paciente.
+
+CONTEXTO:
+- Objetivo: ${smartTraining?.enfoqueFisiologico || smartTraining?.goalTitle || "Hipertrofia"}
+- Rango óptimo: ${recRange.min}-${recRange.max} series efectivas/músculo
+- Lesiones: ${lesionesRaw}
+- Balance: ${balanceResumen.ratioTexto || ""} | Total efectivo: ${weeklyVol.totalEffectiveSets || 0} series (+${weeklyVol.totalWarmupSets || 0} calent.)
+
+RUTINAS:
+${weekSummaryText}
+
+Responde ÚNICAMENTE con JSON:
+{
+  "estado": "aprobado" | "advertencia" | "critico",
+  "dictamenGeneral": "string breve",
+  "alertasBiomecanicas": [
+    { "rutinaNombre": "string", "ejercicio": "string", "riesgo": "string", "sugerencia": "string" }
+  ],
+  "recomendaciones": ["string"]
+}`;
+
+      for (const model of CANDIDATE_MODELS) {
+        try {
+          const genCfg = getGenerationConfig(model, true, 0.2);
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`;
+          const res = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: promptAudit }] }],
+              generationConfig: genCfg,
+            }),
+          });
+          if (!res.ok) continue;
+          const resData = await res.json();
+          const rawTxt = extractGeminiText(resData).replace(/```json\s*|```/gi, "").trim();
+          const parsed = JSON.parse(rawTxt);
+          return new Response(
+            JSON.stringify({ ...parsed, origen: "edge_function", model }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        } catch {}
+      }
+      return new Response(
+        JSON.stringify({ error: "TRAIN_AUDIT_FAILED", message: "No se pudo auditar el plan con IA." }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     return new Response(
       JSON.stringify({ error: "UNKNOWN_ACTION", message: `Acción no reconocida: ${action}` }),
       { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }

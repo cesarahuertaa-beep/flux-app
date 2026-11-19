@@ -5,6 +5,11 @@ import { stripSmaeTag } from "./smaeData";
 
 import { invokeEdgeFunction } from "./supabase";
 import { peekClinicalRecord, saveClinicalRecord } from "./clinicalRecord";
+import { GRUPO_LABELS, normalizeMuscleGroup } from "./constants";
+import {
+  computeWeeklyMuscleVolume,
+  parseRecommendedVolumeRange,
+} from "../utils/routineHelpers";
 
 /**
  * Splits comma-, semicolon-, slash-, or conjunction-separated strings into clean, deduplicated tags.
@@ -2874,4 +2879,605 @@ Devuelve EXCLUSIVAMENTE un objeto JSON válido con los siguientes campos (si alg
   }
 
   throw new Error("No se pudo procesar el ticket con IA. Verifica que la imagen sea nítida.");
+}
+
+// ============================================================================
+// INTELIGENCIA DE ENTRENAMIENTO (Paridad con Nutrición: Borrador + Auditoría)
+// ============================================================================
+
+const TRAINING_PUSH_MUSCLES = new Set(["pecho", "deltoide_anterior", "triceps"]);
+const TRAINING_PULL_MUSCLES = new Set(["dorsal", "deltoide_posterior", "trapecio", "biceps", "antebrazo"]);
+const TRAINING_LEGS_MUSCLES = new Set(["cuadriceps", "isquiotibial", "gluteo", "pantorrilla", "soleo", "aductor", "abductor"]);
+
+const normalizePlainText = (str) =>
+  String(str || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+
+function detectExerciseInjuryConflict(exName, grp, lesionesRaw) {
+  const les = normalizePlainText(lesionesRaw);
+  if (!les || /^(ningun[ao]s?|no|nada|n\/a|sin lesiones)/.test(les)) return null;
+  const name = normalizePlainText(exName);
+  const gNorm = normalizeMuscleGroup(grp);
+
+  if (/(espalda|lumbar|hernia|disco|ciatic|columna)/.test(les)) {
+    if (/(peso muerto|deadlift|sentadilla trasera|back squat|buenos dias|good morning|remo con barra libre|remo inclinado con barra)/.test(name)) {
+      return {
+        zona: "Columna / Zona Lumbar",
+        motivo: "Alta carga axial o flexión lumbar directa sobre antecedente lumbar.",
+        sugerencia: "Sustituir por prensa inclinada con respaldo, sentadilla goblet o remo con pecho apoyado.",
+      };
+    }
+  }
+  if (/(rodilla|menisc|ligamento|cruzado|rotula|patela|condromalacia)/.test(les)) {
+    if (/(sentadilla profunda|sissy|extension de cuadriceps|leg extension|zancada con salto|pliometr)/.test(name)) {
+      return {
+        zona: "Rodilla",
+        motivo: "Alto estrés de cizalla patelar o impacto directo en flexión profunda.",
+        sugerencia: "Priorizar prensa a rango controlado (90°), puente de glúteo o sentadilla búlgara controlada.",
+      };
+    }
+  }
+  if (/(hombro|manguito|supraespinoso|clavicula|acromio)/.test(les)) {
+    if (/(tras nuca|behind the neck|press militar con barra|press con barra|fondos en paralelas profundos|remo al menton|upright row)/.test(name) || gNorm === "deltoide_anterior") {
+      if (/(tras nuca|press militar|remo al menton|upright row|fondos|press inclinado con barra)/.test(name)) {
+        return {
+          zona: "Hombro / Manguito rotador",
+          motivo: "Pinzamiento subacromial o rotación interna bajo carga elevada.",
+          sugerencia: "Cambiar a press con mancuernas en agarre neutro (30-45°), elevaciones en plano escapular o máquina convergente.",
+        };
+      }
+    }
+  }
+  if (/(muneca|codo|epicondil|epitrocl|tunel carpiano)/.test(les)) {
+    if (/(curl con barra recta|press frances con barra recta|rompecraneos con barra recta)/.test(name)) {
+      return {
+        zona: "Codo / Muñeca",
+        motivo: "Estrés en supinación forzada con barra recta.",
+        sugerencia: "Utilizar barra Z, mancuernas con agarre neutro o polea con cuerda.",
+      };
+    }
+  }
+  return null;
+}
+
+function buildTrainingSplitDays(diasSugeridos = 4, splitLabel = "") {
+  const n = Math.max(2, Math.min(6, parseInt(diasSugeridos, 10) || 4));
+  const sl = normalizePlainText(splitLabel);
+  if (n === 2) {
+    return [
+      { dayCode: "LUN", titulo: "Full Body A (Fuerza & Base)", muscles: ["pecho", "dorsal", "cuadriceps", "deltoide_anterior", "abdomen"] },
+      { dayCode: "JUE", titulo: "Full Body B (Posterior & Estabilidad)", muscles: ["isquiotibial", "gluteo", "dorsal", "pecho", "deltoide_posterior", "biceps", "triceps"] },
+    ];
+  }
+  if (n === 3) {
+    if (sl.includes("empuje") || sl.includes("push") || sl.includes("ppl")) {
+      return [
+        { dayCode: "LUN", titulo: "Empuje (Pecho / Hombro / Tríceps)", muscles: ["pecho", "deltoide_anterior", "triceps", "abdomen"] },
+        { dayCode: "MIE", titulo: "Tracción (Espalda / Posterior / Bíceps)", muscles: ["dorsal", "deltoide_posterior", "trapecio", "biceps"] },
+        { dayCode: "VIE", titulo: "Pierna Completa & Core", muscles: ["cuadriceps", "isquiotibial", "gluteo", "pantorrilla", "abdomen"] },
+      ];
+    }
+    return [
+      { dayCode: "LUN", titulo: "Torso Completo", muscles: ["pecho", "dorsal", "deltoide_anterior", "biceps", "triceps"] },
+      { dayCode: "MIE", titulo: "Pierna Completa & Core", muscles: ["cuadriceps", "isquiotibial", "gluteo", "pantorrilla", "abdomen"] },
+      { dayCode: "VIE", titulo: "Full Body Balanceado", muscles: ["dorsal", "pecho", "gluteo", "deltoide_posterior", "abdomen"] },
+    ];
+  }
+  if (n === 4) {
+    return [
+      { dayCode: "LUN", titulo: "Torso A (Empuje & Tracción)", muscles: ["pecho", "dorsal", "deltoide_anterior", "triceps", "biceps"] },
+      { dayCode: "MAR", titulo: "Pierna A (Dominante Cuádriceps)", muscles: ["cuadriceps", "isquiotibial", "gluteo", "pantorrilla", "abdomen"] },
+      { dayCode: "JUE", titulo: "Torso B (Espalda & Hombro)", muscles: ["dorsal", "pecho", "deltoide_posterior", "deltoide_anterior", "biceps", "triceps"] },
+      { dayCode: "VIE", titulo: "Pierna B (Cadena Posterior & Glúteo)", muscles: ["isquiotibial", "gluteo", "cuadriceps", "abductor", "abdomen"] },
+    ];
+  }
+  if (n === 5) {
+    return [
+      { dayCode: "LUN", titulo: "Torso Base", muscles: ["pecho", "dorsal", "deltoide_anterior", "biceps", "triceps"] },
+      { dayCode: "MAR", titulo: "Pierna Base", muscles: ["cuadriceps", "isquiotibial", "gluteo", "pantorrilla"] },
+      { dayCode: "MIE", titulo: "Empuje & Brazos", muscles: ["pecho", "deltoide_anterior", "triceps", "abdomen"] },
+      { dayCode: "VIE", titulo: "Tracción & Deltoide Posterior", muscles: ["dorsal", "deltoide_posterior", "trapecio", "biceps"] },
+      { dayCode: "SAB", titulo: "Pierna Posterior & Glúteo", muscles: ["gluteo", "isquiotibial", "cuadriceps", "abductor", "abdomen"] },
+    ];
+  }
+  return [
+    { dayCode: "LUN", titulo: "Empuje A", muscles: ["pecho", "deltoide_anterior", "triceps"] },
+    { dayCode: "MAR", titulo: "Tracción A", muscles: ["dorsal", "deltoide_posterior", "biceps"] },
+    { dayCode: "MIE", titulo: "Pierna A", muscles: ["cuadriceps", "isquiotibial", "gluteo", "pantorrilla"] },
+    { dayCode: "JUE", titulo: "Empuje B & Core", muscles: ["pecho", "deltoide_anterior", "triceps", "abdomen"] },
+    { dayCode: "VIE", titulo: "Tracción B", muscles: ["dorsal", "trapecio", "deltoide_posterior", "biceps"] },
+    { dayCode: "SAB", titulo: "Pierna B & Glúteo", muscles: ["isquiotibial", "gluteo", "cuadriceps", "pantorrilla"] },
+  ];
+}
+
+function hydrateAiExerciseItem(rawItem, biblioteca = [], idxInDay = 0, defaultPrescription = {}) {
+  const safeBib = Array.isArray(biblioteca) ? biblioteca : [];
+  const rawId = rawItem?.biblioteca_id || rawItem?.id;
+  const rawNameNorm = normalizePlainText(rawItem?.nombre);
+
+  let bibMatch = rawId ? safeBib.find((b) => String(b.id) === String(rawId)) : null;
+  if (!bibMatch && rawNameNorm) {
+    bibMatch =
+      safeBib.find((b) => normalizePlainText(b.nombre) === rawNameNorm) ||
+      safeBib.find((b) => normalizePlainText(b.nombre).includes(rawNameNorm) || rawNameNorm.includes(normalizePlainText(b.nombre)));
+  }
+  if (!bibMatch) return null;
+
+  const numSeries = Math.max(2, Math.min(6, parseInt(rawItem?.num_series, 10) || defaultPrescription.series || 3));
+  const reps = Math.max(4, Math.min(25, parseInt(rawItem?.reps_sugeridas, 10) || defaultPrescription.reps || 10));
+  const descanso = rawItem?.descanso_seg != null ? Math.max(30, Math.min(300, parseInt(rawItem.descanso_seg, 10) || 90)) : (defaultPrescription.rest || 90);
+  const rir = rawItem?.rir_objetivo ? String(rawItem.rir_objetivo).trim() : (defaultPrescription.rir || "2");
+  const nota = rawItem?.nota_tecnica ? String(rawItem.nota_tecnica).trim() : "";
+
+  const addWarmup = Boolean(rawItem?.warmup_primer_serie) || (idxInDay === 0 && numSeries >= 3);
+  const totalSeries = addWarmup && numSeries <= 4 ? numSeries + 1 : numSeries;
+  const seriesDetalle = addWarmup
+    ? Array.from({ length: totalSeries }, (_, si) => ({
+        reps: si === 0 ? Math.min(15, reps + 2) : reps,
+        peso: null,
+        ...(si === 0 ? { tipo: "warmup" } : {}),
+      }))
+    : [];
+
+  return {
+    biblioteca_id: bibMatch.id,
+    nombre: bibMatch.nombre,
+    gif_url: bibMatch.gif_url || "",
+    grupo_muscular: bibMatch.grupo_muscular || "",
+    tipo_movimiento: bibMatch.tipo_movimiento || "",
+    num_series: totalSeries,
+    reps_sugeridas: reps,
+    peso_sugerido: null,
+    unidad: "kg",
+    series_detalle: seriesDetalle,
+    descanso_seg: descanso,
+    rir_objetivo: rir,
+    nota_tecnica: nota || null,
+    bloque_grupo: null,
+    alternativas: [],
+  };
+}
+
+/**
+ * Genera un borrador completo de semana de entrenamiento desde la biblioteca real del especialista
+ * respetando la prescripción física, volumen semanal por músculo y precauciones de lesiones.
+ */
+export async function generateRoutineDraftFromPrescription({
+  biblioteca = [],
+  smartTraining = null,
+  clinicalRec = null,
+  cliente = {},
+}) {
+  const safeBib = Array.isArray(biblioteca) ? biblioteca : [];
+  if (safeBib.length === 0) {
+    throw new Error("Tu biblioteca de ejercicios está vacía.");
+  }
+
+  const anamnesis = clinicalRec?.anamnesis || {};
+  const lesionesRaw = smartTraining?.lesionesRaw || anamnesis?.cirugias_lesiones || "";
+  const diasCount = Math.max(2, Math.min(6, parseInt(smartTraining?.diasSugeridos, 10) || 4));
+  const recRange = parseRecommendedVolumeRange(smartTraining);
+  const enfoque = String(smartTraining?.enfoqueFisiologico || smartTraining?.goalTitle || "Hipertrofia").trim();
+  const splitSugerido = String(smartTraining?.splitSugerido || "").trim();
+
+  const isStrength = /fuerza/i.test(enfoque);
+  const defaultPresc = isStrength
+    ? { series: 4, reps: 6, rest: 150, rir: "2" }
+    : { series: 3, reps: 10, rest: 90, rir: "1-2" };
+
+  // Filtrar catálogo para IA (compacto y seguro frente a lesiones obvias)
+  const safeCatalog = safeBib.filter(
+    (b) => !detectExerciseInjuryConflict(b.nombre, b.grupo_muscular, lesionesRaw)
+  );
+  const poolForAi = (safeCatalog.length >= 10 ? safeCatalog : safeBib).slice(0, 140);
+  const catalogListText = poolForAi
+    .map((b) => `${b.id}|${b.nombre}|${GRUPO_LABELS[normalizeMuscleGroup(b.grupo_muscular)] || b.grupo_muscular || "general"}`)
+    .join("\n");
+
+  const apiKey = getGeminiApiKey();
+
+  // Tier 1: Edge Function `generate-training-plan`
+  try {
+    const edgeRes = await invokeEdgeFunction("clinical-ai", {
+      action: "generate-training-plan",
+      cliente,
+      anamnesis,
+      smartTraining,
+      catalogo: poolForAi.map((b) => ({
+        id: b.id,
+        nombre: b.nombre,
+        grupo_muscular: b.grupo_muscular,
+        tipo_movimiento: b.tipo_movimiento,
+      })),
+      geminiKey: apiKey,
+    });
+    if (edgeRes?.rutinasSugeridas && Array.isArray(edgeRes.rutinasSugeridas) && edgeRes.rutinasSugeridas.length > 0) {
+      const hydrated = edgeRes.rutinasSugeridas
+        .map((r) => ({
+          dayCode: String(r.dayCode || "LUN").toUpperCase().slice(0, 3),
+          titulo: String(r.titulo || "Sesión").trim(),
+          rationaleDia: String(r.rationaleDia || "").trim(),
+          ejercicios: (r.ejercicios || [])
+            .map((item, idx) => hydrateAiExerciseItem(item, safeBib, idx, defaultPresc))
+            .filter(Boolean),
+        }))
+        .filter((r) => r.ejercicios.length > 0);
+      if (hydrated.length > 0) {
+        return {
+          success: true,
+          origen: edgeRes.origen || "edge_function",
+          rutinasSugeridas: hydrated,
+          resumenPlan: edgeRes.resumenPlan || `Borrador de ${hydrated.length} sesiones (${splitSugerido || enfoque}) adaptado al perfil clínico.`,
+        };
+      }
+    }
+  } catch (err) {
+    console.warn("Edge Function generate-training-plan fallback a Tier 2/3:", err?.message || err);
+  }
+
+  // Tier 2: Gemini Direct
+  if (apiKey) {
+    const promptGen = `Eres un entrenador clínico y preparador físico de élite en FLUX.
+Debes diseñar una semana de ${diasCount} rutinas eligiendo ÚNICAMENTE ejercicios del CATÁLOGO REAL proporcionado (usando su ID exacto antes de "|").
+
+PERFIL DEL PACIENTE:
+- Objetivo / Enfoque: ${enfoque}
+- Split sugerido: ${splitSugerido || "Balanceado según frecuencia"}
+- Volumen objetivo semanal por músculo: ${recRange.min}-${recRange.max} series efectivas
+- Lesiones / Precauciones clínicas: ${lesionesRaw || "Ninguna"} ${smartTraining?.precaucionesLesion ? `(${smartTraining.precaucionesLesion})` : ""}
+
+CATÁLOGO DISPONIBLE (formato id|nombre|musculo):
+${catalogListText}
+
+REGLAS ESTRICTAS:
+1. Cada rutina debe incluir 4 a 6 ejercicios variados y seguros según las lesiones del paciente.
+2. Usa SOLO IDs reales del catálogo. No inventes ejercicios.
+3. Marca "warmup_primer_serie": true solo en el primer ejercicio compuesto multiarticular del día.
+4. Responde ÚNICAMENTE con JSON válido:
+{
+  "resumenPlan": "string breve con la estrategia biomecánica semanal",
+  "rutinasSugeridas": [
+    {
+      "dayCode": "LUN",
+      "titulo": "Torso A (Empuje & Tracción)",
+      "rationaleDia": "string corto",
+      "ejercicios": [
+        {
+          "biblioteca_id": "id_exacto_del_catalogo",
+          "nombre": "nombre_exacto",
+          "num_series": 3,
+          "reps_sugeridas": 10,
+          "descanso_seg": 90,
+          "rir_objetivo": "2",
+          "nota_tecnica": "cue técnico breve o vacío",
+          "warmup_primer_serie": true
+        }
+      ]
+    }
+  ]
+}`;
+
+    for (const model of CANDIDATE_MODELS) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 14000);
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+            signal: controller.signal,
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: promptGen }] }],
+              generationConfig: getGenerationConfig(model, true, 0.25),
+            }),
+          }
+        );
+        clearTimeout(timeoutId);
+        if (res.ok) {
+          const data = await res.json();
+          const txt = extractGeminiText(data);
+          if (txt) {
+            const parsed = JSON.parse(txt.replace(/```json\s*|```/gi, "").trim());
+            if (Array.isArray(parsed?.rutinasSugeridas)) {
+              const hydrated = parsed.rutinasSugeridas
+                .map((r) => ({
+                  dayCode: String(r.dayCode || "LUN").toUpperCase().slice(0, 3),
+                  titulo: String(r.titulo || "Sesión").trim(),
+                  rationaleDia: String(r.rationaleDia || "").trim(),
+                  ejercicios: (r.ejercicios || [])
+                    .map((item, idx) => hydrateAiExerciseItem(item, safeBib, idx, defaultPresc))
+                    .filter(Boolean),
+                }))
+                .filter((r) => r.ejercicios.length > 0);
+              if (hydrated.length > 0) {
+                return {
+                  success: true,
+                  origen: "gemini_direct",
+                  rutinasSugeridas: hydrated,
+                  resumenPlan: parsed.resumenPlan || `Borrador de ${hydrated.length} días generado con IA FLUX.`,
+                };
+              }
+            }
+          }
+        }
+      } catch {
+        // Siguiente modelo o fallback local
+      }
+    }
+  }
+
+  // Tier 3: Generador Biomecánico Determinista desde Biblioteca Real
+  const templates = buildTrainingSplitDays(diasCount, splitSugerido);
+  const usedAcrossCycle = new Set();
+  const activePool = safeCatalog.length >= 6 ? safeCatalog : safeBib;
+
+  const rutinasSugeridas = templates.map((tpl) => {
+    const chosen = [];
+    const usedInDay = new Set();
+
+    tpl.muscles.forEach((muscleId, slotIdx) => {
+      const candidates = activePool.filter((b) => {
+        if (usedInDay.has(String(b.id))) return false;
+        return normalizeMuscleGroup(b.grupo_muscular) === muscleId;
+      });
+      if (candidates.length === 0) return;
+
+      // Preferir ejercicios aún no usados en otros días de la semana para dar variedad
+      const freshCandidates = candidates.filter((c) => !usedAcrossCycle.has(String(c.id)));
+      const pick = (freshCandidates.length > 0 ? freshCandidates : candidates)[0];
+      if (!pick) return;
+
+      usedInDay.add(String(pick.id));
+      usedAcrossCycle.add(String(pick.id));
+
+      const isPrimary = slotIdx < 2;
+      const hydrated = hydrateAiExerciseItem(
+        {
+          biblioteca_id: pick.id,
+          nombre: pick.nombre,
+          num_series: isPrimary ? Math.max(defaultPresc.series, 3) : 3,
+          reps_sugeridas: isPrimary ? defaultPresc.reps : Math.min(15, defaultPresc.reps + 2),
+          descanso_seg: isPrimary ? Math.max(defaultPresc.rest, 90) : 60,
+          rir_objetivo: defaultPresc.rir,
+          nota_tecnica: lesionesRaw && isPrimary ? "Control excéntrico y rango cómodo sin dolor" : "",
+          warmup_primer_serie: slotIdx === 0,
+        },
+        safeBib,
+        slotIdx,
+        defaultPresc
+      );
+      if (hydrated) chosen.push(hydrated);
+    });
+
+    return {
+      dayCode: tpl.dayCode,
+      titulo: tpl.titulo,
+      rationaleDia: `Enfoque en ${tpl.muscles.slice(0, 3).map((m) => GRUPO_LABELS[m] || m).join(", ")}`,
+      ejercicios: chosen,
+    };
+  }).filter((r) => r.ejercicios.length > 0);
+
+  if (rutinasSugeridas.length === 0) {
+    throw new Error("No se encontraron ejercicios suficientes en tu biblioteca para armar el split.");
+  }
+
+  return {
+    success: true,
+    origen: "analitico_local",
+    rutinasSugeridas,
+    resumenPlan: `Plan sugerido de ${rutinasSugeridas.length} días (${splitSugerido || enfoque}) priorizando ejercicios seguros de tu biblioteca (${recRange.min}-${recRange.max} series/músculo).`,
+  };
+}
+
+/**
+ * Audita la semana completa de entrenamiento programada:
+ * - Balance empuje/tracción/pierna
+ * - Volumen semanal efectivo por músculo vs rango prescrito
+ * - Compatibilidad biomecánica contra lesiones del expediente
+ */
+export async function auditTrainingWeekWithAi({
+  rutinas = [],
+  smartTraining = null,
+  clinicalRec = null,
+  cliente = {},
+}) {
+  const safeRutinas = Array.isArray(rutinas) ? rutinas : [];
+  if (safeRutinas.length === 0) {
+    throw new Error("Agrega al menos una rutina al ciclo para poder auditar la semana.");
+  }
+
+  const anamnesis = clinicalRec?.anamnesis || {};
+  const lesionesRaw = smartTraining?.lesionesRaw || anamnesis?.cirugias_lesiones || "";
+  const weeklyVol = computeWeeklyMuscleVolume(safeRutinas);
+  const recRange = parseRecommendedVolumeRange(smartTraining);
+
+  let empujeSeries = 0;
+  let traccionSeries = 0;
+  let piernaSeries = 0;
+  const localAlerts = [];
+
+  safeRutinas.forEach((r) => {
+    const rTitle = String(r.nombre || "Rutina").replace("|", " · ");
+    (r.ejercicios || []).forEach((ej) => {
+      const grp = normalizeMuscleGroup(ej.grupo_muscular);
+      const conflict = detectExerciseInjuryConflict(ej.nombre, grp, lesionesRaw);
+      if (conflict) {
+        localAlerts.push({
+          rutinaNombre: rTitle,
+          ejercicio: ej.nombre,
+          riesgo: `${conflict.zona}: ${conflict.motivo}`,
+          sugerencia: conflict.sugerencia,
+        });
+      }
+    });
+  });
+
+  weeklyVol.muscleList.forEach((m) => {
+    if (TRAINING_PUSH_MUSCLES.has(m.id)) empujeSeries += m.sets;
+    else if (TRAINING_PULL_MUSCLES.has(m.id)) traccionSeries += m.sets;
+    else if (TRAINING_LEGS_MUSCLES.has(m.id)) piernaSeries += m.sets;
+  });
+
+  const gruposBajos = weeklyVol.muscleList.filter((m) => m.sets > 0 && m.sets < recRange.min);
+  const gruposAltos = weeklyVol.muscleList.filter((m) => m.sets > recRange.max + 2);
+  const pushPullImbalance =
+    empujeSeries > 0 && traccionSeries === 0
+      ? "Sin trabajo directo de tracción frente a empuje"
+      : empujeSeries > 0 && traccionSeries > 0 && (empujeSeries / traccionSeries > 1.65 || traccionSeries / empujeSeries > 1.65)
+      ? `Desbalance empuje/tracción (${empujeSeries} vs ${traccionSeries} series)`
+      : null;
+
+  const apiKey = getGeminiApiKey();
+
+  const weekSummaryText = safeRutinas
+    .map((r) => {
+      const ejsTxt = (r.ejercicios || [])
+        .map((e) => `  - ${e.nombre} (${GRUPO_LABELS[normalizeMuscleGroup(e.grupo_muscular)] || e.grupo_muscular || "general"}): ${e.num_series}x${e.reps_sugeridas}${e.rir_objetivo ? ` RIR ${e.rir_objetivo}` : ""}${e.descanso_seg ? ` Desc ${e.descanso_seg}s` : ""}`)
+        .join("\n");
+      return `[${String(r.nombre || "Rutina").replace("|", " - ")}]\n${ejsTxt || "  (vacía)"}`;
+    })
+    .join("\n\n");
+
+  const balanceResumen = {
+    empujeSeries,
+    traccionSeries,
+    piernaSeries,
+    ratioTexto: `Empuje ${empujeSeries} · Tracción ${traccionSeries} · Pierna ${piernaSeries} series`,
+  };
+
+  // Tier 1: Edge Function `audit-training-week`
+  try {
+    const edgeRes = await invokeEdgeFunction("clinical-ai", {
+      action: "audit-training-week",
+      cliente,
+      anamnesis,
+      smartTraining,
+      weeklyVol,
+      recRange,
+      balanceResumen,
+      weekSummaryText,
+      localAlerts,
+      geminiKey: apiKey,
+    });
+    if (edgeRes?.dictamenGeneral) {
+      return {
+        ...edgeRes,
+        balanceResumen: edgeRes.balanceResumen || balanceResumen,
+        alertasBiomecanicas: Array.isArray(edgeRes.alertasBiomecanicas) && edgeRes.alertasBiomecanicas.length > 0
+          ? edgeRes.alertasBiomecanicas
+          : localAlerts,
+        gruposBajos,
+        gruposAltos,
+        origen: edgeRes.origen || "edge_function",
+      };
+    }
+  } catch (err) {
+    console.warn("Edge Function audit-training-week fallback a Tier 2/3:", err?.message || err);
+  }
+
+  // Tier 2: Gemini Direct
+  if (apiKey) {
+    const promptAudit = `Eres un Director de Biomecánica Clínica y Metodología del Entrenamiento en FLUX.
+Audita la semana completa de entrenamiento programada del paciente.
+
+CONTEXTO CLÍNICO Y PRESCRIPCIÓN:
+- Objetivo: ${smartTraining?.enfoqueFisiologico || smartTraining?.goalTitle || "Recomp / Hipertrofia"}
+- Frecuencia recomendada: ${smartTraining?.diasSugeridos || safeRutinas.length} días/sem | Rango óptimo por músculo: ${recRange.min}-${recRange.max} series efectivas
+- Lesiones reportadas: ${lesionesRaw || "Ninguna"}
+- Balance actual: ${balanceResumen.ratioTexto} | Total efectivo: ${weeklyVol.totalEffectiveSets} series (+${weeklyVol.totalWarmupSets} calentamiento)
+- Músculos programados: ${weeklyVol.muscleList.map((m) => `${m.label}: ${m.sets}`).join(", ")}
+
+RUTINAS PROGRAMADAS:
+${weekSummaryText}
+
+Responde ÚNICAMENTE con JSON válido:
+{
+  "estado": "aprobado" | "advertencia" | "critico",
+  "dictamenGeneral": "string claro y accionable (máx 2-3 frases)",
+  "alertasBiomecanicas": [
+    { "rutinaNombre": "string", "ejercicio": "string", "riesgo": "string", "sugerencia": "string" }
+  ],
+  "recomendaciones": ["string", "string"]
+}`;
+
+    for (const model of CANDIDATE_MODELS) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 12000);
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+            signal: controller.signal,
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: promptAudit }] }],
+              generationConfig: getGenerationConfig(model, true, 0.2),
+            }),
+          }
+        );
+        clearTimeout(timeoutId);
+        if (res.ok) {
+          const data = await res.json();
+          const txt = extractGeminiText(data);
+          if (txt) {
+            const parsed = JSON.parse(txt.replace(/```json\s*|```/gi, "").trim());
+            const mergedAlerts = [
+              ...(Array.isArray(parsed.alertasBiomecanicas) ? parsed.alertasBiomecanicas : []),
+              ...localAlerts.filter((la) => !(parsed.alertasBiomecanicas || []).some((pa) => normalizePlainText(pa.ejercicio) === normalizePlainText(la.ejercicio))),
+            ];
+            const finalEstado = mergedAlerts.length > 0 && parsed.estado === "aprobado" ? "critico" : (parsed.estado || "aprobado");
+            return {
+              estado: finalEstado,
+              dictamenGeneral: parsed.dictamenGeneral,
+              balanceResumen,
+              alertasBiomecanicas: mergedAlerts,
+              gruposBajos,
+              gruposAltos,
+              recomendaciones: Array.isArray(parsed.recomendaciones) ? parsed.recomendaciones : [],
+              origen: "gemini_direct",
+            };
+          }
+        }
+      } catch {
+        // Siguiente modelo o fallback local
+      }
+    }
+  }
+
+  // Tier 3: Auditoría Analítica y Biomecánica Local
+  const recs = [];
+  if (pushPullImbalance) recs.push(`${pushPullImbalance}. Considera equilibrar remos/jalones respecto a presses.`);
+  if (gruposBajos.length > 0) {
+    recs.push(`Volumen debajo de ${recRange.min} series/sem en: ${gruposBajos.slice(0, 4).map((g) => `${g.label} (${g.sets})`).join(", ")}.`);
+  }
+  if (gruposAltos.length > 0) {
+    recs.push(`Posible exceso de fatiga (>${recRange.max + 2} series/sem) en: ${gruposAltos.map((g) => `${g.label} (${g.sets})`).join(", ")}.`);
+  }
+  if (piernaSeries === 0 && safeRutinas.length >= 2) {
+    recs.push("No se detectan series efectivas asignadas a tren inferior en la semana.");
+  }
+
+  const estado = localAlerts.length > 0 ? "critico" : recs.length > 0 ? "advertencia" : "aprobado";
+  const dictamenGeneral =
+    localAlerts.length > 0
+      ? `Se detectaron ${localAlerts.length} conflicto(s) biomecánico(s) respecto a las lesiones reportadas y ${weeklyVol.totalEffectiveSets} series efectivas semanales.`
+      : recs.length > 0
+      ? `Semana con ${weeklyVol.totalEffectiveSets} series efectivas (${weeklyVol.totalWarmupSets} calent.) y observaciones de balance/volumen a revisar.`
+      : `Semana bien equilibrada con ${weeklyVol.totalEffectiveSets} series efectivas semanales (${balanceResumen.ratioTexto}) y libre de conflictos con lesiones.`;
+
+  return {
+    estado,
+    dictamenGeneral,
+    balanceResumen,
+    alertasBiomecanicas: localAlerts,
+    gruposBajos,
+    gruposAltos,
+    recomendaciones: recs,
+    origen: "analitico_local",
+  };
 }
