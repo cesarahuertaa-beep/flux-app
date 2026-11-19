@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { Play, Pause, RotateCcw, Save, ChevronDown, TrendingUp, TrendingDown, Minus, Plus, Dumbbell, Check, CheckCheck, X, Square, Trophy, Sparkles, Flame, Lock, Unlock, CheckCircle2, Timer, Link2, StickyNote, ArrowLeft, ArrowRight } from "lucide-react";
+import { Play, Pause, RotateCcw, Save, ChevronDown, TrendingUp, TrendingDown, Minus, Plus, Dumbbell, Check, CheckCheck, X, Square, Trophy, Sparkles, Flame, Lock, Unlock, CheckCircle2, Timer, Link2, StickyNote } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { useBackButton } from "../../lib/backButtonHandler";
 import { CachedImage } from "../../lib/mediaCache";
@@ -489,6 +489,7 @@ export default function Training({
 
   const [activeRutinaIdx, setActiveRutinaIdx] = useState(0);
   const [expandedEx,      setExpandedEx]      = useState(0); // Primer ejercicio abierto por defecto
+  const [supersetMode,    setSupersetMode]    = useState({}); // { [blockKey]: 'rondas' | 'detalle' }
   const [activeVariant,   setActiveVariant]   = useState({}); // { [exId]: 'original' | 'alt_0' }
   const [previewEx, setPreviewEx] = useState(null);
   const [showResumen,     setShowResumen]     = useState(false);
@@ -953,10 +954,250 @@ export default function Training({
           <div className="bg-white md:bg-transparent rounded-none md:rounded-xl border-b md:border-b-0 border-[#E2E8F0] divide-y divide-[#E2E8F0] md:divide-y-0 md:space-y-3">
             {(() => {
               const exerciseBlocks = groupExercisesIntoBlocks(ejercicios);
-              const renderExerciseRow = (ex, i, { ssMeta = null, block = null, posInBlock = 0 } = {}) => {
-                const isExpanded = expandedEx === i;
-                const isSupersetItem = Boolean(ssMeta?.isMember && block);
 
+              const triggerRestTimer = (sec) => {
+                const n = parseInt(sec, 10);
+                if (!n || n <= 0) return;
+                timerStore.stopAndReset();
+                timerStore.setSeconds(n, true);
+                timerStore.start();
+              };
+
+              const renderDiscreteRestBtn = (restSec, titleHint = "") => {
+                const n = restSec ? parseInt(restSec, 10) : 0;
+                const lbl = n > 0 ? formatRestLabel(n) : "";
+                if (!lbl) return null;
+                return (
+                  <button
+                    type="button"
+                    onClick={() => triggerRestTimer(n)}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-[#E2E8F0] bg-[#F8FAFC] hover:bg-[var(--brand-secondary)] hover:border-[var(--brand-primary)]/40 text-[#475569] hover:text-[var(--brand-primary)] text-[10px] font-mono font-bold transition-colors cursor-pointer shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]/40"
+                    title={titleHint || `Iniciar descanso (${lbl})`}
+                  >
+                    <Timer size={11} className="text-[var(--brand-primary)] shrink-0" />
+                    <span>{lbl}</span>
+                  </button>
+                );
+              };
+
+              const renderUnitToggle = (exId, activeVarId, activeObj) => {
+                const curPref = unitPrefs[`${exId}_${activeVarId}`] || unitPrefs.lastUsed || activeObj?.unidad || "kg";
+                return (
+                  <div className="inline-flex items-center p-0.5 bg-[#F1F5F9] rounded-md border border-[#E2E8F0] shadow-2xs shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => updateUnitPref(`${exId}_${activeVarId}`, "kg")}
+                      className={`px-1.5 py-0.5 rounded text-[9px] font-bold transition-all cursor-pointer focus:outline-none ${
+                        curPref === "kg"
+                          ? "bg-white text-[#0B1929] shadow-2xs font-extrabold"
+                          : "text-[#64748B] hover:text-[#0B1929]"
+                      }`}
+                      title="Mostrar en Kilogramos"
+                    >
+                      KG
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateUnitPref(`${exId}_${activeVarId}`, "lb")}
+                      className={`px-1.5 py-0.5 rounded text-[9px] font-bold transition-all cursor-pointer focus:outline-none ${
+                        curPref === "lb"
+                          ? "bg-white text-[#0B1929] shadow-2xs font-extrabold"
+                          : "text-[#64748B] hover:text-[#0B1929]"
+                      }`}
+                      title="Mostrar en Libras"
+                    >
+                      LB
+                    </button>
+                  </div>
+                );
+              };
+
+              const renderSetRow = ({ ex, activeObj, activeVarId, prefUnit, exPR, sMeta, si, leadingSlot = null, compactBottomSpace = false }) => {
+                const repKey = `${ex.id}-${wi}-${si}-reps-${activeVarId}`;
+                const kgKey = `${ex.id}-${wi}-${si}-peso-${activeVarId}`;
+                const repVal = progreso[repKey] || "";
+                const kgVal = progreso[kgKey] || "";
+
+                const prevReps = getPrevVal(ex.id, activeVarId, activeObj, si, "reps");
+                const prevKg = getPrevVal(ex.id, activeVarId, activeObj, si, "peso");
+
+                const displayKgVal = parseDisplayWeight(kgVal, prefUnit);
+                const displayPrevKg = parseDisplayWeight(prevKg, prefUnit);
+
+                const avancePct = calcularAvance(kgVal, repVal, prevKg, prevReps);
+                const isSetPR = exPR.isPR && exPR.bestSetIdx === si;
+                const isFalta = repVal === "Falta";
+
+                return (
+                  <div key={si} className={`flex flex-col ${compactBottomSpace ? "" : "mb-3"}`}>
+                    <div className="flex gap-2 items-center">
+                      {leadingSlot}
+
+                      <div className="flex-1">
+                        <input
+                          type="text"
+                          inputMode={isFalta ? "text" : "numeric"}
+                          pattern={isFalta ? undefined : "[0-9]*"}
+                          placeholder={prevReps}
+                          value={repVal}
+                          disabled={inputsDisabled}
+                          onFocus={() => !inputsDisabled && setFocusedInput({ exId: ex.id, wi, si })}
+                          onBlur={() => setTimeout(() => setFocusedInput(null), 250)}
+                          onChange={(e) => onProgressChange(ex.id, wi, si, "reps", e.target.value, activeVarId)}
+                          className={`w-full h-10 rounded-lg border px-2 text-center text-[15px] font-semibold transition-shadow ${
+                            isFalta
+                              ? "border-red-300 bg-red-50/70 text-red-600 font-bold"
+                              : inputsDisabled
+                              ? "border-[#E2E8F0] bg-[#F8FAFC] text-[#475569] cursor-not-allowed"
+                              : sMeta.isWarmup
+                              ? "border-amber-200/80 bg-amber-50/20 text-[#0B1929] placeholder-[#9BA5B0] focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] outline-none"
+                              : "border-[#E2E8F0] bg-white text-[#0B1929] placeholder-[#9BA5B0] focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] outline-none"
+                          }`}
+                        />
+                      </div>
+
+                      <div className="flex-1 relative">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          placeholder={displayPrevKg}
+                          value={localWeightInputs[kgKey] !== undefined ? localWeightInputs[kgKey] : displayKgVal}
+                          disabled={inputsDisabled || isFalta}
+                          onFocus={() => {
+                            if (inputsDisabled) return;
+                            setFocusedInput({ exId: ex.id, wi, si });
+                            setLocalWeightInputs(prev => ({ ...prev, [kgKey]: displayKgVal || "" }));
+                          }}
+                          onBlur={() => {
+                            setTimeout(() => setFocusedInput(null), 250);
+                            const raw = localWeightInputs[kgKey];
+                            if (raw !== undefined) {
+                              const dbVal = parseDBWeight(raw, prefUnit);
+                              onProgressChange(ex.id, wi, si, "peso", dbVal, activeVarId);
+                              setLocalWeightInputs(prev => {
+                                const next = { ...prev };
+                                delete next[kgKey];
+                                return next;
+                              });
+                            }
+                          }}
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            if (!/^-?\d*\.?\d*$/.test(raw) && raw !== "") return;
+                            setLocalWeightInputs(prev => ({ ...prev, [kgKey]: raw }));
+                            if (!raw.endsWith(".")) {
+                              const dbVal = parseDBWeight(raw, prefUnit);
+                              onProgressChange(ex.id, wi, si, "peso", dbVal, activeVarId);
+                            }
+                          }}
+                          className={`w-full h-10 rounded-lg border px-2 pr-7 text-center text-[15px] font-semibold transition-shadow ${
+                            isFalta
+                              ? "border-red-200 bg-red-50/30 text-red-400"
+                              : inputsDisabled
+                              ? "border-[#E2E8F0] bg-[#F8FAFC] text-[#475569] cursor-not-allowed"
+                              : sMeta.isWarmup
+                              ? "border-amber-200/80 bg-amber-50/20 text-[#0B1929] placeholder-[#9BA5B0] focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] outline-none"
+                              : "border-[#E2E8F0] bg-white text-[#0B1929] placeholder-[#9BA5B0] focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] outline-none"
+                          }`}
+                        />
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-[#94A3B8] pointer-events-none uppercase">
+                          {prefUnit}
+                        </span>
+                      </div>
+
+                      <div className="w-14 flex flex-col justify-center items-center shrink-0">
+                        {isSetPR ? (
+                          <span className="inline-flex items-center gap-0.5 bg-amber-100 text-amber-700 border border-amber-300 px-1.5 py-0.5 rounded text-[9px] font-bold">
+                            <Trophy size={10} className="text-amber-500" /> PR
+                          </span>
+                        ) : avancePct !== null ? (
+                          <div className="flex items-center gap-0.5">
+                            {avancePct === 0
+                              ? <Minus size={12} className="text-[#9BA5B0]" />
+                              : avancePct > 0
+                                ? <TrendingUp size={12} className="text-emerald-500" />
+                                : <TrendingDown size={12} className="text-red-400" />
+                            }
+                            {avancePct !== 0 && (
+                              <span className={`text-[10px] font-bold font-mono ${avancePct > 0 ? "text-emerald-500" : "text-red-400"}`}>
+                                {Math.abs(avancePct).toFixed(0)}%
+                              </span>
+                            )}
+                          </div>
+                        ) : <span className="text-[10px] text-[#CBD5E1] font-mono">-</span>}
+                      </div>
+                    </div>
+
+                    {/* Barra de Acciones Accesible (Falté / Corporal) */}
+                    {!inputsDisabled && focusedInput?.exId === ex.id && focusedInput?.wi === wi && focusedInput?.si === si && (
+                      <div className={`flex gap-2 mt-1.5 ${leadingSlot ? "pl-11" : "pl-0"} pr-16 animate-in fade-in slide-in-from-top-1 duration-200`}>
+                        <button
+                          type="button"
+                          onPointerDown={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (isFalta) {
+                              onProgressChange(ex.id, wi, si, "reps", "", activeVarId);
+                              onProgressChange(ex.id, wi, si, "peso", "", activeVarId);
+                            } else {
+                              onProgressChange(ex.id, wi, si, "reps", "Falta", activeVarId);
+                              onProgressChange(ex.id, wi, si, "peso", "0", activeVarId);
+                            }
+                            setLocalWeightInputs(prev => {
+                              const next = { ...prev };
+                              delete next[kgKey];
+                              return next;
+                            });
+                            setFocusedInput(null);
+                          }}
+                          className={`flex-1 flex items-center justify-center gap-1.5 text-xs font-bold py-2 px-3 rounded-lg shadow-2xs active:scale-95 transition-all cursor-pointer ${
+                            isFalta
+                              ? "bg-slate-100 text-[#0B1929] hover:bg-slate-200 border border-slate-300"
+                              : "bg-[#FEE2E2] text-[#EF4444] hover:bg-[#FCA5A5] border border-red-200"
+                          }`}
+                        >
+                          <span>{isFalta ? "Reactivar serie" : "Falté a esta serie"}</span>
+                        </button>
+
+                        {ultimoPeso && (
+                          <button
+                            type="button"
+                            onPointerDown={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              onProgressChange(ex.id, wi, si, "peso", ultimoPeso.toString(), activeVarId);
+                              setLocalWeightInputs(prev => {
+                                const next = { ...prev };
+                                delete next[kgKey];
+                                return next;
+                              });
+                              setFocusedInput(null);
+                            }}
+                            className="flex-1 flex items-center justify-center gap-1.5 bg-[#E0E7FF] text-[#4F46E5] hover:bg-[#C7D2FE] border border-indigo-200 text-xs font-bold py-2 px-3 rounded-lg shadow-2xs active:scale-95 transition-all cursor-pointer"
+                          >
+                            <span>
+                              Corporal ({prefUnit === "lb" ? `${(Number(ultimoPeso) * 2.20462262).toFixed(1)} lb` : `${ultimoPeso} kg`})
+                            </span>
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              };
+
+              const renderSyncFooter = () => (
+                <div className="flex items-center justify-end gap-1.5 mt-4 text-[11px] font-medium text-[#6B7A8D]">
+                  {syncStatus === "saving" && <RotateCcw size={14} className="animate-spin text-[var(--brand-primary)]" />}
+                  {syncStatus === "local" && <Check size={14} />}
+                  {syncStatus === "synced" && <CheckCheck size={14} className="text-[var(--brand-primary)]" />}
+                  <span>
+                    {syncStatus === "saving" ? "Guardando..." : syncStatus === "local" ? "Guardado localmente" : "Sincronizado"}
+                  </span>
+                </div>
+              );
+
+              const renderSingleExerciseDetails = (ex, i) => {
                 const varData = getVariantObj(ex);
                 const activeObj = varData.obj;
                 const activeVarId = varData.variantId;
@@ -964,423 +1205,145 @@ export default function Training({
                 const exPR = getExercisePRData(ex, activeVarId, activeObj);
                 const visualLabels = getSeriesVisualLabels(activeObj, numSeries);
                 const restSeg = activeObj?.descanso_seg ?? ex.descanso_seg;
-                const restNum = restSeg ? parseInt(restSeg, 10) : 0;
-                const restLabel = restNum > 0 ? formatRestLabel(restNum) : "";
                 const rirTarget = activeObj?.rir_objetivo ?? ex.rir_objetivo;
                 const techNote = activeObj?.nota_tecnica ?? ex.nota_tecnica;
+                const prefUnit = unitPrefs[`${ex.id}_${activeVarId}`] || unitPrefs.lastUsed || activeObj.unidad || "kg";
 
                 const otherVariants = [];
-                if (activeVarId !=="original") {
-                  otherVariants.push({ obj: ex, variantId:"original" });
+                if (activeVarId !== "original") {
+                  otherVariants.push({ obj: ex, variantId: "original" });
                 }
                 (ex.alternativas || []).forEach((alt, altIdx) => {
                   const vid = `alt_${altIdx}`;
                   if (vid !== activeVarId) otherVariants.push({ obj: alt, variantId: vid });
                 });
 
-                // Check if there is data this week for any variant of this exercise
-                const isSaved = ["original","alt_0","alt_1"].some(vid => progreso[`${ex.id}-${wi}-0-reps-${vid}`] !== undefined);
+                const exGraphData = getExerciseGraphData(ex, activeObj, activeVarId);
+                const exNumSeries = parseInt(activeObj?.num_series || ex.num_series) || 4;
+                const graphSeries = getSeriesVisualLabels(activeObj, exNumSeries).filter((l) => !l.isWarmup);
+                const seriesColors = ["#0ea5e9", "#10b981", "#f59e0b", "#8b5cf6", "#ef4444", "#14b8a6"];
 
-                const rowContent = (
-                  <>
-                <button
-                  className="w-full flex items-center gap-3.5 md:gap-4 px-4 md:px-5 py-3.5 md:py-4 text-left"
-                  onClick={() => setExpandedEx(isExpanded ? null : i)}
-                >
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                    isSupersetItem
-                      ? "bg-[var(--brand-secondary)] border border-[var(--brand-primary)]/30"
-                      : "bg-[#E8F1FB]"
-                  }`}>
-                    <span className="text-xs font-mono font-bold text-[var(--brand-primary)]">
-                      {isSupersetItem ? ssMeta.codeLabel : i + 1}
-                    </span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-[#0B1929]">{activeObj.nombre}</p>
-                    <div className="flex items-center flex-wrap gap-1.5 mt-0.5">
-                      <span className="text-xs text-[#6B7A8D]">{GRUPO_LABELS[normalizeMuscleGroup(resolveCanonicalGroup(activeObj))] || resolveCanonicalGroup(activeObj) || "General"}</span>
-                      {restLabel && (
-                        <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[#F1F5F9] text-[#475569]">
-                          <Timer size={10} /> {restLabel}
-                        </span>
-                      )}
-                      {rirTarget && (
-                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[#F8FAFC] border border-[#E2E8F0] text-[#475569]">
-                          RIR {rirTarget}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  {exPR.isPR && (
-                    <span className="inline-flex items-center gap-1 text-[11px] bg-amber-50 text-amber-700 px-2.5 py-0.5 rounded-full font-bold border border-amber-200 shadow-sm">
-                      <Trophy size={12} className="text-amber-500" /> Nuevo PR
-                    </span>
-                  )}
-                  {isSaved && (
-                    <span className="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded font-medium border border-green-100 hidden md:block">
-                      ✓ Guardado
-                    </span>
-                  )}
-                  <ChevronDown
-                    size={16}
-                    className={`text-[#CBD5E1] transition-transform flex-shrink-0 ${isExpanded ?"rotate-180" :""}`}
-                  />
-                </button>
-
-              {isExpanded && (
-                <div className="px-4 md:px-5 pb-4 md:pb-5 border-t border-[#F0F4FA] pt-4">
-
-                  {/* Fila superior: Miniatura GIF + Alternativas */}
-                  <div className="flex items-start gap-4 mb-5">
-                    {/* Miniatura Activa */}
+                return (
+                  <div className="px-4 md:px-5 pb-4 md:pb-5 border-t border-[#F0F4FA] pt-4">
+                    {/* Fila superior: Miniatura GIF + Alternativas */}
+                    <div className="flex items-start gap-4 mb-4">
                       <button
+                        type="button"
                         onClick={() => setPreviewEx(activeObj)}
-                        className="w-24 h-24 sm:w-28 sm:h-28 flex-shrink-0 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl overflow-hidden shadow-sm relative flex items-center justify-center hover:opacity-90 transition-opacity cursor-pointer text-left p-0"
+                        className="w-24 h-24 sm:w-28 sm:h-28 flex-shrink-0 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl overflow-hidden shadow-sm relative flex items-center justify-center hover:opacity-90 transition-opacity cursor-pointer text-left p-0 focus:outline-none"
                       >
-                      {activeObj.gif_url ? (
-                        <CachedImage
-                          src={activeObj.gif_url}
-                          alt={activeObj.nombre}
-                          className="w-full h-full object-contain mix-blend-multiply"
-                          fallback={<Dumbbell size={28} className="text-[#6B7A8D]" />}
-                        />
-                      ) : (
-                        <Dumbbell size={28} className="text-[#6B7A8D]" />
-                      )}
-                      {activeObj.gif_url && (
-                        <div className="absolute bottom-1 right-1 bg-white/90 backdrop-blur border border-[#E2E8F0] rounded px-1.5 py-0.5">
-                          <span className="text-[8px] font-mono font-bold text-[#0B1929] tracking-widest uppercase">GIF</span>
-                        </div>
-                      )}
+                        {activeObj.gif_url ? (
+                          <CachedImage
+                            src={activeObj.gif_url}
+                            alt={activeObj.nombre}
+                            className="w-full h-full object-contain mix-blend-multiply"
+                            fallback={<Dumbbell size={28} className="text-[#6B7A8D]" />}
+                          />
+                        ) : (
+                          <Dumbbell size={28} className="text-[#6B7A8D]" />
+                        )}
+                        {activeObj.gif_url && (
+                          <div className="absolute bottom-1 right-1 bg-white/90 backdrop-blur border border-[#E2E8F0] rounded px-1.5 py-0.5">
+                            <span className="text-[8px] font-mono font-bold text-[#0B1929] tracking-widest uppercase">GIF</span>
+                          </div>
+                        )}
                       </button>
 
-                    {/* Alternativas Clickables */}
-                    <div className="flex-1 min-w-0 flex gap-3 overflow-x-auto pb-2 scroll-hide">
-                      {otherVariants.map((v) => (
-                        <button 
-                          key={v.variantId}
-                          type="button"
-                          disabled={inputsDisabled}
-                          onClick={() => !inputsDisabled && setActiveVariant(s => ({ ...s, [ex.id]: v.variantId }))}
-                          className={`w-16 sm:w-20 flex-shrink-0 flex flex-col gap-1.5 items-center transition-opacity ${
-                            inputsDisabled ? "opacity-40 cursor-not-allowed" : "opacity-60 hover:opacity-100 cursor-pointer"
-                          }`}
-                        >
-                          <div className="w-16 h-16 sm:w-20 sm:h-20 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg flex items-center justify-center shadow-sm relative overflow-hidden">
-                            {v.obj.gif_url ? (
-                              <CachedImage
-                                src={v.obj.gif_url}
-                                alt={v.obj.nombre}
-                                className="w-full h-full object-contain mix-blend-multiply"
-                                fallback={<Dumbbell size={20} className="text-[#6B7A8D]" />}
-                              />
-                            ) : (
-                              <Dumbbell size={20} className="text-[#6B7A8D]" />
-                            )}
-                            <div className="absolute top-1 left-1 bg-white/90 backdrop-blur border border-[#E2E8F0] rounded px-1 py-0.5">
-                              <span className="text-[7px] font-bold text-[#0B1929] uppercase">{v.variantId === 'original' ? 'ORG' : 'ALT'}</span>
+                      <div className="flex-1 min-w-0 flex gap-3 overflow-x-auto pb-2 scroll-hide">
+                        {otherVariants.map((v) => (
+                          <button
+                            key={v.variantId}
+                            type="button"
+                            disabled={inputsDisabled}
+                            onClick={() => !inputsDisabled && setActiveVariant(s => ({ ...s, [ex.id]: v.variantId }))}
+                            className={`w-16 sm:w-20 flex-shrink-0 flex flex-col gap-1.5 items-center transition-opacity ${
+                              inputsDisabled ? "opacity-40 cursor-not-allowed" : "opacity-60 hover:opacity-100 cursor-pointer"
+                            }`}
+                          >
+                            <div className="w-16 h-16 sm:w-20 sm:h-20 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg flex items-center justify-center shadow-sm relative overflow-hidden">
+                              {v.obj.gif_url ? (
+                                <CachedImage
+                                  src={v.obj.gif_url}
+                                  alt={v.obj.nombre}
+                                  className="w-full h-full object-contain mix-blend-multiply"
+                                  fallback={<Dumbbell size={20} className="text-[#6B7A8D]" />}
+                                />
+                              ) : (
+                                <Dumbbell size={20} className="text-[#6B7A8D]" />
+                              )}
+                              <div className="absolute top-1 left-1 bg-white/90 backdrop-blur border border-[#E2E8F0] rounded px-1 py-0.5">
+                                <span className="text-[7px] font-bold text-[#0B1929] uppercase">{v.variantId === "original" ? "ORG" : "ALT"}</span>
+                              </div>
                             </div>
-                          </div>
-                          <p className="text-[9px] font-medium text-center text-[#6B7A8D] leading-tight line-clamp-2">
-                            {v.obj.nombre}
-                          </p>
-                        </button>
-                      ))}
+                            <p className="text-[9px] font-medium text-center text-[#6B7A8D] leading-tight line-clamp-2">
+                              {v.obj.nombre}
+                            </p>
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Prescripción opcional: Descanso rápido, RIR y Nota técnica */}
-                  {(restLabel || rirTarget || techNote) && (
-                    <div className="mb-4 flex flex-col gap-2">
-                      {(restLabel || rirTarget) && (
-                        <div className="flex items-center flex-wrap gap-2">
-                          {restLabel && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                timerStore.stopAndReset();
-                                timerStore.setSeconds(restNum, true);
-                                timerStore.start();
-                              }}
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--brand-secondary)] hover:bg-[var(--brand-primary)] text-[var(--brand-primary)] hover:text-white border border-[var(--brand-primary)]/30 text-xs font-bold transition-colors cursor-pointer"
-                              title="Iniciar cronómetro con el descanso sugerido"
-                            >
-                              <Timer size={13} />
-                              <span>Iniciar descanso · {restLabel}</span>
-                            </button>
-                          )}
+                    {techNote && (
+                      <div className="mb-4 px-3 py-2 rounded-xl bg-[var(--brand-secondary)]/55 border border-[var(--brand-primary)]/20 text-xs text-[#0B1929] flex items-start gap-2">
+                        <StickyNote size={14} className="text-[var(--brand-primary)] shrink-0 mt-0.5" />
+                        <span className="leading-snug">{techNote}</span>
+                      </div>
+                    )}
+
+                    {/* Barra discreta de guía + descanso (única cuando está abierto) */}
+                    {(restSeg || rirTarget) && (
+                      <div className="mb-3 flex items-center justify-between gap-2 px-1">
+                        <div className="flex items-center gap-2 flex-wrap">
                           {rirTarget && (
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-[#F8FAFC] border border-[#E2E8F0] text-[#0B1929] text-xs font-bold">
-                              RIR Objetivo: {rirTarget}
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-[#F8FAFC] border border-[#E2E8F0] text-[#475569] text-[10px] font-bold">
+                              RIR {rirTarget}
                             </span>
                           )}
                         </div>
-                      )}
-                      {techNote && (
-                        <div className="px-3 py-2 rounded-xl bg-[var(--brand-secondary)]/55 border border-[var(--brand-primary)]/20 text-xs text-[#0B1929] flex items-start gap-2">
-                          <StickyNote size={14} className="text-[var(--brand-primary)] shrink-0 mt-0.5" />
-                          <span className="leading-snug">{techNote}</span>
+                        {renderDiscreteRestBtn(restSeg)}
+                      </div>
+                    )}
+
+                    {/* Tabla de Series */}
+                    <div>
+                      <div className="flex gap-2 mb-2 px-1 items-center">
+                        <div className="w-9 text-center text-[10px] font-mono text-[#6B7A8D] uppercase">Serie</div>
+                        <div className="flex-1 text-center text-[10px] font-mono text-[#6B7A8D] uppercase">Reps</div>
+                        <div className="flex-1 flex items-center justify-center gap-1.5 text-[10px] font-mono text-[#6B7A8D] uppercase">
+                          <span>Peso</span>
+                          {renderUnitToggle(ex.id, activeVarId, activeObj)}
                         </div>
-                      )}
-                    </div>
-                  )}
+                        <div className="w-14 text-center text-[10px] font-mono text-[#6B7A8D] uppercase">Avance</div>
+                      </div>
 
-                  {/* Tabla de Series */}
-                  <div>
-                    {(() => {
-                      const prefUnit = unitPrefs[`${ex.id}_${activeVarId}`] || unitPrefs.lastUsed || activeObj.unidad || 'kg';
-
-                      return (
-                        <>
-                          <div className="flex gap-2 mb-2 px-1 items-center">
-                            <div className="w-9 text-center text-[10px] font-mono text-[#6B7A8D] uppercase">Serie</div>
-                            <div className="flex-1 text-center text-[10px] font-mono text-[#6B7A8D] uppercase">Reps</div>
-                            <div className="flex-1 flex items-center justify-center gap-1.5 text-[10px] font-mono text-[#6B7A8D] uppercase">
-                              <span>Peso</span>
-                              {/* Selector Segmentado de Unidad en Cabecera */}
-                              <div className="inline-flex items-center p-0.5 bg-[#F1F5F9] rounded-md border border-[#E2E8F0] shadow-2xs">
-                                <button
-                                  type="button"
-                                  onClick={() => updateUnitPref(`${ex.id}_${activeVarId}`, 'kg')}
-                                  className={`px-1.5 py-0.5 rounded text-[9px] font-bold transition-all cursor-pointer ${
-                                    prefUnit === 'kg'
-                                      ? 'bg-white text-[#0B1929] shadow-2xs font-extrabold'
-                                      : 'text-[#64748B] hover:text-[#0B1929]'
-                                  }`}
-                                  title="Mostrar en Kilogramos"
-                                >
-                                  KG
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => updateUnitPref(`${ex.id}_${activeVarId}`, 'lb')}
-                                  className={`px-1.5 py-0.5 rounded text-[9px] font-bold transition-all cursor-pointer ${
-                                    prefUnit === 'lb'
-                                      ? 'bg-white text-[#0B1929] shadow-2xs font-extrabold'
-                                      : 'text-[#64748B] hover:text-[#0B1929]'
-                                  }`}
-                                  title="Mostrar en Libras"
-                                >
-                                  LB
-                                </button>
-                              </div>
-                            </div>
-                            <div className="w-14 text-center text-[10px] font-mono text-[#6B7A8D] uppercase">Avance</div>
+                      {Array.from({ length: numSeries }).map((_, si) => {
+                        const sMeta = visualLabels[si] || { label: String(si + 1), isWarmup: false, tipo: "normal", shortTag: "" };
+                        const leadingSlot = (
+                          <div className="w-9 flex flex-col items-center justify-center shrink-0">
+                            <span
+                              className={`inline-flex items-center justify-center min-w-[26px] px-1 py-0.5 rounded text-[11px] font-mono font-bold ${
+                                sMeta.isWarmup
+                                  ? "bg-amber-50 text-amber-700 border border-amber-200"
+                                  : sMeta.tipo === "dropset"
+                                  ? "bg-purple-50 text-purple-700 border border-purple-200"
+                                  : sMeta.tipo === "failure"
+                                  ? "bg-rose-50 text-rose-700 border border-rose-200"
+                                  : "text-[#0B1929]"
+                              }`}
+                              title={sMeta.shortTag || `Serie ${sMeta.label}`}
+                            >
+                              {sMeta.label}
+                            </span>
+                            {sMeta.shortTag && (
+                              <span className="text-[8px] font-bold text-[#6B7A8D] leading-none mt-0.5">{sMeta.shortTag}</span>
+                            )}
                           </div>
+                        );
+                        return renderSetRow({ ex, activeObj, activeVarId, prefUnit, exPR, sMeta, si, leadingSlot });
+                      })}
+                    </div>
 
-                          {Array.from({ length: numSeries }).map((_, si) => {
-                            const repKey   = `${ex.id}-${wi}-${si}-reps-${activeVarId}`;
-                            const kgKey    = `${ex.id}-${wi}-${si}-peso-${activeVarId}`;
-                            const repVal   = progreso[repKey] ||"";
-                            const kgVal    = progreso[kgKey] ||"";
-                            
-                            const prevReps = getPrevVal(ex.id, activeVarId, activeObj, si,"reps");
-                            const prevKg   = getPrevVal(ex.id, activeVarId, activeObj, si,"peso");
-                            
-                            const displayKgVal  = parseDisplayWeight(kgVal, prefUnit);
-                            const displayPrevKg = parseDisplayWeight(prevKg, prefUnit);
-
-                            // Avance por 1RM estimado: comparar (peso+reps actuales) vs (peso+reps prev)
-                            const avancePct = calcularAvance(kgVal, repVal, prevKg, prevReps);
-                            const isSetPR = exPR.isPR && exPR.bestSetIdx === si;
-                            const isFalta = repVal === "Falta";
-                            const sMeta = visualLabels[si] || { label: String(si + 1), isWarmup: false, tipo: "normal", shortTag: "" };
-
-                            return (
-                              <div key={si} className="flex flex-col mb-3">
-                                <div className="flex gap-2 items-center">
-                                  <div className="w-9 flex flex-col items-center justify-center shrink-0">
-                                    <span
-                                      className={`inline-flex items-center justify-center min-w-[26px] px-1 py-0.5 rounded text-[11px] font-mono font-bold ${
-                                        sMeta.isWarmup
-                                          ? "bg-amber-50 text-amber-700 border border-amber-200"
-                                          : sMeta.tipo === "dropset"
-                                          ? "bg-purple-50 text-purple-700 border border-purple-200"
-                                          : sMeta.tipo === "failure"
-                                          ? "bg-rose-50 text-rose-700 border border-rose-200"
-                                          : "text-[#0B1929]"
-                                      }`}
-                                      title={sMeta.shortTag || `Serie ${sMeta.label}`}
-                                    >
-                                      {sMeta.label}
-                                    </span>
-                                    {sMeta.shortTag && (
-                                      <span className="text-[8px] font-bold text-[#6B7A8D] leading-none mt-0.5">{sMeta.shortTag}</span>
-                                    )}
-                                  </div>
-
-                                  <div className="flex-1">
-                                    <input
-                                      type="text"
-                                      inputMode={isFalta ? "text" : "numeric"}
-                                      pattern={isFalta ? undefined : "[0-9]*"}
-                                      placeholder={prevReps}
-                                      value={repVal}
-                                      disabled={inputsDisabled}
-                                      onFocus={() => !inputsDisabled && setFocusedInput({ exId: ex.id, wi, si })}
-                                      onBlur={() => setTimeout(() => setFocusedInput(null), 250)}
-                                      onChange={(e) => onProgressChange(ex.id, wi, si,"reps", e.target.value, activeVarId)}
-                                      className={`w-full h-10 rounded-lg border px-2 text-center text-[15px] font-semibold transition-shadow ${
-                                        isFalta
-                                          ? "border-red-300 bg-red-50/70 text-red-600 font-bold"
-                                          : inputsDisabled
-                                          ? "border-[#E2E8F0] bg-[#F8FAFC] text-[#475569] cursor-not-allowed"
-                                          : sMeta.isWarmup
-                                          ? "border-amber-200/80 bg-amber-50/20 text-[#0B1929] placeholder-[#9BA5B0] focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] outline-none"
-                                          : "border-[#E2E8F0] bg-white text-[#0B1929] placeholder-[#9BA5B0] focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] outline-none"
-                                      }`}
-                                    />
-                                  </div>
-
-                                  <div className="flex-1 relative">
-                                    <input
-                                      type="text"
-                                      inputMode="decimal"
-                                      placeholder={displayPrevKg}
-                                      value={localWeightInputs[kgKey] !== undefined ? localWeightInputs[kgKey] : displayKgVal}
-                                      disabled={inputsDisabled || isFalta}
-                                      onFocus={() => {
-                                        if (inputsDisabled) return;
-                                        setFocusedInput({ exId: ex.id, wi, si });
-                                        // Seed local state with current display value so user starts from what they see
-                                        setLocalWeightInputs(prev => ({ ...prev, [kgKey]: displayKgVal || "" }));
-                                      }}
-                                      onBlur={() => {
-                                        setTimeout(() => setFocusedInput(null), 250);
-                                        const raw = localWeightInputs[kgKey];
-                                        if (raw !== undefined) {
-                                          // On blur, commit final conversion to progreso
-                                          const dbVal = parseDBWeight(raw, prefUnit);
-                                          onProgressChange(ex.id, wi, si, "peso", dbVal, activeVarId);
-                                          // Clear local state so value is driven by progreso again
-                                          setLocalWeightInputs(prev => {
-                                            const next = { ...prev };
-                                            delete next[kgKey];
-                                            return next;
-                                          });
-                                        }
-                                      }}
-                                      onChange={(e) => {
-                                        const raw = e.target.value;
-                                        // Only allow digits, dot, and minus
-                                        if (!/^-?\d*\.?\d*$/.test(raw) && raw !== "") return;
-                                        // Update local display immediately — no conversion during typing
-                                        setLocalWeightInputs(prev => ({ ...prev, [kgKey]: raw }));
-                                        // Also save to progreso so debounce works (skip conversion for partial values)
-                                        if (!raw.endsWith('.')) {
-                                          const dbVal = parseDBWeight(raw, prefUnit);
-                                          onProgressChange(ex.id, wi, si, "peso", dbVal, activeVarId);
-                                        }
-                                      }}
-                                      className={`w-full h-10 rounded-lg border px-2 pr-7 text-center text-[15px] font-semibold transition-shadow ${
-                                        isFalta
-                                          ? "border-red-200 bg-red-50/30 text-red-400"
-                                          : inputsDisabled
-                                          ? "border-[#E2E8F0] bg-[#F8FAFC] text-[#475569] cursor-not-allowed"
-                                          : sMeta.isWarmup
-                                          ? "border-amber-200/80 bg-amber-50/20 text-[#0B1929] placeholder-[#9BA5B0] focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] outline-none"
-                                          : "border-[#E2E8F0] bg-white text-[#0B1929] placeholder-[#9BA5B0] focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] outline-none"
-                                      }`}
-                                    />
-                                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-[#94A3B8] pointer-events-none uppercase">
-                                      {prefUnit}
-                                    </span>
-                                  </div>
-
-                                  <div className="w-14 flex flex-col justify-center items-center">
-                                    {isSetPR ? (
-                                      <span className="inline-flex items-center gap-0.5 bg-amber-100 text-amber-700 border border-amber-300 px-1.5 py-0.5 rounded text-[9px] font-bold">
-                                        <Trophy size={10} className="text-amber-500" /> PR
-                                      </span>
-                                    ) : avancePct !== null ? (
-                                      <div className="flex items-center gap-0.5">
-                                        {avancePct === 0
-                                          ? <Minus size={12} className="text-[#9BA5B0]" />
-                                          : avancePct > 0
-                                            ? <TrendingUp size={12} className="text-emerald-500" />
-                                            : <TrendingDown size={12} className="text-red-400" />
-                                        }
-                                        {avancePct !== 0 && (
-                                          <span className={`text-[10px] font-bold font-mono ${avancePct > 0 ? 'text-emerald-500' : 'text-red-400'}`}>
-                                            {Math.abs(avancePct).toFixed(0)}%
-                                          </span>
-                                        )}
-                                      </div>
-                                    ) : <span className="text-[10px] text-[#CBD5E1] font-mono">-</span>}
-                                  </div>
-                                </div>
-                                
-                                {/* Barra de Acciones Accesible (Falté / Corporal) */}
-                                {!inputsDisabled && focusedInput?.exId === ex.id && focusedInput?.wi === wi && focusedInput?.si === si && (
-                                  <div className="flex gap-2 mt-1.5 pl-10 pr-14 animate-in fade-in slide-in-from-top-1 duration-200">
-                                    <button
-                                      type="button"
-                                      onPointerDown={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        if (isFalta) {
-                                          onProgressChange(ex.id, wi, si, "reps", "", activeVarId);
-                                          onProgressChange(ex.id, wi, si, "peso", "", activeVarId);
-                                        } else {
-                                          onProgressChange(ex.id, wi, si, "reps", "Falta", activeVarId);
-                                          onProgressChange(ex.id, wi, si, "peso", "0", activeVarId);
-                                        }
-                                        setLocalWeightInputs(prev => {
-                                          const next = { ...prev };
-                                          delete next[kgKey];
-                                          return next;
-                                        });
-                                        setFocusedInput(null);
-                                      }}
-                                      className={`flex-1 flex items-center justify-center gap-1.5 text-xs font-bold py-2 px-3 rounded-lg shadow-2xs active:scale-95 transition-all cursor-pointer ${
-                                        isFalta
-                                          ? "bg-slate-100 text-[#0B1929] hover:bg-slate-200 border border-slate-300"
-                                          : "bg-[#FEE2E2] text-[#EF4444] hover:bg-[#FCA5A5] border border-red-200"
-                                      }`}
-                                    >
-                                      <span>{isFalta ? "Reactivar serie" : "Falté a esta serie"}</span>
-                                    </button>
-
-                                    {ultimoPeso && (
-                                      <button
-                                        type="button"
-                                        onPointerDown={(e) => {
-                                          e.preventDefault();
-                                          e.stopPropagation();
-                                          onProgressChange(ex.id, wi, si, "peso", ultimoPeso.toString(), activeVarId);
-                                          setLocalWeightInputs(prev => {
-                                            const next = { ...prev };
-                                            delete next[kgKey];
-                                            return next;
-                                          });
-                                          setFocusedInput(null);
-                                        }}
-                                        className="flex-1 flex items-center justify-center gap-1.5 bg-[#E0E7FF] text-[#4F46E5] hover:bg-[#C7D2FE] border border-indigo-200 text-xs font-bold py-2 px-3 rounded-lg shadow-2xs active:scale-95 transition-all cursor-pointer"
-                                      >
-                                        <span>
-                                          Corporal ({prefUnit === "lb" ? `${(Number(ultimoPeso) * 2.20462262).toFixed(1)} lb` : `${ultimoPeso} kg`})
-                                        </span>
-                                      </button>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </>
-                      );
-                    })()}
-                  </div>
-
-                  {(() => {
-                    const exGraphData = getExerciseGraphData(ex, activeObj, activeVarId);
-                    if (!exGraphData || exGraphData.length === 0) return null;
-                    const exNumSeries = parseInt(activeObj?.num_series || ex.num_series) || 4;
-                    const graphSeries = getSeriesVisualLabels(activeObj, exNumSeries).filter((l) => !l.isWarmup);
-                    if (graphSeries.length === 0) return null;
-                    const seriesColors = ["#0ea5e9", "#10b981", "#f59e0b", "#8b5cf6", "#ef4444", "#14b8a6"];
-                    return (
+                    {exGraphData && exGraphData.length > 0 && graphSeries.length > 0 && (
                       <div className="mt-4 pt-4 border-t border-[#F0F4FA]">
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-1.5 text-xs font-bold text-[#0B1929]">
@@ -1393,7 +1356,7 @@ export default function Training({
                           <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={exGraphData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
                               <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
-                              <XAxis dataKey="week" tick={{ fontSize: 10, fontFamily: "JetBrains Mono", fill: "#6B7A8D" }} axisLine={{ stroke: '#CBD5E1' }} tickLine={false} />
+                              <XAxis dataKey="week" tick={{ fontSize: 10, fontFamily: "JetBrains Mono", fill: "#6B7A8D" }} axisLine={{ stroke: "#CBD5E1" }} tickLine={false} />
                               <YAxis tick={{ fontSize: 10, fontFamily: "JetBrains Mono", fill: "#6B7A8D" }} axisLine={false} tickLine={false} />
                               <Tooltip
                                 contentStyle={{
@@ -1421,86 +1384,372 @@ export default function Training({
                           </ResponsiveContainer>
                         </div>
                       </div>
-                    );
-                  })()}
+                    )}
 
-                  {isSupersetItem && (() => {
-                    const hasNext = posInBlock < block.items.length - 1;
-                    const nextItem = hasNext ? block.items[posInBlock + 1] : null;
-                    const firstItem = block.items[0];
-                    const blockRestSecs = restNum > 0
-                      ? restNum
-                      : (parseInt(firstItem?.ex?.descanso_seg, 10) || 0);
-                    return (
-                      <div className="mt-4 pt-3 border-t border-[#F0F4FA] flex items-center justify-between gap-2 flex-wrap">
-                        {hasNext ? (
-                          <>
-                            <span className="text-[11px] text-[#6B7A8D] font-semibold">
-                              Siguiente en {block.blockTitle}:
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => setExpandedEx(nextItem.index)}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--brand-primary)] text-white hover:opacity-90 text-xs font-bold shadow-2xs transition-opacity cursor-pointer"
-                            >
-                              <span>Pasar a {nextItem.meta.codeLabel} · {nextItem.ex.nombre}</span>
-                              <ArrowRight size={13} className="shrink-0" />
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => setExpandedEx(firstItem.index)}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--brand-secondary)] text-[var(--brand-primary)] border border-[var(--brand-primary)]/30 hover:bg-[var(--brand-primary)] hover:text-white text-xs font-bold transition-colors cursor-pointer"
-                            >
-                              <ArrowLeft size={13} className="shrink-0" />
-                              <span>Volver a {firstItem.meta.codeLabel} ({firstItem.ex.nombre})</span>
-                            </button>
-                            {blockRestSecs > 0 && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  timerStore.stopAndReset();
-                                  timerStore.setSeconds(blockRestSecs, true);
-                                  timerStore.start();
-                                  setExpandedEx(firstItem.index);
-                                }}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--brand-primary)] text-white hover:opacity-90 text-xs font-bold shadow-2xs transition-opacity cursor-pointer"
-                              >
-                                <Timer size={13} className="shrink-0" />
-                                <span>Descansar ({formatRestLabel(blockRestSecs)}) e ir a {firstItem.meta.codeLabel}</span>
-                              </button>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    );
-                  })()}
-
-                  <div className="flex items-center justify-end gap-1.5 mt-4 text-[11px] font-medium text-[#6B7A8D]">
-                    {syncStatus ==="saving" && <RotateCcw size={14} className="animate-spin text-[var(--brand-primary)]" />}
-                    {syncStatus ==="local" && <Check size={14} />}
-                    {syncStatus ==="synced" && <CheckCheck size={14} className="text-[var(--brand-primary)]" />}
-                    <span>
-                      {syncStatus ==="saving" ?"Guardando..." : syncStatus ==="local" ?"Guardado localmente" :"Sincronizado"}
-                    </span>
+                    {renderSyncFooter()}
                   </div>
-                </div>
-              )}
-                  </>
+                );
+              };
+
+              const renderSupersetRoundsView = (block, blockKey) => {
+                const maxRounds = Math.max(
+                  1,
+                  ...block.items.map((it) => {
+                    const { obj } = getVariantObj(it.ex);
+                    return parseInt(obj?.num_series || it.ex.num_series, 10) || 3;
+                  })
                 );
 
-                if (isSupersetItem) {
+                return (
+                  <div className="bg-white">
+                    {/* Tarjetas resumen compactas de A1, A2... (GIF, unidad, cambio rápido de alternativa y nota) */}
+                    <div className="px-4 md:px-5 py-3 bg-[#F8FAFC]/70 border-b border-[#E2E8F0] grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {block.items.map((it) => {
+                        const { obj: activeObj, variantId: activeVarId } = getVariantObj(it.ex);
+                        const exPR = getExercisePRData(it.ex, activeVarId, activeObj);
+                        const rirTarget = activeObj?.rir_objetivo ?? it.ex.rir_objetivo;
+                        const techNote = activeObj?.nota_tecnica ?? it.ex.nota_tecnica;
+                        const totalVariants = 1 + (it.ex.alternativas || []).length;
+                        const variantCycleList = [
+                          "original",
+                          ...(it.ex.alternativas || []).map((_, aIdx) => `alt_${aIdx}`),
+                        ];
+                        const cycleNextVariant = () => {
+                          if (inputsDisabled || totalVariants <= 1) return;
+                          const curPos = Math.max(0, variantCycleList.indexOf(activeVarId));
+                          const nextVid = variantCycleList[(curPos + 1) % variantCycleList.length];
+                          setActiveVariant((s) => ({ ...s, [it.ex.id]: nextVid }));
+                        };
+
+                        return (
+                          <div key={it.ex.id || it.index} className="bg-white rounded-xl border border-[#E2E8F0] p-2.5 flex flex-col gap-1.5">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <button
+                                type="button"
+                                onClick={() => setPreviewEx(activeObj)}
+                                className="w-11 h-11 rounded-lg bg-[#F8FAFC] border border-[#E2E8F0] overflow-hidden shrink-0 flex items-center justify-center relative cursor-pointer focus:outline-none"
+                                title="Ver demostración"
+                              >
+                                {activeObj.gif_url ? (
+                                  <CachedImage
+                                    src={activeObj.gif_url}
+                                    alt={activeObj.nombre}
+                                    className="w-full h-full object-contain mix-blend-multiply"
+                                    fallback={<Dumbbell size={18} className="text-[#6B7A8D]" />}
+                                  />
+                                ) : (
+                                  <Dumbbell size={18} className="text-[#6B7A8D]" />
+                                )}
+                              </button>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <span className="px-1.5 py-0.5 rounded bg-[var(--brand-secondary)] text-[var(--brand-primary)] border border-[var(--brand-primary)]/30 text-[10px] font-mono font-extrabold shrink-0">
+                                    {it.meta.codeLabel}
+                                  </span>
+                                  <p className="text-xs font-bold text-[#0B1929] truncate">{activeObj.nombre}</p>
+                                </div>
+                                <div className="flex items-center flex-wrap gap-1.5 mt-1">
+                                  <span className="text-[10px] text-[#6B7A8D]">
+                                    {GRUPO_LABELS[normalizeMuscleGroup(resolveCanonicalGroup(activeObj))] || resolveCanonicalGroup(activeObj) || "General"}
+                                  </span>
+                                  {rirTarget && (
+                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#F8FAFC] border border-[#E2E8F0] text-[#475569]">
+                                      RIR {rirTarget}
+                                    </span>
+                                  )}
+                                  {exPR.isPR && (
+                                    <span className="inline-flex items-center gap-0.5 text-[9px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded font-bold border border-amber-200">
+                                      <Trophy size={9} className="text-amber-500" /> PR
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex flex-col items-end gap-1 shrink-0">
+                                {renderUnitToggle(it.ex.id, activeVarId, activeObj)}
+                                {totalVariants > 1 && !inputsDisabled && (
+                                  <button
+                                    type="button"
+                                    onClick={cycleNextVariant}
+                                    className="text-[9px] font-bold text-[var(--brand-primary)] hover:underline cursor-pointer"
+                                    title="Cambiar por alternativa"
+                                  >
+                                    {activeVarId === "original" ? "Alternativa" : "Volver ORG"}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                            {techNote && (
+                              <div className="px-2 py-1 rounded-lg bg-[var(--brand-secondary)]/45 border border-[var(--brand-primary)]/15 text-[10px] text-[#334155] flex items-start gap-1.5">
+                                <StickyNote size={11} className="text-[var(--brand-primary)] shrink-0 mt-0.5" />
+                                <span className="leading-snug">{techNote}</span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Rondas intercaladas (Ronda 1: A1 -> A2, Ronda 2: A1 -> A2...) */}
+                    <div className="divide-y divide-[#E2E8F0]">
+                      {Array.from({ length: maxRounds }, (_, si) => {
+                        const activeInRound = block.items.filter((it) => {
+                          const { obj } = getVariantObj(it.ex);
+                          const cnt = parseInt(obj?.num_series || it.ex.num_series, 10) || 3;
+                          return si < cnt;
+                        });
+                        if (activeInRound.length === 0) return null;
+
+                        const doneInRound = activeInRound.filter((it) => {
+                          const { variantId } = getVariantObj(it.ex);
+                          const rVal = String(progreso[`${it.ex.id}-${wi}-${si}-reps-${variantId}`] ?? "").trim();
+                          const pVal = String(progreso[`${it.ex.id}-${wi}-${si}-peso-${variantId}`] ?? "").trim();
+                          return rVal !== "" && (rVal === "Falta" || pVal !== "");
+                        }).length;
+
+                        return (
+                          <div key={si} className="px-4 md:px-5 py-3 space-y-3">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--brand-primary)]">
+                                Ronda {si + 1}
+                              </span>
+                              <div className="flex items-center gap-3 text-[10px] font-mono text-[#6B7A8D] uppercase">
+                                <span className={`font-bold ${doneInRound === activeInRound.length ? "text-emerald-600" : "text-[#64748B]"}`}>
+                                  {doneInRound}/{activeInRound.length}
+                                </span>
+                                <span className="hidden sm:inline">Reps · Peso · Avance</span>
+                              </div>
+                            </div>
+
+                            <div className="space-y-3">
+                              {activeInRound.map((it) => {
+                                const { obj: activeObj, variantId: activeVarId } = getVariantObj(it.ex);
+                                const numSeries = parseInt(activeObj?.num_series || it.ex.num_series, 10) || 3;
+                                const visualLabels = getSeriesVisualLabels(activeObj, numSeries);
+                                const sMeta = visualLabels[si] || { label: String(si + 1), isWarmup: false, tipo: "normal", shortTag: "" };
+                                const exPR = getExercisePRData(it.ex, activeVarId, activeObj);
+                                const prefUnit = unitPrefs[`${it.ex.id}_${activeVarId}`] || unitPrefs.lastUsed || activeObj?.unidad || "kg";
+                                const restSeg = activeObj?.descanso_seg ?? it.ex.descanso_seg;
+
+                                return (
+                                  <div key={`${it.ex.id}-${si}`} className="bg-[#F8FAFC]/65 rounded-xl border border-[#E2E8F0]/80 p-2.5">
+                                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                                      <div className="flex items-center gap-1.5 min-w-0">
+                                        <span className="px-1.5 py-0.5 rounded bg-[var(--brand-secondary)] text-[var(--brand-primary)] border border-[var(--brand-primary)]/30 text-[10px] font-mono font-extrabold shrink-0">
+                                          {it.meta.codeLabel}
+                                        </span>
+                                        <span className="text-xs font-semibold text-[#0B1929] truncate">{activeObj.nombre}</span>
+                                        {(sMeta.isWarmup || sMeta.shortTag) && (
+                                          <span
+                                            className={`text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0 ${
+                                              sMeta.isWarmup
+                                                ? "bg-amber-50 text-amber-700 border-amber-200"
+                                                : sMeta.tipo === "dropset"
+                                                ? "bg-purple-50 text-purple-700 border-purple-200"
+                                                : "bg-rose-50 text-rose-700 border-rose-200"
+                                            }`}
+                                          >
+                                            {sMeta.label} {sMeta.shortTag}
+                                          </span>
+                                        )}
+                                      </div>
+                                      {renderDiscreteRestBtn(restSeg, `Iniciar descanso (${formatRestLabel(restSeg)}) después de ${it.meta.codeLabel}`)}
+                                    </div>
+                                    {renderSetRow({
+                                      ex: it.ex,
+                                      activeObj,
+                                      activeVarId,
+                                      prefUnit,
+                                      exPR,
+                                      sMeta,
+                                      si,
+                                      leadingSlot: null,
+                                      compactBottomSpace: true,
+                                    })}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="px-4 md:px-5 pb-4 pt-1 border-t border-[#F0F4FA]">
+                      <div className="flex items-center justify-between gap-2 flex-wrap mt-2">
+                        <button
+                          type="button"
+                          onClick={() => setSupersetMode((prev) => ({ ...prev, [blockKey]: "detalle" }))}
+                          className="text-[11px] font-bold text-[#64748B] hover:text-[var(--brand-primary)] cursor-pointer transition-colors"
+                        >
+                          Ver alternativas y gráfica de 1RM →
+                        </button>
+                        <div className="flex items-center gap-1.5 text-[11px] font-medium text-[#6B7A8D]">
+                          {syncStatus === "saving" && <RotateCcw size={14} className="animate-spin text-[var(--brand-primary)]" />}
+                          {syncStatus === "local" && <Check size={14} />}
+                          {syncStatus === "synced" && <CheckCheck size={14} className="text-[var(--brand-primary)]" />}
+                          <span>
+                            {syncStatus === "saving" ? "Guardando..." : syncStatus === "local" ? "Guardado localmente" : "Sincronizado"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              };
+
+              return exerciseBlocks.map((block, bIdx) => {
+                if (block.type === "superset") {
+                  const blockKey = `${rutinaActiva?.id || "rut"}_${block.groupCode}_${bIdx}`;
+                  const isBlockExpanded = block.items.some((it) => expandedEx === it.index);
+                  const mode = supersetMode[blockKey] || "rondas";
+                  const activeDetalleItem = block.items.find((it) => expandedEx === it.index) || block.items[0];
+
                   return (
                     <div
-                      key={ex.id || i}
-                      className={isExpanded ? "bg-white" : "bg-white hover:bg-[#F8FAFC]/40 transition-colors"}
+                      key={`block-${block.groupCode}-${bIdx}`}
+                      className="bg-white rounded-none md:rounded-2xl border-y md:border border-[var(--brand-primary)]/40 border-l-4 border-l-[var(--brand-primary)] overflow-hidden md:shadow-xs"
                     >
-                      {rowContent}
+                      {/* Cabecera única de Biserie / Triserie */}
+                      <div className="px-4 md:px-5 py-2.5 bg-[var(--brand-secondary)]/75 border-b border-[var(--brand-primary)]/20 flex items-center justify-between gap-2 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => setExpandedEx(isBlockExpanded ? null : block.items[0].index)}
+                          className="flex items-center gap-1.5 min-w-0 text-left cursor-pointer focus:outline-none"
+                        >
+                          <Link2 size={14} className="text-[var(--brand-primary)] shrink-0" />
+                          <span className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--brand-primary)]">
+                            {block.blockTitle}
+                          </span>
+                          <span className="text-[11px] text-[#475569] font-medium hidden sm:inline">
+                            · Alterna serie por serie ({block.blockCodesJoined})
+                          </span>
+                        </button>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          {isBlockExpanded && (
+                            <div className="inline-flex items-center p-0.5 bg-white/90 rounded-lg border border-[var(--brand-primary)]/25">
+                              <button
+                                type="button"
+                                onClick={() => setSupersetMode((prev) => ({ ...prev, [blockKey]: "rondas" }))}
+                                className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition-colors cursor-pointer focus:outline-none ${
+                                  mode === "rondas"
+                                    ? "bg-[var(--brand-primary)] text-white"
+                                    : "text-[#475569] hover:text-[var(--brand-primary)]"
+                                }`}
+                              >
+                                Rondas
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setSupersetMode((prev) => ({ ...prev, [blockKey]: "detalle" }))}
+                                className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition-colors cursor-pointer focus:outline-none ${
+                                  mode === "detalle"
+                                    ? "bg-[var(--brand-primary)] text-white"
+                                    : "text-[#475569] hover:text-[var(--brand-primary)]"
+                                }`}
+                              >
+                                Detalle
+                              </button>
+                            </div>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setExpandedEx(isBlockExpanded ? null : block.items[0].index)}
+                            className="p-1 rounded-md text-[#64748B] hover:text-[var(--brand-primary)] cursor-pointer focus:outline-none"
+                            aria-label={isBlockExpanded ? "Colapsar bloque" : "Expandir bloque"}
+                          >
+                            <ChevronDown size={16} className={`transition-transform ${isBlockExpanded ? "rotate-180" : ""}`} />
+                          </button>
+                        </div>
+                      </div>
+
+                      {!isBlockExpanded ? (
+                        <div className="divide-y divide-[#E2E8F0]">
+                          {block.items.map((it) => {
+                            const { obj: activeObj } = getVariantObj(it.ex);
+                            const restSeg = activeObj?.descanso_seg ?? it.ex.descanso_seg;
+                            const restLabel = restSeg && parseInt(restSeg, 10) > 0 ? formatRestLabel(restSeg) : "";
+                            const rirTarget = activeObj?.rir_objetivo ?? it.ex.rir_objetivo;
+                            const itemSaved = ["original", "alt_0", "alt_1"].some((vid) => progreso[`${it.ex.id}-${wi}-0-reps-${vid}`] !== undefined);
+                            return (
+                              <button
+                                key={it.ex.id || it.index}
+                                type="button"
+                                onClick={() => setExpandedEx(it.index)}
+                                className="w-full flex items-center gap-3.5 md:gap-4 px-4 md:px-5 py-3 text-left hover:bg-[#F8FAFC]/60 transition-colors cursor-pointer focus:outline-none"
+                              >
+                                <div className="w-8 h-8 rounded-lg bg-[var(--brand-secondary)] border border-[var(--brand-primary)]/30 flex items-center justify-center shrink-0">
+                                  <span className="text-xs font-mono font-bold text-[var(--brand-primary)]">{it.meta.codeLabel}</span>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-semibold text-[#0B1929] truncate">{activeObj.nombre}</p>
+                                  <div className="flex items-center flex-wrap gap-1.5 mt-0.5">
+                                    <span className="text-xs text-[#6B7A8D]">{GRUPO_LABELS[normalizeMuscleGroup(resolveCanonicalGroup(activeObj))] || resolveCanonicalGroup(activeObj) || "General"}</span>
+                                    {restLabel && (
+                                      <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[#F1F5F9] text-[#475569]">
+                                        <Timer size={10} /> {restLabel}
+                                      </span>
+                                    )}
+                                    {rirTarget && (
+                                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[#F8FAFC] border border-[#E2E8F0] text-[#475569]">
+                                        RIR {rirTarget}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                {itemSaved && (
+                                  <span className="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded font-medium border border-green-100 hidden md:block">
+                                    ✓ Guardado
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : mode === "rondas" ? (
+                        renderSupersetRoundsView(block, blockKey)
+                      ) : (
+                        <div>
+                          {/* Selector de ejercicio dentro de Detalle */}
+                          <div className="px-4 md:px-5 py-2 bg-[#F8FAFC] border-b border-[#E2E8F0] flex items-center gap-1.5 overflow-x-auto scroll-hide">
+                            {block.items.map((it) => {
+                              const { obj: activeObj } = getVariantObj(it.ex);
+                              const active = activeDetalleItem.index === it.index;
+                              return (
+                                <button
+                                  key={it.ex.id || it.index}
+                                  type="button"
+                                  onClick={() => setExpandedEx(it.index)}
+                                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border shrink-0 transition-colors cursor-pointer focus:outline-none ${
+                                    active
+                                      ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)]"
+                                      : "bg-white text-[#475569] border-[#E2E8F0] hover:text-[var(--brand-primary)]"
+                                  }`}
+                                >
+                                  <span className="font-mono">{it.meta.codeLabel}</span>
+                                  <span className="truncate max-w-[160px]">{activeObj.nombre}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                          {renderSingleExerciseDetails(activeDetalleItem.ex, activeDetalleItem.index)}
+                        </div>
+                      )}
                     </div>
                   );
                 }
+
+                // Ejercicio individual (fuera de biserie)
+                const singleItem = block.items[0];
+                const ex = singleItem.ex;
+                const i = singleItem.index;
+                const isExpanded = expandedEx === i;
+                const { obj: activeObj, variantId: activeVarId } = getVariantObj(ex);
+                const exPR = getExercisePRData(ex, activeVarId, activeObj);
+                const restSeg = activeObj?.descanso_seg ?? ex.descanso_seg;
+                const restLabel = restSeg && parseInt(restSeg, 10) > 0 ? formatRestLabel(restSeg) : "";
+                const rirTarget = activeObj?.rir_objetivo ?? ex.rir_objetivo;
+                const isSaved = ["original", "alt_0", "alt_1"].some(vid => progreso[`${ex.id}-${wi}-0-reps-${vid}`] !== undefined);
 
                 return (
                   <div
@@ -1511,61 +1760,49 @@ export default function Training({
                         : "bg-white md:border-[#E2E8F0]"
                     }`}
                   >
-                    {rowContent}
+                    <button
+                      type="button"
+                      className="w-full flex items-center gap-3.5 md:gap-4 px-4 md:px-5 py-3.5 md:py-4 text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--brand-primary)]/40"
+                      onClick={() => setExpandedEx(isExpanded ? null : i)}
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-[#E8F1FB] flex items-center justify-center flex-shrink-0">
+                        <span className="text-xs font-mono font-bold text-[var(--brand-primary)]">{i + 1}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-[#0B1929]">{activeObj.nombre}</p>
+                        <div className="flex items-center flex-wrap gap-1.5 mt-0.5">
+                          <span className="text-xs text-[#6B7A8D]">{GRUPO_LABELS[normalizeMuscleGroup(resolveCanonicalGroup(activeObj))] || resolveCanonicalGroup(activeObj) || "General"}</span>
+                          {!isExpanded && restLabel && (
+                            <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[#F1F5F9] text-[#475569]">
+                              <Timer size={10} /> {restLabel}
+                            </span>
+                          )}
+                          {!isExpanded && rirTarget && (
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[#F8FAFC] border border-[#E2E8F0] text-[#475569]">
+                              RIR {rirTarget}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {exPR.isPR && (
+                        <span className="inline-flex items-center gap-1 text-[11px] bg-amber-50 text-amber-700 px-2.5 py-0.5 rounded-full font-bold border border-amber-200 shadow-sm">
+                          <Trophy size={12} className="text-amber-500" /> Nuevo PR
+                        </span>
+                      )}
+                      {isSaved && (
+                        <span className="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded font-medium border border-green-100 hidden md:block">
+                          ✓ Guardado
+                        </span>
+                      )}
+                      <ChevronDown
+                        size={16}
+                        className={`text-[#CBD5E1] transition-transform flex-shrink-0 ${isExpanded ? "rotate-180" : ""}`}
+                      />
+                    </button>
+
+                    {isExpanded && renderSingleExerciseDetails(ex, i)}
                   </div>
                 );
-              };
-
-              return exerciseBlocks.map((block, bIdx) => {
-                if (block.type === "superset") {
-                  return (
-                    <div
-                      key={`block-${block.groupCode}-${bIdx}`}
-                      className="bg-white rounded-none md:rounded-2xl border-y md:border border-[var(--brand-primary)]/40 border-l-4 border-l-[var(--brand-primary)] overflow-hidden md:shadow-xs"
-                    >
-                      <div className="px-4 md:px-5 py-2 bg-[var(--brand-secondary)]/75 border-b border-[var(--brand-primary)]/20 flex items-center justify-between gap-2 flex-wrap">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <Link2 size={14} className="text-[var(--brand-primary)] shrink-0" />
-                          <span className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--brand-primary)]">
-                            {block.blockTitle}
-                          </span>
-                          <span className="text-[11px] text-[#475569] font-medium hidden sm:inline">
-                            · Alterna antes de descansar
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1 shrink-0">
-                          {block.items.map((it) => {
-                            const active = expandedEx === it.index;
-                            const itemSaved = ["original", "alt_0", "alt_1"].some((vid) => progreso[`${it.ex.id}-${wi}-0-reps-${vid}`] !== undefined);
-                            return (
-                              <button
-                                key={it.ex.id || it.index}
-                                type="button"
-                                onClick={() => setExpandedEx(active ? null : it.index)}
-                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-mono font-extrabold border transition-colors cursor-pointer ${
-                                  active
-                                    ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-2xs"
-                                    : "bg-white text-[var(--brand-primary)] border-[var(--brand-primary)]/30 hover:bg-[var(--brand-secondary)]"
-                                }`}
-                                title={it.ex.nombre}
-                              >
-                                <span>{it.meta.codeLabel}</span>
-                                {itemSaved && <Check size={10} className={active ? "text-white" : "text-emerald-600"} />}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                      <div className="divide-y divide-[#E2E8F0]">
-                        {block.items.map((it, posInBlock) =>
-                          renderExerciseRow(it.ex, it.index, { ssMeta: it.meta, block, posInBlock })
-                        )}
-                      </div>
-                    </div>
-                  );
-                }
-                const singleItem = block.items[0];
-                return renderExerciseRow(singleItem.ex, singleItem.index, { ssMeta: singleItem.meta, block: null, posInBlock: 0 });
               });
             })()}
           </div>

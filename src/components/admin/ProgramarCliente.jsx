@@ -8093,7 +8093,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                           {ssMeta.blockTitle}
                                         </span>
                                         <span className="text-[10px] font-medium text-[#475569] hidden sm:inline truncate">
-                                          · Alterna {ssMeta.blockCodesJoined} antes de descansar
+                                          · Alterna serie por serie ({ssMeta.blockCodesJoined})
                                         </span>
                                       </div>
                                       <button
@@ -8129,64 +8129,9 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                         )}
                                         <span className="truncate">{e.nombre}</span>
                                       </div>
-                                      <div className="flex items-center flex-wrap gap-1.5 mt-1">
-                                        <span className="text-[10px] text-[#6B7A8D] font-normal">
-                                          {GRUPO_LABELS[normalizeMuscleGroup(resolveCanonicalExercise(e).grupo_muscular)] || resolveCanonicalExercise(e).grupo_muscular || e.grupo_muscular}
-                                          {warmSetsCount > 0 ? ` · ${effSetsCount} ef. / ${warmSetsCount} cal.` : ""}
-                                        </span>
-                                        {hMark ? (
-                                          <button
-                                            type="button"
-                                            onClick={() => applyHistoryMarksToExercise(i)}
-                                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold border transition-colors cursor-pointer ${
-                                              e._historyApplied
-                                                ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-2xs"
-                                                : "bg-[var(--brand-secondary)] text-[var(--brand-primary)] border-[var(--brand-primary)]/35 hover:bg-[var(--brand-primary)] hover:text-white"
-                                            }`}
-                                            title="Importar la mejor marca histórica registrada por este paciente en este ejercicio"
-                                          >
-                                            {e._historyApplied ? <CheckCircle2 className="w-3 h-3 shrink-0" /> : <Trophy className="w-3 h-3 shrink-0" />}
-                                            <span>
-                                              {e._historyApplied
-                                                ? `Mejor marca aplicada${markSummaryLabel ? ` · ${markSummaryLabel}` : ""}`
-                                                : `Importar mejor marca${markSummaryLabel ? ` · ${markSummaryLabel}` : ""}`}
-                                            </span>
-                                          </button>
-                                        ) : !loadingPatientHistory ? (
-                                          <span className="text-[10px] text-[#94A3B8] font-normal">• Sin marcas previas</span>
-                                        ) : null}
-                                        <button
-                                          type="button"
-                                          onClick={() => toggleExerciseOptions(i)}
-                                          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold border transition-colors cursor-pointer ${
-                                            e._showOptions || hasOptValues
-                                              ? "bg-[var(--brand-secondary)] text-[var(--brand-primary)] border-[var(--brand-primary)]/30"
-                                              : "bg-white text-[#6B7A8D] border-[#E2E8F0] hover:text-[var(--brand-primary)]"
-                                          }`}
-                                          title="Opcional: Descanso, RIR objetivo o nota técnica"
-                                        >
-                                          <SlidersHorizontal className="w-2.5 h-2.5 shrink-0" />
-                                          <span>
-                                            {hasOptValues
-                                              ? [
-                                                  e.descanso_seg ? formatRestLabel(e.descanso_seg) : "",
-                                                  e.rir_objetivo ? `RIR ${e.rir_objetivo}` : "",
-                                                  e.nota_tecnica ? "Nota" : "",
-                                                ].filter(Boolean).join(" · ")
-                                              : "+ Descanso / RIR / Nota"}
-                                          </span>
-                                        </button>
-                                        {ssMeta.isMember && ssMeta.blockSize >= 3 && (
-                                          <button
-                                            type="button"
-                                            onClick={() => detachFromSuperset(i)}
-                                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold border bg-white text-[#64748B] border-[#E2E8F0] hover:text-red-600 hover:bg-red-50 hover:border-red-200 transition-colors cursor-pointer"
-                                            title={`Sacar ${ssMeta.codeLabel} de ${ssMeta.blockTitle}`}
-                                          >
-                                            <Unlink2 className="w-2.5 h-2.5 shrink-0" />
-                                            <span>Salir del bloque</span>
-                                          </button>
-                                        )}
+                                      <div className="text-[10px] text-[#6B7A8D] font-normal mt-0.5 truncate">
+                                        {GRUPO_LABELS[normalizeMuscleGroup(resolveCanonicalExercise(e).grupo_muscular)] || resolveCanonicalExercise(e).grupo_muscular || e.grupo_muscular}
+                                        {warmSetsCount > 0 ? ` · ${effSetsCount} ef. / ${warmSetsCount} cal.` : ""}
                                       </div>
                                     </div>
                                   
@@ -8255,6 +8200,67 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                     <button type="button" onClick={() => remEj(i)} className="bg-red-50 text-red-500 rounded-lg p-1.5 hover:bg-red-100 flex items-center justify-center transition-colors border-none cursor-pointer shrink-0" title="Eliminar ejercicio">
                                       <Trash2 className="w-[14px] h-[14px]" />
                                     </button>
+                                  </div>
+                                </div>
+
+                                {/* SUB-BARRA COMPACTA DE ANCHO COMPLETO (sin apretar la columna del título) */}
+                                <div className="mt-2 pt-1.5 border-t border-[#F1F5F9] sm:border-t-0 sm:pt-0 sm:pl-[70px] flex items-center justify-between flex-wrap gap-1.5">
+                                  <div className="flex items-center flex-wrap gap-1.5">
+                                    {hMark ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => applyHistoryMarksToExercise(i)}
+                                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold border transition-colors cursor-pointer ${
+                                          e._historyApplied
+                                            ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-2xs"
+                                            : "bg-[var(--brand-secondary)] text-[var(--brand-primary)] border-[var(--brand-primary)]/35 hover:bg-[var(--brand-primary)] hover:text-white"
+                                        }`}
+                                        title="Importar la mejor marca histórica registrada por este paciente en este ejercicio"
+                                      >
+                                        {e._historyApplied ? <CheckCircle2 className="w-3 h-3 shrink-0" /> : <Trophy className="w-3 h-3 shrink-0" />}
+                                        <span>
+                                          {e._historyApplied
+                                            ? `Mejor marca aplicada${markSummaryLabel ? ` · ${markSummaryLabel}` : ""}`
+                                            : `Importar mejor marca${markSummaryLabel ? ` · ${markSummaryLabel}` : ""}`}
+                                        </span>
+                                      </button>
+                                    ) : !loadingPatientHistory ? (
+                                      <span className="text-[10px] text-[#94A3B8] font-normal">Sin marcas previas</span>
+                                    ) : null}
+                                  </div>
+                                  <div className="flex items-center flex-wrap gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleExerciseOptions(i)}
+                                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold border transition-colors cursor-pointer ${
+                                        e._showOptions || hasOptValues
+                                          ? "bg-[var(--brand-secondary)] text-[var(--brand-primary)] border-[var(--brand-primary)]/30"
+                                          : "bg-white text-[#6B7A8D] border-[#E2E8F0] hover:text-[var(--brand-primary)]"
+                                      }`}
+                                      title="Opcional: Descanso, RIR objetivo o nota técnica"
+                                    >
+                                      <SlidersHorizontal className="w-2.5 h-2.5 shrink-0" />
+                                      <span>
+                                        {hasOptValues
+                                          ? [
+                                              e.descanso_seg ? formatRestLabel(e.descanso_seg) : "",
+                                              e.rir_objetivo ? `RIR ${e.rir_objetivo}` : "",
+                                              e.nota_tecnica ? "Nota" : "",
+                                            ].filter(Boolean).join(" · ")
+                                          : "+ Descanso / RIR / Nota"}
+                                      </span>
+                                    </button>
+                                    {ssMeta.isMember && ssMeta.blockSize >= 3 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => detachFromSuperset(i)}
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold border bg-white text-[#64748B] border-[#E2E8F0] hover:text-red-600 hover:bg-red-50 hover:border-red-200 transition-colors cursor-pointer"
+                                        title={`Sacar ${ssMeta.codeLabel} de ${ssMeta.blockTitle}`}
+                                      >
+                                        <Unlink2 className="w-2.5 h-2.5 shrink-0" />
+                                        <span>Salir del bloque</span>
+                                      </button>
+                                    )}
                                   </div>
                                 </div>
 
