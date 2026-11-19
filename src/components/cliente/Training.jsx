@@ -1402,8 +1402,8 @@ export default function Training({
 
                 return (
                   <div className="bg-white">
-                    {/* Tarjetas resumen compactas de A1, A2... (GIF, unidad, cambio rápido de alternativa y nota) */}
-                    <div className="px-4 md:px-5 py-3 bg-[#F8FAFC]/70 border-b border-[#E2E8F0] grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {/* Tarjetas resumen verticales de A1, A2... (ancho completo arriba/abajo) */}
+                    <div className="px-4 md:px-5 py-3 bg-[#F8FAFC]/70 border-b border-[#E2E8F0] flex flex-col gap-2">
                       {block.items.map((it) => {
                         const { obj: activeObj, variantId: activeVarId } = getVariantObj(it.ex);
                         const exPR = getExercisePRData(it.ex, activeVarId, activeObj);
@@ -1710,27 +1710,39 @@ export default function Training({
                         renderSupersetRoundsView(block, blockKey)
                       ) : (
                         <div>
-                          {/* Selector de ejercicio dentro de Detalle */}
-                          <div className="px-4 md:px-5 py-2 bg-[#F8FAFC] border-b border-[#E2E8F0] flex items-center gap-1.5 overflow-x-auto scroll-hide">
-                            {block.items.map((it) => {
-                              const { obj: activeObj } = getVariantObj(it.ex);
-                              const active = activeDetalleItem.index === it.index;
-                              return (
-                                <button
-                                  key={it.ex.id || it.index}
-                                  type="button"
-                                  onClick={() => setExpandedEx(it.index)}
-                                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border shrink-0 transition-colors cursor-pointer focus:outline-none ${
-                                    active
-                                      ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)]"
-                                      : "bg-white text-[#475569] border-[#E2E8F0] hover:text-[var(--brand-primary)]"
-                                  }`}
-                                >
-                                  <span className="font-mono">{it.meta.codeLabel}</span>
-                                  <span className="truncate max-w-[160px]">{activeObj.nombre}</span>
-                                </button>
-                              );
-                            })}
+                          {/* Switch segmentado entre ejercicios del bloque (A1 / A2...) */}
+                          <div className="px-4 md:px-5 py-2.5 bg-[#F8FAFC] border-b border-[#E2E8F0]">
+                            <div
+                              className="grid gap-1 p-1 rounded-xl bg-[#E2E8F0]/65 border border-[#E2E8F0]"
+                              style={{ gridTemplateColumns: `repeat(${block.items.length}, minmax(0, 1fr))` }}
+                            >
+                              {block.items.map((it) => {
+                                const { obj: activeObj } = getVariantObj(it.ex);
+                                const active = activeDetalleItem.index === it.index;
+                                return (
+                                  <button
+                                    key={it.ex.id || it.index}
+                                    type="button"
+                                    onClick={() => setExpandedEx(it.index)}
+                                    className={`flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer focus:outline-none min-w-0 ${
+                                      active
+                                        ? "bg-white text-[var(--brand-primary)] shadow-2xs border border-[var(--brand-primary)]/25"
+                                        : "text-[#64748B] hover:text-[#0B1929]"
+                                    }`}
+                                    title={activeObj.nombre}
+                                  >
+                                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-extrabold shrink-0 ${
+                                      active
+                                        ? "bg-[var(--brand-primary)] text-white"
+                                        : "bg-white/80 text-[#475569]"
+                                    }`}>
+                                      {it.meta.codeLabel}
+                                    </span>
+                                    <span className="truncate">{activeObj.nombre}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
                           </div>
                           {renderSingleExerciseDetails(activeDetalleItem.ex, activeDetalleItem.index)}
                         </div>
