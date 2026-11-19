@@ -1597,12 +1597,77 @@ export default function Training({
                 );
               };
 
+              const renderAccordionExerciseRow = ({ ex, index, codeLabel, isSupersetMember = false, allowExpand = true }) => {
+                const isRowExpanded = allowExpand && expandedEx === index;
+                const { obj: activeObj, variantId: activeVarId } = getVariantObj(ex);
+                const exPR = getExercisePRData(ex, activeVarId, activeObj);
+                const restSeg = activeObj?.descanso_seg ?? ex.descanso_seg;
+                const restLabel = restSeg && parseInt(restSeg, 10) > 0 ? formatRestLabel(restSeg) : "";
+                const rirTarget = activeObj?.rir_objetivo ?? ex.rir_objetivo;
+                const isSaved = ["original", "alt_0", "alt_1"].some((vid) => progreso[`${ex.id}-${wi}-0-reps-${vid}`] !== undefined);
+
+                return (
+                  <div key={ex.id || index}>
+                    <button
+                      type="button"
+                      className={`w-full flex items-center gap-3.5 md:gap-4 px-4 md:px-5 ${
+                        allowExpand ? "py-3.5 md:py-4" : "py-3"
+                      } text-left cursor-pointer hover:bg-[#F8FAFC]/50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--brand-primary)]/40`}
+                      onClick={() => setExpandedEx(isRowExpanded ? null : index)}
+                    >
+                      <div
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                          isSupersetMember
+                            ? "bg-[var(--brand-secondary)] border border-[var(--brand-primary)]/30"
+                            : "bg-[#E8F1FB]"
+                        }`}
+                      >
+                        <span className="text-xs font-mono font-bold text-[var(--brand-primary)]">{codeLabel}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-[#0B1929] truncate">{activeObj.nombre}</p>
+                        <div className="flex items-center flex-wrap gap-1.5 mt-0.5">
+                          <span className="text-xs text-[#6B7A8D]">
+                            {GRUPO_LABELS[normalizeMuscleGroup(resolveCanonicalGroup(activeObj))] || resolveCanonicalGroup(activeObj) || "General"}
+                          </span>
+                          {!isRowExpanded && restLabel && (
+                            <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[#F1F5F9] text-[#475569]">
+                              <Timer size={10} /> {restLabel}
+                            </span>
+                          )}
+                          {!isRowExpanded && rirTarget && (
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[#F8FAFC] border border-[#E2E8F0] text-[#475569]">
+                              RIR {rirTarget}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {exPR.isPR && (
+                        <span className="inline-flex items-center gap-1 text-[11px] bg-amber-50 text-amber-700 px-2.5 py-0.5 rounded-full font-bold border border-amber-200 shadow-sm">
+                          <Trophy size={12} className="text-amber-500" /> Nuevo PR
+                        </span>
+                      )}
+                      {isSaved && (
+                        <span className="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded font-medium border border-green-100 hidden md:block">
+                          ✓ Guardado
+                        </span>
+                      )}
+                      <ChevronDown
+                        size={16}
+                        className={`text-[#CBD5E1] transition-transform flex-shrink-0 ${isRowExpanded ? "rotate-180" : ""}`}
+                      />
+                    </button>
+
+                    {isRowExpanded && renderSingleExerciseDetails(ex, index)}
+                  </div>
+                );
+              };
+
               return exerciseBlocks.map((block, bIdx) => {
                 if (block.type === "superset") {
                   const blockKey = `${rutinaActiva?.id || "rut"}_${block.groupCode}_${bIdx}`;
                   const isBlockExpanded = block.items.some((it) => expandedEx === it.index);
                   const mode = supersetMode[blockKey] || "rondas";
-                  const activeDetalleItem = block.items.find((it) => expandedEx === it.index) || block.items[0];
 
                   return (
                     <div
@@ -1665,86 +1730,29 @@ export default function Training({
 
                       {!isBlockExpanded ? (
                         <div className="divide-y divide-[#E2E8F0]">
-                          {block.items.map((it) => {
-                            const { obj: activeObj } = getVariantObj(it.ex);
-                            const restSeg = activeObj?.descanso_seg ?? it.ex.descanso_seg;
-                            const restLabel = restSeg && parseInt(restSeg, 10) > 0 ? formatRestLabel(restSeg) : "";
-                            const rirTarget = activeObj?.rir_objetivo ?? it.ex.rir_objetivo;
-                            const itemSaved = ["original", "alt_0", "alt_1"].some((vid) => progreso[`${it.ex.id}-${wi}-0-reps-${vid}`] !== undefined);
-                            return (
-                              <button
-                                key={it.ex.id || it.index}
-                                type="button"
-                                onClick={() => setExpandedEx(it.index)}
-                                className="w-full flex items-center gap-3.5 md:gap-4 px-4 md:px-5 py-3 text-left hover:bg-[#F8FAFC]/60 transition-colors cursor-pointer focus:outline-none"
-                              >
-                                <div className="w-8 h-8 rounded-lg bg-[var(--brand-secondary)] border border-[var(--brand-primary)]/30 flex items-center justify-center shrink-0">
-                                  <span className="text-xs font-mono font-bold text-[var(--brand-primary)]">{it.meta.codeLabel}</span>
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-semibold text-[#0B1929] truncate">{activeObj.nombre}</p>
-                                  <div className="flex items-center flex-wrap gap-1.5 mt-0.5">
-                                    <span className="text-xs text-[#6B7A8D]">{GRUPO_LABELS[normalizeMuscleGroup(resolveCanonicalGroup(activeObj))] || resolveCanonicalGroup(activeObj) || "General"}</span>
-                                    {restLabel && (
-                                      <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[#F1F5F9] text-[#475569]">
-                                        <Timer size={10} /> {restLabel}
-                                      </span>
-                                    )}
-                                    {rirTarget && (
-                                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[#F8FAFC] border border-[#E2E8F0] text-[#475569]">
-                                        RIR {rirTarget}
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                                {itemSaved && (
-                                  <span className="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded font-medium border border-green-100 hidden md:block">
-                                    ✓ Guardado
-                                  </span>
-                                )}
-                              </button>
-                            );
-                          })}
+                          {block.items.map((it) =>
+                            renderAccordionExerciseRow({
+                              ex: it.ex,
+                              index: it.index,
+                              codeLabel: it.meta.codeLabel,
+                              isSupersetMember: true,
+                              allowExpand: false,
+                            })
+                          )}
                         </div>
                       ) : mode === "rondas" ? (
                         renderSupersetRoundsView(block, blockKey)
                       ) : (
-                        <div>
-                          {/* Switch segmentado entre ejercicios del bloque (A1 / A2...) */}
-                          <div className="px-4 md:px-5 py-2.5 bg-[#F8FAFC] border-b border-[#E2E8F0]">
-                            <div
-                              className="grid gap-1 p-1 rounded-xl bg-[#E2E8F0]/65 border border-[#E2E8F0]"
-                              style={{ gridTemplateColumns: `repeat(${block.items.length}, minmax(0, 1fr))` }}
-                            >
-                              {block.items.map((it) => {
-                                const { obj: activeObj } = getVariantObj(it.ex);
-                                const active = activeDetalleItem.index === it.index;
-                                return (
-                                  <button
-                                    key={it.ex.id || it.index}
-                                    type="button"
-                                    onClick={() => setExpandedEx(it.index)}
-                                    className={`flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer focus:outline-none min-w-0 ${
-                                      active
-                                        ? "bg-white text-[var(--brand-primary)] shadow-2xs border border-[var(--brand-primary)]/25"
-                                        : "text-[#64748B] hover:text-[#0B1929]"
-                                    }`}
-                                    title={activeObj.nombre}
-                                  >
-                                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-extrabold shrink-0 ${
-                                      active
-                                        ? "bg-[var(--brand-primary)] text-white"
-                                        : "bg-white/80 text-[#475569]"
-                                    }`}>
-                                      {it.meta.codeLabel}
-                                    </span>
-                                    <span className="truncate">{activeObj.nombre}</span>
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                          {renderSingleExerciseDetails(activeDetalleItem.ex, activeDetalleItem.index)}
+                        <div className="divide-y divide-[#E2E8F0]">
+                          {block.items.map((it) =>
+                            renderAccordionExerciseRow({
+                              ex: it.ex,
+                              index: it.index,
+                              codeLabel: it.meta.codeLabel,
+                              isSupersetMember: true,
+                              allowExpand: true,
+                            })
+                          )}
                         </div>
                       )}
                     </div>
@@ -1756,12 +1764,6 @@ export default function Training({
                 const ex = singleItem.ex;
                 const i = singleItem.index;
                 const isExpanded = expandedEx === i;
-                const { obj: activeObj, variantId: activeVarId } = getVariantObj(ex);
-                const exPR = getExercisePRData(ex, activeVarId, activeObj);
-                const restSeg = activeObj?.descanso_seg ?? ex.descanso_seg;
-                const restLabel = restSeg && parseInt(restSeg, 10) > 0 ? formatRestLabel(restSeg) : "";
-                const rirTarget = activeObj?.rir_objetivo ?? ex.rir_objetivo;
-                const isSaved = ["original", "alt_0", "alt_1"].some(vid => progreso[`${ex.id}-${wi}-0-reps-${vid}`] !== undefined);
 
                 return (
                   <div
@@ -1772,47 +1774,13 @@ export default function Training({
                         : "bg-white md:border-[#E2E8F0]"
                     }`}
                   >
-                    <button
-                      type="button"
-                      className="w-full flex items-center gap-3.5 md:gap-4 px-4 md:px-5 py-3.5 md:py-4 text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--brand-primary)]/40"
-                      onClick={() => setExpandedEx(isExpanded ? null : i)}
-                    >
-                      <div className="w-8 h-8 rounded-lg bg-[#E8F1FB] flex items-center justify-center flex-shrink-0">
-                        <span className="text-xs font-mono font-bold text-[var(--brand-primary)]">{i + 1}</span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-[#0B1929]">{activeObj.nombre}</p>
-                        <div className="flex items-center flex-wrap gap-1.5 mt-0.5">
-                          <span className="text-xs text-[#6B7A8D]">{GRUPO_LABELS[normalizeMuscleGroup(resolveCanonicalGroup(activeObj))] || resolveCanonicalGroup(activeObj) || "General"}</span>
-                          {!isExpanded && restLabel && (
-                            <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[#F1F5F9] text-[#475569]">
-                              <Timer size={10} /> {restLabel}
-                            </span>
-                          )}
-                          {!isExpanded && rirTarget && (
-                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[#F8FAFC] border border-[#E2E8F0] text-[#475569]">
-                              RIR {rirTarget}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      {exPR.isPR && (
-                        <span className="inline-flex items-center gap-1 text-[11px] bg-amber-50 text-amber-700 px-2.5 py-0.5 rounded-full font-bold border border-amber-200 shadow-sm">
-                          <Trophy size={12} className="text-amber-500" /> Nuevo PR
-                        </span>
-                      )}
-                      {isSaved && (
-                        <span className="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded font-medium border border-green-100 hidden md:block">
-                          ✓ Guardado
-                        </span>
-                      )}
-                      <ChevronDown
-                        size={16}
-                        className={`text-[#CBD5E1] transition-transform flex-shrink-0 ${isExpanded ? "rotate-180" : ""}`}
-                      />
-                    </button>
-
-                    {isExpanded && renderSingleExerciseDetails(ex, i)}
+                    {renderAccordionExerciseRow({
+                      ex,
+                      index: i,
+                      codeLabel: String(i + 1),
+                      isSupersetMember: false,
+                      allowExpand: true,
+                    })}
                   </div>
                 );
               });
