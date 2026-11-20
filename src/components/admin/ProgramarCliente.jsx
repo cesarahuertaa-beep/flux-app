@@ -1146,7 +1146,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   }, [selected?.id, loadPatientExerciseHistory]);
 
   /** Extrae los campos opcionales de prescripción (descanso, RIR, nota, biserie) para persistencia uniforme. */
-  const extractOptionalExerciseFields = (src) => {
+  const extractOptionalExerciseFields = (src, { includeBlock = true } = {}) => {
     const restRaw = src?.descanso_seg;
     const restParsed =
       restRaw !== null && restRaw !== undefined && String(restRaw).trim() !== ""
@@ -1154,12 +1154,54 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         : NaN;
     const rir = src?.rir_objetivo ? String(src.rir_objetivo).trim() : "";
     const nota = src?.nota_tecnica ? String(src.nota_tecnica).trim() : "";
-    const bloque = src?.bloque_grupo ? String(src.bloque_grupo).trim() : "";
-    return {
+    const base = {
       descanso_seg: !isNaN(restParsed) && restParsed > 0 ? Math.min(600, restParsed) : null,
       rir_objetivo: rir || null,
       nota_tecnica: nota || null,
-      bloque_grupo: bloque || null,
+    };
+    if (!includeBlock) return base;
+    const bloque = src?.bloque_grupo ? String(src.bloque_grupo).trim() : "";
+    return { ...base, bloque_grupo: bloque || null };
+  };
+
+  /** Redimensiona filas editables por serie al cambiar el total de series. */
+  const resizeSeriesFormRows = (seriesForm, nextCount, fallbackReps = 10, fallbackPeso = "") => {
+    if (!Array.isArray(seriesForm) || seriesForm.length === 0) return seriesForm;
+    const count = Math.max(1, Math.min(12, parseInt(nextCount, 10) || 1));
+    const last = seriesForm[seriesForm.length - 1] || {
+      reps: String(fallbackReps || 10),
+      peso: String(fallbackPeso || ""),
+      tipo: "normal",
+    };
+    return Array.from({ length: count }, (_, idx) =>
+      seriesForm[idx] ? { ...seriesForm[idx] } : { reps: last.reps, peso: last.peso, tipo: "normal" }
+    );
+  };
+
+  /** Hidrata una alternativa al formato editable completo del modal híbrido. */
+  const hydrateAltFormItem = (alt, parentUnit = "kg", numSeries = 4, fallbackReps = 10) => {
+    const altResolved = resolveCanonicalExercise(alt);
+    const altUnit = alt.unidad || parentUnit;
+    const altReps = alt.reps_sugeridas ?? fallbackReps ?? 10;
+    const altPesoInput = formatWeightForInput(alt.peso_sugerido, altUnit);
+    const altNormDetalle = normalizeSeriesDetalle(alt.series_detalle);
+    const altSeriesForm =
+      altNormDetalle.length > 0
+        ? seriesDetalleToForm(altNormDetalle, numSeries, altReps, altPesoInput, altUnit)
+        : [];
+    return {
+      ...altResolved,
+      reps_sugeridas: altReps,
+      peso_sugerido: altPesoInput,
+      unidad: altUnit,
+      series_detalle: altNormDetalle,
+      seriesForm: altSeriesForm,
+      descanso_seg: alt.descanso_seg != null && alt.descanso_seg !== "" ? String(alt.descanso_seg) : "",
+      rir_objetivo: alt.rir_objetivo || "",
+      nota_tecnica: alt.nota_tecnica || "",
+      _showOptions: false,
+      _showRmPicker: false,
+      _historyApplied: false,
     };
   };
 
@@ -1221,14 +1263,10 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       nota_tecnica: x.nota_tecnica || "",
       bloque_grupo: x.bloque_grupo || null,
       _showOptions: false,
-      alternativas: (x.alternativas || []).map((alt) => {
-        const altResolved = resolveCanonicalExercise(alt);
-        return {
-          ...altResolved,
-          peso_sugerido: formatWeightForInput(alt.peso_sugerido, alt.unidad || unit),
-          series_detalle: normalizeSeriesDetalle(alt.series_detalle),
-        };
-      }),
+      _showRmPicker: false,
+      alternativas: (x.alternativas || []).map((alt) =>
+        hydrateAltFormItem(alt, unit, numSeries, resolved.reps_sugeridas || x.reps_sugeridas || 10)
+      ),
       _dndId: String((!clearIds && x.id) || Math.random().toString(36).slice(2, 9)),
     };
     if (clearIds) {
@@ -3518,15 +3556,13 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     setShowRutinaModal(true); 
   };
 
-  const serializeExerciseForDb = (e, rid, orden) => {
-    const unit = e.unidad || "kg";
-    const numSeries = +e.num_series || 4;
-    let repsSug = +e.reps_sugeridas || 10;
-    let pesoSugKg = convertInputWeightToKg(e.peso_sugerido, unit);
+  const serializeSeriesAndWeights = (item, itemUnit, numSeries, fallbackReps = 10) => {
+    let repsSug = +item?.reps_sugeridas || fallbackReps;
+    let pesoSugKg = convertInputWeightToKg(item?.peso_sugerido, itemUnit);
     let seriesDetalle = [];
 
-    if (Array.isArray(e.seriesForm) && e.seriesForm.length > 0) {
-      const converted = seriesFormToDb(e.seriesForm, unit, numSeries);
+    if (Array.isArray(item?.seriesForm) && item.seriesForm.length > 0) {
+      const converted = seriesFormToDb(item.seriesForm, itemUnit, numSeries);
       const workingRows = converted.filter((s) => normalizeSeriesType(s.tipo) !== "warmup");
       const refRows = workingRows.length > 0 ? workingRows : converted;
       const validWeights = refRows.map((s) => s.peso).filter((p) => p !== null);
@@ -3536,9 +3572,16 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       if (hasCustomSeriesBreakdown(converted, repsSug, pesoSugKg)) {
         seriesDetalle = converted;
       }
-    } else if (Array.isArray(e.series_detalle) && e.series_detalle.length > 0) {
-      seriesDetalle = normalizeSeriesDetalle(e.series_detalle);
+    } else if (Array.isArray(item?.series_detalle) && item.series_detalle.length > 0) {
+      seriesDetalle = normalizeSeriesDetalle(item.series_detalle);
     }
+    return { repsSug, pesoSugKg, seriesDetalle };
+  };
+
+  const serializeExerciseForDb = (e, rid, orden) => {
+    const unit = e.unidad || "kg";
+    const numSeries = +e.num_series || 4;
+    const { repsSug, pesoSugKg, seriesDetalle } = serializeSeriesAndWeights(e, unit, numSeries, 10);
 
     const resolved = resolveCanonicalExercise(e);
     return {
@@ -3556,14 +3599,26 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       ...extractOptionalExerciseFields(e),
       alternativas: (e.alternativas || []).map((alt) => {
         const altResolved = resolveCanonicalExercise(alt);
+        const altUnit = alt.unidad || unit;
+        const altSer = serializeSeriesAndWeights(alt, altUnit, numSeries, repsSug);
+        const cleanAlt = { ...alt };
+        delete cleanAlt.seriesForm;
+        delete cleanAlt._showOptions;
+        delete cleanAlt._showRmPicker;
+        delete cleanAlt._historyApplied;
+        delete cleanAlt._dndId;
         return {
-          ...alt,
+          ...cleanAlt,
           nombre: altResolved.nombre || alt.nombre,
           grupo_muscular: altResolved.grupo_muscular || alt.grupo_muscular || "",
           biblioteca_id: altResolved.biblioteca_id || null,
           gif_url: altResolved.gif_url || alt.gif_url || "",
-          peso_sugerido: convertInputWeightToKg(alt.peso_sugerido, alt.unidad || unit),
-          series_detalle: normalizeSeriesDetalle(alt.series_detalle),
+          tipo_movimiento: alt.tipo_movimiento || "",
+          unidad: altUnit,
+          reps_sugeridas: altSer.repsSug,
+          peso_sugerido: altSer.pesoSugKg,
+          series_detalle: altSer.seriesDetalle,
+          ...extractOptionalExerciseFields(alt, { includeBlock: false }),
         };
       }),
       orden,
@@ -3860,8 +3915,9 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       setRutinaForm(p => ({ ...p, ejercicios:[...p.ejercicios, { 
         _dndId: Math.random().toString(36).slice(2,9), 
         biblioteca_id:ej.id, nombre:ej.nombre, grupo_muscular:ej.grupo_muscular, 
+        tipo_movimiento: ej.tipo_movimiento || "",
         gif_url:ej.gif_url||"", num_series:4, reps_sugeridas:10, peso_sugerido:"", unidad:"kg", series_detalle:[], seriesForm:[], alternativas:[],
-        descanso_seg: "", rir_objetivo: "", nota_tecnica: "", bloque_grupo: null, _showOptions: false
+        descanso_seg: "", rir_objetivo: "", nota_tecnica: "", bloque_grupo: null, _showOptions: false, _showRmPicker: false, _historyApplied: false
       }] }));
     } else {
       setRutinaForm(p => {
@@ -3873,11 +3929,19 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           biblioteca_id: ej.id,
           nombre: ej.nombre,
           grupo_muscular: ej.grupo_muscular || main.grupo_muscular || "",
+          tipo_movimiento: ej.tipo_movimiento || "",
           gif_url: ej.gif_url || "",
           reps_sugeridas: main.reps_sugeridas || 10,
           peso_sugerido: main.peso_sugerido || "",
           unidad: main.unidad || "kg",
-          series_detalle: []
+          series_detalle: [],
+          seriesForm: [],
+          descanso_seg: "",
+          rir_objetivo: "",
+          nota_tecnica: "",
+          _showOptions: false,
+          _showRmPicker: false,
+          _historyApplied: false,
         };
         es[activeAltSlot] = { ...main, alternativas: [...(main.alternativas || []), newAlt] };
         return { ...p, ejercicios: es };
@@ -3886,77 +3950,95 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     }
   };
 
+  /** Aplica una transformación sobre un ejercicio principal (`altIdx === null`) o una alternativa puntual. */
+  const updateTargetItem = (es, i, altIdx, fn) => {
+    const main = es[i];
+    if (!main) return es;
+    const parentSeriesCount = Math.max(1, Math.min(12, parseInt(main.num_series, 10) || 4));
+    if (altIdx === null || altIdx === undefined) {
+      es[i] = fn(main, parentSeriesCount);
+      return es;
+    }
+    const alts = [...(main.alternativas || [])];
+    if (!alts[altIdx]) return es;
+    alts[altIdx] = fn(alts[altIdx], parentSeriesCount);
+    es[i] = { ...main, alternativas: alts };
+    return es;
+  };
+
   const updEj = (i, f, v) => setRutinaForm(p => {
     const es = [...p.ejercicios];
-    const cur = { ...es[i], [f]: v, ...(f !== "unidad" && f !== "descanso_seg" && f !== "rir_objetivo" && f !== "nota_tecnica" ? { _historyApplied: false } : {}) };
-    if (f === "num_series" && Array.isArray(cur.seriesForm) && cur.seriesForm.length > 0) {
-      const nextCount = Math.max(1, Math.min(12, parseInt(v, 10) || 1));
-      const prevRows = cur.seriesForm;
-      const last = prevRows[prevRows.length - 1] || { reps: String(cur.reps_sugeridas || 10), peso: String(cur.peso_sugerido || ""), tipo: "normal" };
-      cur.seriesForm = Array.from({ length: nextCount }, (_, idx) =>
-        prevRows[idx] ? { ...prevRows[idx] } : { reps: last.reps, peso: last.peso, tipo: "normal" }
-      );
+    const clearHist = f !== "unidad" && f !== "descanso_seg" && f !== "rir_objetivo" && f !== "nota_tecnica";
+    const cur = { ...es[i], [f]: v, ...(clearHist ? { _historyApplied: false } : {}) };
+    if (f === "num_series") {
+      cur.seriesForm = resizeSeriesFormRows(cur.seriesForm, v, cur.reps_sugeridas, cur.peso_sugerido);
+      cur.alternativas = (cur.alternativas || []).map((alt) => ({
+        ...alt,
+        seriesForm: resizeSeriesFormRows(alt.seriesForm, v, alt.reps_sugeridas ?? cur.reps_sugeridas, alt.peso_sugerido),
+      }));
     }
     es[i] = cur;
     return { ...p, ejercicios: es };
   });
 
-  const togglePerSeries = (i) => setRutinaForm(p => {
+  const togglePerSeries = (i, altIdx = null) => setRutinaForm(p => {
     const es = [...p.ejercicios];
-    const cur = es[i];
-    if (!cur) return p;
-    if (Array.isArray(cur.seriesForm) && cur.seriesForm.length > 0) {
-      const firstWorking = cur.seriesForm.find((s) => normalizeSeriesType(s.tipo) !== "warmup") || cur.seriesForm[0] || {};
-      es[i] = {
+    updateTargetItem(es, i, altIdx, (cur, parentCount) => {
+      if (Array.isArray(cur.seriesForm) && cur.seriesForm.length > 0) {
+        const firstWorking = cur.seriesForm.find((s) => normalizeSeriesType(s.tipo) !== "warmup") || cur.seriesForm[0] || {};
+        return {
+          ...cur,
+          reps_sugeridas: firstWorking.reps || cur.reps_sugeridas || 10,
+          peso_sugerido: firstWorking.peso !== undefined ? firstWorking.peso : (cur.peso_sugerido || ""),
+          series_detalle: [],
+          seriesForm: [],
+        };
+      }
+      return {
         ...cur,
-        reps_sugeridas: firstWorking.reps || cur.reps_sugeridas || 10,
-        peso_sugerido: firstWorking.peso !== undefined ? firstWorking.peso : (cur.peso_sugerido || ""),
-        series_detalle: [],
-        seriesForm: [],
-      };
-    } else {
-      const count = Math.max(1, Math.min(12, parseInt(cur.num_series, 10) || 4));
-      es[i] = {
-        ...cur,
-        seriesForm: Array.from({ length: count }, () => ({
+        seriesForm: Array.from({ length: parentCount }, () => ({
           reps: String(cur.reps_sugeridas || 10),
           peso: String(cur.peso_sugerido || ""),
           tipo: "normal",
         })),
       };
-    }
-    return { ...p, ejercicios: es };
-  });
-
-  const updSerieField = (i, si, field, val) => setRutinaForm(p => {
-    const es = [...p.ejercicios];
-    const cur = { ...es[i], _historyApplied: false };
-    const nextSeries = (cur.seriesForm || []).map((s, idx) => (idx === si ? { ...s, [field]: val } : s));
-    cur.seriesForm = nextSeries;
-    if (si === 0 && field === "reps" && val !== "") cur.reps_sugeridas = val;
-    if (si === 0 && field === "peso") cur.peso_sugerido = val;
-    es[i] = cur;
-    return { ...p, ejercicios: es };
-  });
-
-  const toggleSeriesType = (i, si) => setRutinaForm(p => {
-    const es = [...p.ejercicios];
-    const cur = es[i];
-    if (!cur || !Array.isArray(cur.seriesForm)) return p;
-    const nextSeries = cur.seriesForm.map((s, idx) => {
-      if (idx !== si) return s;
-      const curType = normalizeSeriesType(s.tipo);
-      const nextType = SERIES_TYPES[curType]?.next || "normal";
-      return { ...s, tipo: nextType };
     });
-    es[i] = { ...cur, seriesForm: nextSeries };
     return { ...p, ejercicios: es };
   });
 
-  const toggleExerciseOptions = (i) => setRutinaForm(p => {
+  const updSerieField = (i, si, field, val, altIdx = null) => setRutinaForm(p => {
     const es = [...p.ejercicios];
-    if (!es[i]) return p;
-    es[i] = { ...es[i], _showOptions: !es[i]._showOptions };
+    updateTargetItem(es, i, altIdx, (cur) => {
+      const nextSeries = (cur.seriesForm || []).map((s, idx) => (idx === si ? { ...s, [field]: val } : s));
+      const updated = { ...cur, _historyApplied: false, seriesForm: nextSeries };
+      if (si === 0 && field === "reps" && val !== "") updated.reps_sugeridas = val;
+      if (si === 0 && field === "peso") updated.peso_sugerido = val;
+      return updated;
+    });
+    return { ...p, ejercicios: es };
+  });
+
+  const toggleSeriesType = (i, si, altIdx = null) => setRutinaForm(p => {
+    const es = [...p.ejercicios];
+    updateTargetItem(es, i, altIdx, (cur) => {
+      if (!Array.isArray(cur.seriesForm)) return cur;
+      const nextSeries = cur.seriesForm.map((s, idx) => {
+        if (idx !== si) return s;
+        const curType = normalizeSeriesType(s.tipo);
+        const nextType = SERIES_TYPES[curType]?.next || "normal";
+        return { ...s, tipo: nextType };
+      });
+      return { ...cur, seriesForm: nextSeries };
+    });
+    return { ...p, ejercicios: es };
+  });
+
+  const toggleExerciseOptions = (i, altIdx = null) => setRutinaForm(p => {
+    const es = [...p.ejercicios];
+    updateTargetItem(es, i, altIdx, (cur) => {
+      const nextOpen = !cur._showOptions;
+      return { ...cur, _showOptions: nextOpen, ...(nextOpen ? { _showRmPicker: false } : {}) };
+    });
     return { ...p, ejercicios: es };
   });
 
@@ -3967,11 +4049,9 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     if (!cur) return p;
 
     if (cur.bloque_grupo && next && cur.bloque_grupo === next.bloque_grupo) {
-      // Desvincular este bloque entre i e i+1
       const groupId = cur.bloque_grupo;
       const prevSame = i > 0 && es[i - 1]?.bloque_grupo === groupId;
       if (prevSame) {
-        // i pertenece al bloque anterior; cortar desde i+1
         es[i + 1].bloque_grupo = null;
       } else {
         es[i].bloque_grupo = null;
@@ -4006,40 +4086,42 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     return { ...p, ejercicios: normalizeSupersetBlocks(es) };
   });
 
-  const toggleRmPicker = (i) => setRutinaForm(p => {
+  const toggleRmPicker = (i, altIdx = null) => setRutinaForm(p => {
     const es = [...p.ejercicios];
-    if (!es[i]) return p;
-    es[i] = { ...es[i], _showRmPicker: !es[i]._showRmPicker };
+    updateTargetItem(es, i, altIdx, (cur) => {
+      const nextOpen = !cur._showRmPicker;
+      return { ...cur, _showRmPicker: nextOpen, ...(nextOpen ? { _showOptions: false } : {}) };
+    });
     return { ...p, ejercicios: es };
   });
 
-  const applyCalculatedLoadToExercise = (i, computeFn) => setRutinaForm(p => {
+  const applyCalculatedLoadToExercise = (i, computeFn, altIdx = null) => setRutinaForm(p => {
     const es = [...p.ejercicios];
-    const cur = es[i];
-    if (!cur) return p;
-    const hMark = lookupExerciseHistory(patientHistoryMarks, cur);
-    const res = computeFn(cur, hMark);
-    if (!res) return p;
+    updateTargetItem(es, i, altIdx, (cur) => {
+      const hMark = lookupExerciseHistory(patientHistoryMarks, cur);
+      const res = computeFn(cur, hMark);
+      if (!res) return cur;
 
-    const nextSeriesForm = Array.isArray(cur.seriesForm) && cur.seriesForm.length > 0
-      ? cur.seriesForm.map((sf) =>
-          normalizeSeriesType(sf.tipo) === "warmup"
-            ? sf
-            : { ...sf, peso: res.peso, reps: res.reps }
-        )
-      : cur.seriesForm;
+      const nextSeriesForm = Array.isArray(cur.seriesForm) && cur.seriesForm.length > 0
+        ? cur.seriesForm.map((sf) =>
+            normalizeSeriesType(sf.tipo) === "warmup"
+              ? sf
+              : { ...sf, peso: res.peso, reps: res.reps }
+          )
+        : cur.seriesForm;
 
-    es[i] = {
-      ...cur,
-      peso_sugerido: res.peso,
-      reps_sugeridas: res.reps,
-      seriesForm: nextSeriesForm,
-      _showRmPicker: false,
-    };
+      return {
+        ...cur,
+        peso_sugerido: res.peso,
+        reps_sugeridas: res.reps,
+        seriesForm: nextSeriesForm,
+        _showRmPicker: false,
+      };
+    });
     return { ...p, ejercicios: es };
   });
 
-  const applyPercent1RMToExercise = (i, pct) =>
+  const applyPercent1RMToExercise = (i, pct, altIdx = null) =>
     applyCalculatedLoadToExercise(i, (cur, hMark) => {
       if (!hMark?.best1RM) return null;
       const calc = calculateWeightFrom1RM({
@@ -4048,9 +4130,9 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         unit: cur.unidad || "kg",
       });
       return calc ? { peso: calc.pesoInput, reps: String(calc.estReps) } : null;
-    });
+    }, altIdx);
 
-  const applyDoubleProgressionToExercise = (i) =>
+  const applyDoubleProgressionToExercise = (i, altIdx = null) =>
     applyCalculatedLoadToExercise(i, (cur, hMark) => {
       const prog = computeDoubleProgressionSuggestion({
         hMark,
@@ -4058,12 +4140,12 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         unit: cur.unidad || "kg",
       });
       return prog ? { peso: prog.nextPesoInput, reps: prog.nextReps } : null;
-    });
+    }, altIdx);
 
-  const applyMarkToExerciseObject = (exObj, mark) => {
+  const applyMarkToExerciseObject = (exObj, mark, parentNumSeries = null) => {
     if (!mark) return exObj;
     const unit = exObj.unidad || "kg";
-    const numSeries = Math.max(1, parseInt(exObj.num_series, 10) || 4);
+    const numSeries = Math.max(1, parseInt(parentNumSeries ?? exObj.num_series, 10) || 4);
     const repsStr = String(mark.reps_sugeridas || exObj.reps_sugeridas || 10);
     const pesoStr = mark.peso_sugerido != null ? convertWeightToInput(mark.peso_sugerido, unit) : (exObj.peso_sugerido || "");
     const existingTypes = Array.isArray(exObj.seriesForm) && exObj.seriesForm.length > 0
@@ -4093,19 +4175,13 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   };
 
   const applyBestMarksWithAlts = (cur, historyMap) => {
+    const parentCount = Math.max(1, parseInt(cur.num_series, 10) || 4);
     const mark = lookupExerciseHistory(historyMap, cur);
     const nextAlts = (cur.alternativas || []).map((alt) => {
       const altMark = lookupExerciseHistory(historyMap, alt);
-      if (!altMark) return alt;
-      const altUnit = alt.unidad || cur.unidad || "kg";
-      return {
-        ...alt,
-        reps_sugeridas: String(altMark.reps_sugeridas || alt.reps_sugeridas || 10),
-        peso_sugerido: altMark.peso_sugerido != null ? convertWeightToInput(altMark.peso_sugerido, altUnit) : (alt.peso_sugerido || ""),
-        series_detalle: Array.isArray(altMark.series_detalle) ? altMark.series_detalle : [],
-      };
+      return altMark ? applyMarkToExerciseObject(alt, altMark, parentCount) : alt;
     });
-    const updatedMain = mark ? applyMarkToExerciseObject(cur, mark) : cur;
+    const updatedMain = mark ? applyMarkToExerciseObject(cur, mark, parentCount) : cur;
     const anyApplied = Boolean(mark) || nextAlts.some((a, idx) => a !== (cur.alternativas || [])[idx]);
     return {
       updated: { ...updatedMain, alternativas: nextAlts },
@@ -4113,12 +4189,19 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     };
   };
 
-  const applyHistoryMarksToExercise = (i) => {
+  const applyHistoryMarksToExercise = (i, altIdx = null) => {
     setRutinaForm(p => {
       const es = [...p.ejercicios];
       const cur = es[i];
       if (!cur) return p;
-      es[i] = applyBestMarksWithAlts(cur, patientHistoryMarks).updated;
+      if (altIdx !== null && altIdx !== undefined) {
+        updateTargetItem(es, i, altIdx, (altItem, parentCount) => {
+          const altMark = lookupExerciseHistory(patientHistoryMarks, altItem);
+          return altMark ? applyMarkToExerciseObject(altItem, altMark, parentCount) : altItem;
+        });
+      } else {
+        es[i] = applyBestMarksWithAlts(cur, patientHistoryMarks).updated;
+      }
       return { ...p, ejercicios: es };
     });
   };
@@ -4147,7 +4230,14 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   
   const toggleUnidad = (i) => setRutinaForm(p => { const es=[...p.ejercicios]; es[i]={...es[i], unidad: es[i].unidad ==="lb" ?"kg" :"lb"}; return { ...p, ejercicios:es }; });
   const toggleUnidadAlt = (i, altIdx) => setRutinaForm(p => { const es=[...p.ejercicios]; const alts=[...es[i].alternativas]; alts[altIdx]={...alts[altIdx], unidad: alts[altIdx].unidad ==="lb" ?"kg" :"lb"}; es[i]={...es[i], alternativas: alts}; return { ...p, ejercicios:es }; });
-  const updAlt = (i, altIdx, f, v) => setRutinaForm(p => { const es=[...p.ejercicios]; const alts=[...es[i].alternativas]; alts[altIdx]={...alts[altIdx], [f]:v}; es[i]={...es[i], alternativas: alts}; return { ...p, ejercicios:es }; });
+  const updAlt = (i, altIdx, f, v) => setRutinaForm(p => {
+    const es = [...p.ejercicios];
+    const alts = [...es[i].alternativas];
+    const clearHist = f !== "unidad" && f !== "descanso_seg" && f !== "rir_objetivo" && f !== "nota_tecnica";
+    alts[altIdx] = { ...alts[altIdx], [f]: v, ...(clearHist ? { _historyApplied: false } : {}) };
+    es[i] = { ...es[i], alternativas: alts };
+    return { ...p, ejercicios: es };
+  });
   const remAlt = (i, altIdx) => setRutinaForm(p => { const es=[...p.ejercicios]; es[i]={...es[i], alternativas: es[i].alternativas.filter((_,x)=>x!==altIdx)}; return { ...p, ejercicios:es }; });
   const promoteAlt = (i, altIdx) => setRutinaForm(p => {
     const es = [...p.ejercicios];
@@ -4157,27 +4247,39 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     if (!targetAlt) return p;
 
     const mainUnit = main.unidad || "kg";
-    const mainDetalleDb = Array.isArray(main.seriesForm) && main.seriesForm.length > 0
-      ? seriesFormToDb(main.seriesForm, mainUnit, +main.num_series || 4)
+    const parentCount = +main.num_series || 4;
+    const mainSeriesFormCopy = Array.isArray(main.seriesForm) ? main.seriesForm.map((s) => ({ ...s })) : [];
+    const mainDetalleDb = mainSeriesFormCopy.length > 0
+      ? seriesFormToDb(mainSeriesFormCopy, mainUnit, parentCount)
       : normalizeSeriesDetalle(main.series_detalle);
 
     const oldMainAsAlt = {
       biblioteca_id: main.biblioteca_id || null,
       nombre: main.nombre,
       grupo_muscular: main.grupo_muscular || "",
+      tipo_movimiento: main.tipo_movimiento || "",
       gif_url: main.gif_url || "",
       reps_sugeridas: main.reps_sugeridas || 10,
       peso_sugerido: main.peso_sugerido || "",
       unidad: mainUnit,
       series_detalle: mainDetalleDb,
+      seriesForm: mainSeriesFormCopy,
+      descanso_seg: main.descanso_seg || "",
+      rir_objetivo: main.rir_objetivo || "",
+      nota_tecnica: main.nota_tecnica || "",
+      _showOptions: false,
+      _showRmPicker: false,
+      _historyApplied: false,
     };
 
     const newAlts = alts.map((a, idx) => idx === altIdx ? oldMainAsAlt : a);
     const targetUnit = targetAlt.unidad || mainUnit;
     const targetDetalle = normalizeSeriesDetalle(targetAlt.series_detalle);
     const targetPesoInput = targetAlt.peso_sugerido ?? main.peso_sugerido;
-    const targetSeriesForm = targetDetalle.length > 0
-      ? seriesDetalleToForm(targetDetalle, +main.num_series || 4, targetAlt.reps_sugeridas ?? main.reps_sugeridas, targetPesoInput, targetUnit)
+    const targetSeriesForm = Array.isArray(targetAlt.seriesForm) && targetAlt.seriesForm.length > 0
+      ? targetAlt.seriesForm.map((s) => ({ ...s }))
+      : targetDetalle.length > 0
+      ? seriesDetalleToForm(targetDetalle, parentCount, targetAlt.reps_sugeridas ?? main.reps_sugeridas, targetPesoInput, targetUnit)
       : [];
 
     es[i] = {
@@ -4185,13 +4287,20 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       biblioteca_id: targetAlt.biblioteca_id || main.biblioteca_id || null,
       nombre: targetAlt.nombre,
       grupo_muscular: targetAlt.grupo_muscular || main.grupo_muscular || "",
+      tipo_movimiento: targetAlt.tipo_movimiento || main.tipo_movimiento || "",
       gif_url: targetAlt.gif_url || "",
       reps_sugeridas: targetAlt.reps_sugeridas ?? main.reps_sugeridas,
       peso_sugerido: targetPesoInput,
       unidad: targetUnit,
       series_detalle: targetDetalle,
       seriesForm: targetSeriesForm,
-      alternativas: newAlts
+      descanso_seg: targetAlt.descanso_seg || "",
+      rir_objetivo: targetAlt.rir_objetivo || "",
+      nota_tecnica: targetAlt.nota_tecnica || "",
+      _showOptions: false,
+      _showRmPicker: false,
+      _historyApplied: false,
+      alternativas: newAlts,
     };
 
     return { ...p, ejercicios: es };
@@ -8183,7 +8292,10 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
             {/* Right Column: Ejercicios Programados & Alternativas */}
             <div className="lg:col-span-7 bg-white rounded-none md:rounded-2xl border-0 md:border border-[#E2E8F0] p-4 sm:p-6 shadow-none md:shadow-sm">
               {(() => {
-                const matchedHistoryCount = rutinaForm.ejercicios.filter((ejItem) => Boolean(lookupExerciseHistory(patientHistoryMarks, ejItem))).length;
+                const matchedHistoryCount = rutinaForm.ejercicios.filter((ejItem) =>
+                  Boolean(lookupExerciseHistory(patientHistoryMarks, ejItem)) ||
+                  (ejItem.alternativas || []).some((altItem) => Boolean(lookupExerciseHistory(patientHistoryMarks, altItem)))
+                ).length;
                 const sessionVol = computeWeeklyMuscleVolume([{ ejercicios: rutinaForm.ejercicios }]);
                 return (
                   <div className="mb-4 space-y-2.5">
@@ -8349,23 +8461,287 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                       <SortableContext items={rutinaForm.ejercicios.map(e => String(e._dndId))} strategy={verticalListSortingStrategy}>
                         {(() => {
                           const supersetMeta = computeSupersetMetadata(rutinaForm.ejercicios);
-                          return rutinaForm.ejercicios.map((e, i) => {
-                            const hMark = lookupExerciseHistory(patientHistoryMarks, e);
-                            const u = e.unidad || "kg";
+
+                          const renderExerciseToolPanels = ({
+                            item,
+                            exIdx,
+                            altIdx = null,
+                            ssMeta = null,
+                            showLeftPad = true,
+                            parentFallback = null,
+                          }) => {
+                            const isAlt = altIdx !== null && altIdx !== undefined;
+                            const hMark = lookupExerciseHistory(patientHistoryMarks, item);
+                            const u = item.unidad || parentFallback?.unidad || "kg";
                             const wLbl = hMark?.bestWeightKg != null && hMark.bestWeightKg > 0 ? `${convertWeightToInput(hMark.bestWeightKg, u)} ${u}` : null;
                             const rLbl = hMark?.bestReps != null ? `${hMark.bestReps} reps` : null;
                             const markSummaryLabel = [wLbl, rLbl].filter(Boolean).join(" × ");
+                            const isPerSeriesOpen = Array.isArray(item.seriesForm) && item.seriesForm.length > 0;
+                            const visualLabels = isPerSeriesOpen ? getSeriesVisualLabels(item, item.seriesForm.length) : [];
+                            const hasOptValues = Boolean(
+                              (item.descanso_seg && parseInt(item.descanso_seg, 10) > 0) ||
+                              (item.rir_objetivo && String(item.rir_objetivo).trim()) ||
+                              (item.nota_tecnica && String(item.nota_tecnica).trim())
+                            );
+                            const indentPanelCls = showLeftPad ? "sm:ml-[64px]" : "";
+                            const indentSubbarCls = showLeftPad
+                              ? "mt-2 pt-1.5 border-t border-[#F1F5F9] sm:border-t-0 sm:pt-0 sm:pl-[70px]"
+                              : "mt-1.5 pt-1.5 border-t border-[#E2E8F0]/70";
+                            const updateField = (field, val) =>
+                              isAlt ? updAlt(exIdx, altIdx, field, val) : updEj(exIdx, field, val);
+
+                            return (
+                              <>
+                                {/* SUB-BARRA COMPACTA */}
+                                <div className={`${indentSubbarCls} flex items-center justify-between flex-wrap gap-1.5`}>
+                                  <div className="flex items-center flex-wrap gap-1.5">
+                                    {hMark ? (
+                                      <>
+                                        <button
+                                          type="button"
+                                          onClick={() => applyHistoryMarksToExercise(exIdx, altIdx)}
+                                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold border transition-colors cursor-pointer ${
+                                            item._historyApplied
+                                              ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-2xs"
+                                              : "bg-[var(--brand-secondary)] text-[var(--brand-primary)] border-[var(--brand-primary)]/35 hover:bg-[var(--brand-primary)] hover:text-white"
+                                          }`}
+                                          title="Importar la mejor marca histórica registrada por este paciente en este ejercicio"
+                                        >
+                                          {item._historyApplied ? <CheckCircle2 className="w-3 h-3 shrink-0" /> : <Trophy className="w-3 h-3 shrink-0" />}
+                                          <span>
+                                            {item._historyApplied
+                                              ? `Marca aplicada${markSummaryLabel ? ` · ${markSummaryLabel}` : ""}`
+                                              : markSummaryLabel
+                                              ? `Marca: ${markSummaryLabel}`
+                                              : "Importar mejor marca"}
+                                          </span>
+                                        </button>
+                                        {hMark.best1RM > 0 && (
+                                          <button
+                                            type="button"
+                                            onClick={() => toggleRmPicker(exIdx, altIdx)}
+                                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold border transition-colors cursor-pointer ${
+                                              item._showRmPicker
+                                                ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)]"
+                                                : "bg-white text-[#475569] border-[#E2E8F0] hover:text-[var(--brand-primary)] hover:border-[var(--brand-primary)]/40"
+                                            }`}
+                                            title="Calcular carga por % de 1RM estimado o doble progresión"
+                                          >
+                                            <span>% 1RM · ~{convertWeightToInput(hMark.best1RM, u)} {u}</span>
+                                          </button>
+                                        )}
+                                      </>
+                                    ) : !isAlt && !loadingPatientHistory ? (
+                                      <span className="text-[10px] text-[#94A3B8] font-normal">Sin marcas previas</span>
+                                    ) : null}
+                                  </div>
+                                  <div className="flex items-center flex-wrap gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleExerciseOptions(exIdx, altIdx)}
+                                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold border transition-colors cursor-pointer ${
+                                        item._showOptions || hasOptValues
+                                          ? "bg-[var(--brand-secondary)] text-[var(--brand-primary)] border-[var(--brand-primary)]/30"
+                                          : "bg-white text-[#6B7A8D] border-[#E2E8F0] hover:text-[var(--brand-primary)]"
+                                      }`}
+                                      title={
+                                        isAlt
+                                          ? "Descanso, RIR o nota técnica específica para esta alternativa (si se deja vacío hereda del principal)"
+                                          : "Opcional: Descanso, RIR objetivo o nota técnica"
+                                      }
+                                    >
+                                      <SlidersHorizontal className="w-2.5 h-2.5 shrink-0" />
+                                      <span>
+                                        {hasOptValues
+                                          ? [
+                                              item.descanso_seg ? formatRestLabel(item.descanso_seg) : "",
+                                              item.rir_objetivo ? `RIR ${item.rir_objetivo}` : "",
+                                              item.nota_tecnica ? "Nota" : "",
+                                            ].filter(Boolean).join(" · ")
+                                          : "+ Descanso / RIR / Nota"}
+                                      </span>
+                                    </button>
+                                    {!isAlt && ssMeta?.isMember && ssMeta.blockSize >= 3 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => detachFromSuperset(exIdx)}
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold border bg-white text-[#64748B] border-[#E2E8F0] hover:text-red-600 hover:bg-red-50 hover:border-red-200 transition-colors cursor-pointer"
+                                        title={`Sacar ${ssMeta.codeLabel} de ${ssMeta.blockTitle}`}
+                                      >
+                                        <Unlink2 className="w-2.5 h-2.5 shrink-0" />
+                                        <span>Salir del bloque</span>
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* PANEL %1RM & DOBLE PROGRESIÓN (GRID SIMÉTRICO, SIN SALTOS HUÉRFANOS) */}
+                                {item._showRmPicker && hMark?.best1RM > 0 && (() => {
+                                  const progSug = computeDoubleProgressionSuggestion({
+                                    hMark,
+                                    targetReps: +item.reps_sugeridas || +parentFallback?.reps_sugeridas || 10,
+                                    unit: u,
+                                  });
+                                  return (
+                                    <div className={`mt-2 ${indentPanelCls} p-2.5 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] space-y-2`}>
+                                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#6B7A8D]">
+                                          Carga por % de 1RM (~{convertWeightToInput(hMark.best1RM, u)} {u})
+                                        </span>
+                                        {progSug && (
+                                          <button
+                                            type="button"
+                                            onClick={() => applyDoubleProgressionToExercise(exIdx, altIdx)}
+                                            className="px-2.5 py-0.5 rounded-lg bg-[var(--brand-secondary)] text-[var(--brand-primary)] border border-[var(--brand-primary)]/30 hover:bg-[var(--brand-primary)] hover:text-white text-[10px] font-bold cursor-pointer transition-colors"
+                                            title="Aplicar sugerencia de doble progresión"
+                                          >
+                                            Progresión: {progSug.label}
+                                          </button>
+                                        )}
+                                      </div>
+                                      <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+                                        {[65, 70, 75, 80, 85, 90].map((pctVal) => {
+                                          const calc = calculateWeightFrom1RM({ best1RMKg: hMark.best1RM, targetPct: pctVal, unit: u });
+                                          return (
+                                            <button
+                                              key={pctVal}
+                                              type="button"
+                                              onClick={() => applyPercent1RMToExercise(exIdx, pctVal, altIdx)}
+                                              className="px-2 py-1.5 rounded-lg bg-white border border-[#E2E8F0] hover:border-[var(--brand-primary)] hover:bg-[var(--brand-secondary)]/35 text-center cursor-pointer transition-colors"
+                                              title={calc ? `${pctVal}% ≈ ${calc.pesoInput} ${u} × ~${calc.estReps} reps` : ""}
+                                            >
+                                              <div className="text-[11px] font-extrabold text-[var(--brand-primary)] leading-tight">{pctVal}%</div>
+                                              <div className="text-[10px] font-mono font-semibold text-[#475569] leading-tight mt-0.5">{calc?.pesoInput} {u}</div>
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  );
+                                })()}
+
+                                {/* OPCIONALES: DESCANSO, RIR Y NOTA TÉCNICA */}
+                                {item._showOptions && (
+                                  <div className={`mt-2 ${indentPanelCls} p-2.5 rounded-xl bg-white border border-[#E2E8F0] grid grid-cols-2 sm:grid-cols-12 gap-2 items-end`}>
+                                    <div className="col-span-1 sm:col-span-3">
+                                      <label className="text-[10px] font-bold text-[#6B7A8D] uppercase flex items-center gap-1 mb-1">
+                                        <Timer className="w-3 h-3 text-[var(--brand-primary)]" /> Descanso (seg)
+                                      </label>
+                                      <input
+                                        type="number"
+                                        min="10"
+                                        max="600"
+                                        value={item.descanso_seg || ""}
+                                        onChange={(ev) => updateField("descanso_seg", ev.target.value)}
+                                        placeholder={isAlt && parentFallback?.descanso_seg ? `Hereda: ${parentFallback.descanso_seg}s` : "Ej. 90"}
+                                        className="w-full px-2 py-1 rounded-lg border border-[#E2E8F0] text-xs font-semibold focus:outline-none focus:border-[var(--brand-primary)]"
+                                      />
+                                    </div>
+                                    <div className="col-span-1 sm:col-span-3">
+                                      <label className="text-[10px] font-bold text-[#6B7A8D] uppercase block mb-1">RIR Objetivo</label>
+                                      <input
+                                        type="text"
+                                        maxLength={12}
+                                        value={item.rir_objetivo || ""}
+                                        onChange={(ev) => updateField("rir_objetivo", ev.target.value)}
+                                        placeholder={isAlt && parentFallback?.rir_objetivo ? `Hereda: ${parentFallback.rir_objetivo}` : "Ej. 1-2"}
+                                        className="w-full px-2 py-1 rounded-lg border border-[#E2E8F0] text-xs font-semibold focus:outline-none focus:border-[var(--brand-primary)]"
+                                      />
+                                    </div>
+                                    <div className="col-span-2 sm:col-span-6">
+                                      <label className="text-[10px] font-bold text-[#6B7A8D] uppercase block mb-1">Nota técnica / Cue</label>
+                                      <input
+                                        type="text"
+                                        maxLength={140}
+                                        value={item.nota_tecnica || ""}
+                                        onChange={(ev) => updateField("nota_tecnica", ev.target.value)}
+                                        placeholder={isAlt && parentFallback?.nota_tecnica ? "Opcional (hereda nota del principal)" : "Ej. Pausa 1s abajo, control excéntrico"}
+                                        className="w-full px-2 py-1 rounded-lg border border-[#E2E8F0] text-xs font-medium focus:outline-none focus:border-[var(--brand-primary)]"
+                                      />
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* DESGLOSE POR SERIE (SIN BOTÓN DUPLICADO NI TEXTO LARGO) */}
+                                {isPerSeriesOpen && (
+                                  <div className={`mt-2 ${indentPanelCls} p-2.5 rounded-xl bg-[var(--brand-secondary)]/45 border border-[var(--brand-primary)]/25 space-y-2`}>
+                                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--brand-primary)]">
+                                          Por serie ({item.seriesForm.length} · {u.toUpperCase()})
+                                        </span>
+                                        <span className="text-[10px] text-[#6B7A8D] hidden sm:inline">
+                                          · Toca # para Warm-up / Drop / Fallo
+                                        </span>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => togglePerSeries(exIdx, altIdx)}
+                                        className="text-[10px] font-bold text-[var(--brand-primary)] hover:underline cursor-pointer"
+                                      >
+                                        Usar uniforme
+                                      </button>
+                                    </div>
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                      {item.seriesForm.map((sf, si) => {
+                                        const curType = normalizeSeriesType(sf.tipo);
+                                        const typeCfg = SERIES_TYPES[curType] || SERIES_TYPES.normal;
+                                        const vLbl = visualLabels[si] || { label: String(si + 1) };
+                                        const tagCls =
+                                          curType === "warmup"
+                                            ? "bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100"
+                                            : curType === "dropset"
+                                            ? "bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100"
+                                            : curType === "failure"
+                                            ? "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100"
+                                            : "bg-[var(--brand-secondary)]/70 text-[var(--brand-primary)] border-[var(--brand-primary)]/20 hover:bg-[var(--brand-secondary)]";
+                                        return (
+                                          <div key={si} className={`bg-white rounded-lg border p-1.5 space-y-1 ${curType === "warmup" ? "border-amber-200/90" : "border-[var(--brand-primary)]/20"}`}>
+                                            <button
+                                              type="button"
+                                              onClick={() => toggleSeriesType(exIdx, si, altIdx)}
+                                              className={`w-full px-1 py-0.5 rounded border text-[9px] font-extrabold uppercase flex items-center justify-between gap-1 cursor-pointer transition-colors ${tagCls}`}
+                                              title="Pulsa para cambiar tipo (Normal → Calentamiento → Drop Set → Al fallo)"
+                                            >
+                                              <span>#{vLbl.label}</span>
+                                              <span>{typeCfg.short || "Normal"}</span>
+                                            </button>
+                                            <div className="grid grid-cols-2 gap-1">
+                                              <input
+                                                type="number"
+                                                min="1"
+                                                value={sf.reps}
+                                                onChange={(ev) => updSerieField(exIdx, si, "reps", ev.target.value, altIdx)}
+                                                placeholder="Reps"
+                                                title={`Reps Serie ${si + 1}`}
+                                                className="w-full px-1 py-1 rounded border border-[#E2E8F0] focus:outline-none focus:border-[var(--brand-primary)] text-[11px] font-semibold text-center"
+                                              />
+                                              <input
+                                                type="text"
+                                                inputMode="decimal"
+                                                value={sf.peso}
+                                                onChange={(ev) => updSerieField(exIdx, si, "peso", ev.target.value, altIdx)}
+                                                placeholder={u}
+                                                title={`Peso Serie ${si + 1}`}
+                                                className="w-full px-1 py-1 rounded border border-[#E2E8F0] focus:outline-none focus:border-[var(--brand-primary)] text-[11px] font-semibold text-center"
+                                              />
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
+                              </>
+                            );
+                          };
+
+                          return rutinaForm.ejercicios.map((e, i) => {
                             const isPerSeriesOpen = Array.isArray(e.seriesForm) && e.seriesForm.length > 0;
-                            const visualLabels = isPerSeriesOpen ? getSeriesVisualLabels(e, e.seriesForm.length) : [];
                             const ssMeta = supersetMeta[i] || {};
                             const nextSsMeta = supersetMeta[i + 1] || null;
                             const isSameBlockAsNext = Boolean(ssMeta.isMember && nextSsMeta?.isMember && ssMeta.groupCode === nextSsMeta.groupCode);
                             const isGapBetweenDistinctBlocks = Boolean(ssMeta.isMember && ssMeta.isEnd && nextSsMeta?.isMember && !isSameBlockAsNext);
-                            const hasOptValues = Boolean(
-                              (e.descanso_seg && parseInt(e.descanso_seg, 10) > 0) ||
-                              (e.rir_objetivo && String(e.rir_objetivo).trim()) ||
-                              (e.nota_tecnica && String(e.nota_tecnica).trim())
-                            );
                             const effSetsCount = countEffectiveSeries(e);
                             const totalSetsCount = parseInt(e.num_series, 10) || 4;
                             const warmSetsCount = Math.max(0, totalSetsCount - effSetsCount);
@@ -8504,246 +8880,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                   </div>
                                 </div>
 
-                                {/* SUB-BARRA COMPACTA DE ANCHO COMPLETO (sin apretar la columna del título) */}
-                                <div className="mt-2 pt-1.5 border-t border-[#F1F5F9] sm:border-t-0 sm:pt-0 sm:pl-[70px] flex items-center justify-between flex-wrap gap-1.5">
-                                  <div className="flex items-center flex-wrap gap-1.5">
-                                    {hMark ? (
-                                      <>
-                                        <button
-                                          type="button"
-                                          onClick={() => applyHistoryMarksToExercise(i)}
-                                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold border transition-colors cursor-pointer ${
-                                            e._historyApplied
-                                              ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-2xs"
-                                              : "bg-[var(--brand-secondary)] text-[var(--brand-primary)] border-[var(--brand-primary)]/35 hover:bg-[var(--brand-primary)] hover:text-white"
-                                          }`}
-                                          title="Importar la mejor marca histórica registrada por este paciente en este ejercicio"
-                                        >
-                                          {e._historyApplied ? <CheckCircle2 className="w-3 h-3 shrink-0" /> : <Trophy className="w-3 h-3 shrink-0" />}
-                                          <span>
-                                            {e._historyApplied
-                                              ? `Mejor marca aplicada${markSummaryLabel ? ` · ${markSummaryLabel}` : ""}`
-                                              : `Importar mejor marca${markSummaryLabel ? ` · ${markSummaryLabel}` : ""}`}
-                                          </span>
-                                        </button>
-                                        {hMark.best1RM > 0 && (
-                                          <button
-                                            type="button"
-                                            onClick={() => toggleRmPicker(i)}
-                                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold border transition-colors cursor-pointer ${
-                                              e._showRmPicker
-                                                ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)]"
-                                                : "bg-white text-[#475569] border-[#E2E8F0] hover:text-[var(--brand-primary)] hover:border-[var(--brand-primary)]/40"
-                                            }`}
-                                            title="Calcular carga por % de 1RM estimado o doble progresión"
-                                          >
-                                            <span>1RM ~{convertWeightToInput(hMark.best1RM, u)} {u} · %</span>
-                                          </button>
-                                        )}
-                                      </>
-                                    ) : !loadingPatientHistory ? (
-                                      <span className="text-[10px] text-[#94A3B8] font-normal">Sin marcas previas</span>
-                                    ) : null}
-                                  </div>
-                                  <div className="flex items-center flex-wrap gap-1.5">
-                                    <button
-                                      type="button"
-                                      onClick={() => toggleExerciseOptions(i)}
-                                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold border transition-colors cursor-pointer ${
-                                        e._showOptions || hasOptValues
-                                          ? "bg-[var(--brand-secondary)] text-[var(--brand-primary)] border-[var(--brand-primary)]/30"
-                                          : "bg-white text-[#6B7A8D] border-[#E2E8F0] hover:text-[var(--brand-primary)]"
-                                      }`}
-                                      title="Opcional: Descanso, RIR objetivo o nota técnica"
-                                    >
-                                      <SlidersHorizontal className="w-2.5 h-2.5 shrink-0" />
-                                      <span>
-                                        {hasOptValues
-                                          ? [
-                                              e.descanso_seg ? formatRestLabel(e.descanso_seg) : "",
-                                              e.rir_objetivo ? `RIR ${e.rir_objetivo}` : "",
-                                              e.nota_tecnica ? "Nota" : "",
-                                            ].filter(Boolean).join(" · ")
-                                          : "+ Descanso / RIR / Nota"}
-                                      </span>
-                                    </button>
-                                    {ssMeta.isMember && ssMeta.blockSize >= 3 && (
-                                      <button
-                                        type="button"
-                                        onClick={() => detachFromSuperset(i)}
-                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold border bg-white text-[#64748B] border-[#E2E8F0] hover:text-red-600 hover:bg-red-50 hover:border-red-200 transition-colors cursor-pointer"
-                                        title={`Sacar ${ssMeta.codeLabel} de ${ssMeta.blockTitle}`}
-                                      >
-                                        <Unlink2 className="w-2.5 h-2.5 shrink-0" />
-                                        <span>Salir del bloque</span>
-                                      </button>
-                                    )}
-                                  </div>
-                                </div>
-
-                                {/* CALCULADORA DISCRETA DE %1RM & DOBLE PROGRESIÓN */}
-                                {e._showRmPicker && hMark?.best1RM > 0 && (() => {
-                                  const progSug = computeDoubleProgressionSuggestion({
-                                    hMark,
-                                    targetReps: +e.reps_sugeridas || 10,
-                                    unit: u,
-                                  });
-                                  return (
-                                    <div className="mt-2 sm:ml-[64px] p-2 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] flex items-center flex-wrap gap-1.5">
-                                      <span className="text-[10px] font-bold text-[#6B7A8D] uppercase mr-1">% de 1RM:</span>
-                                      {[65, 70, 75, 80, 85, 90].map((pctVal) => {
-                                        const calc = calculateWeightFrom1RM({ best1RMKg: hMark.best1RM, targetPct: pctVal, unit: u });
-                                        return (
-                                          <button
-                                            key={pctVal}
-                                            type="button"
-                                            onClick={() => applyPercent1RMToExercise(i, pctVal)}
-                                            className="px-2 py-0.5 rounded-md bg-white border border-[#E2E8F0] hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)] text-[10px] font-mono font-bold text-[#0B1929] cursor-pointer transition-colors"
-                                            title={calc ? `${pctVal}% ≈ ${calc.pesoInput} ${u} × ~${calc.estReps} reps` : ""}
-                                          >
-                                            {pctVal}% ({calc?.pesoInput}{u})
-                                          </button>
-                                        );
-                                      })}
-                                      {progSug && (
-                                        <button
-                                          type="button"
-                                          onClick={() => applyDoubleProgressionToExercise(i)}
-                                          className="ml-auto px-2 py-0.5 rounded-md bg-[var(--brand-secondary)] text-[var(--brand-primary)] border border-[var(--brand-primary)]/30 hover:bg-[var(--brand-primary)] hover:text-white text-[10px] font-bold cursor-pointer transition-colors"
-                                          title="Aplicar sugerencia de doble progresión"
-                                        >
-                                          Progresión: {progSug.label}
-                                        </button>
-                                      )}
-                                    </div>
-                                  );
-                                })()}
-
-                                {/* OPCIONALES: DESCANSO, RIR Y NOTA TÉCNICA */}
-                                {e._showOptions && (
-                                  <div className="mt-2 sm:ml-[64px] p-2.5 rounded-xl bg-white border border-[#E2E8F0] grid grid-cols-2 sm:grid-cols-12 gap-2 items-end">
-                                    <div className="col-span-1 sm:col-span-3">
-                                      <label className="text-[10px] font-bold text-[#6B7A8D] uppercase flex items-center gap-1 mb-1">
-                                        <Timer className="w-3 h-3 text-[var(--brand-primary)]" /> Descanso (seg)
-                                      </label>
-                                      <input
-                                        type="number"
-                                        min="10"
-                                        max="600"
-                                        value={e.descanso_seg || ""}
-                                        onChange={(ev) => updEj(i, "descanso_seg", ev.target.value)}
-                                        placeholder="Ej. 90"
-                                        className="w-full px-2 py-1 rounded-lg border border-[#E2E8F0] text-xs font-semibold focus:outline-none focus:border-[var(--brand-primary)]"
-                                      />
-                                    </div>
-                                    <div className="col-span-1 sm:col-span-3">
-                                      <label className="text-[10px] font-bold text-[#6B7A8D] uppercase block mb-1">RIR Objetivo</label>
-                                      <input
-                                        type="text"
-                                        maxLength={12}
-                                        value={e.rir_objetivo || ""}
-                                        onChange={(ev) => updEj(i, "rir_objetivo", ev.target.value)}
-                                        placeholder="Ej. 1-2"
-                                        className="w-full px-2 py-1 rounded-lg border border-[#E2E8F0] text-xs font-semibold focus:outline-none focus:border-[var(--brand-primary)]"
-                                      />
-                                    </div>
-                                    <div className="col-span-2 sm:col-span-6">
-                                      <label className="text-[10px] font-bold text-[#6B7A8D] uppercase block mb-1">Nota técnica / Cue</label>
-                                      <input
-                                        type="text"
-                                        maxLength={140}
-                                        value={e.nota_tecnica || ""}
-                                        onChange={(ev) => updEj(i, "nota_tecnica", ev.target.value)}
-                                        placeholder="Ej. Pausa 1s abajo, control excéntrico"
-                                        className="w-full px-2 py-1 rounded-lg border border-[#E2E8F0] text-xs font-medium focus:outline-none focus:border-[var(--brand-primary)]"
-                                      />
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* PER-SERIES HYBRID EDITOR */}
-                                {isPerSeriesOpen && (
-                                  <div className="mt-2.5 sm:ml-[64px] p-2.5 rounded-xl bg-[var(--brand-secondary)]/55 border border-[var(--brand-primary)]/25 space-y-2">
-                                    <div className="flex items-center justify-between gap-2 flex-wrap">
-                                      <div>
-                                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--brand-primary)] block">
-                                          Desglose por serie ({e.seriesForm.length} series • {(e.unidad || "kg").toUpperCase()})
-                                        </span>
-                                        <span className="text-[10px] text-[#6B7A8D]">
-                                          Pulsa la etiqueta de una serie para marcar Calentamiento (no cuenta volumen), Drop Set o Fallo
-                                        </span>
-                                      </div>
-                                      <div className="flex items-center gap-2.5">
-                                        {hMark && (
-                                          <button
-                                            type="button"
-                                            onClick={() => applyHistoryMarksToExercise(i)}
-                                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-[var(--brand-primary)] text-white hover:opacity-90 text-[10px] font-bold transition-opacity cursor-pointer shadow-2xs"
-                                            title="Rellenar cada serie con la mejor marca histórica del paciente"
-                                          >
-                                            <Trophy className="w-2.5 h-2.5 shrink-0" />
-                                            <span>{markSummaryLabel ? `Importar mejor (${markSummaryLabel})` : "Importar mejor marca"}</span>
-                                          </button>
-                                        )}
-                                        <button
-                                          type="button"
-                                          onClick={() => togglePerSeries(i)}
-                                          className="text-[10px] font-bold text-[var(--brand-primary)] hover:underline cursor-pointer"
-                                        >
-                                          Usar valor uniforme
-                                        </button>
-                                      </div>
-                                    </div>
-                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                      {e.seriesForm.map((sf, si) => {
-                                        const curType = normalizeSeriesType(sf.tipo);
-                                        const typeCfg = SERIES_TYPES[curType] || SERIES_TYPES.normal;
-                                        const vLbl = visualLabels[si] || { label: String(si + 1) };
-                                        const tagCls =
-                                          curType === "warmup"
-                                            ? "bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100"
-                                            : curType === "dropset"
-                                            ? "bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100"
-                                            : curType === "failure"
-                                            ? "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100"
-                                            : "bg-[var(--brand-secondary)]/70 text-[var(--brand-primary)] border-[var(--brand-primary)]/20 hover:bg-[var(--brand-secondary)]";
-                                        return (
-                                        <div key={si} className={`bg-white rounded-lg border p-1.5 space-y-1 ${curType === "warmup" ? "border-amber-200/90" : "border-[var(--brand-primary)]/20"}`}>
-                                          <button
-                                            type="button"
-                                            onClick={() => toggleSeriesType(i, si)}
-                                            className={`w-full px-1 py-0.5 rounded border text-[9px] font-extrabold uppercase flex items-center justify-between gap-1 cursor-pointer transition-colors ${tagCls}`}
-                                            title="Pulsa para cambiar tipo (Normal → Calentamiento → Drop Set → Al fallo)"
-                                          >
-                                            <span>#{vLbl.label}</span>
-                                            <span>{typeCfg.short || "Normal"}</span>
-                                          </button>
-                                          <div className="grid grid-cols-2 gap-1">
-                                            <input
-                                              type="number"
-                                              min="1"
-                                              value={sf.reps}
-                                              onChange={(ev) => updSerieField(i, si, "reps", ev.target.value)}
-                                              placeholder="Reps"
-                                              title={`Reps Serie ${si + 1}`}
-                                              className="w-full px-1 py-1 rounded border border-[#E2E8F0] focus:outline-none focus:border-[var(--brand-primary)] text-[11px] font-semibold text-center"
-                                            />
-                                            <input
-                                              type="text"
-                                              inputMode="decimal"
-                                              value={sf.peso}
-                                              onChange={(ev) => updSerieField(i, si, "peso", ev.target.value)}
-                                              placeholder={e.unidad || "kg"}
-                                              title={`Peso Serie ${si + 1}`}
-                                              className="w-full px-1 py-1 rounded border border-[#E2E8F0] focus:outline-none focus:border-[var(--brand-primary)] text-[11px] font-semibold text-center"
-                                            />
-                                          </div>
-                                        </div>
-                                        );
-                                      })}
-                                    </div>
-                                  </div>
-                                )}
+                                {renderExerciseToolPanels({ item: e, exIdx: i, altIdx: null, ssMeta, showLeftPad: true })}
                             
                                 {/* ACTIVE ALT SLOT INDICATOR */}
                                 {activeAltSlot === i && (
@@ -8757,47 +8894,90 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                   </div>
                                 )}
                             
-                                {/* ALTERNATIVES */}
-                                {(e.alternativas || []).map((alt, altIdx) => (
-                                  <div key={`alt-${altIdx}`} className="mt-2 ml-3 sm:ml-[64px] grid grid-cols-[28px_1fr_auto] sm:grid-cols-[28px_1fr_56px_76px_100px] gap-2 sm:gap-1.5 items-center p-2 sm:py-1.5 sm:px-2 bg-white sm:bg-[#F8FAFC] rounded-xl border border-[#E2E8F0]">
-                                    <div className="w-7 h-7 rounded-md overflow-hidden bg-gray-50 border border-[#E2E8F0] flex items-center justify-center shrink-0">
-                                      {alt.gif_url ? (
-                                        /\.(mp4|webm|mov)($|\?)/i.test(alt.gif_url) ? (
-                                          <video src={alt.gif_url} autoPlay loop muted playsInline className="w-full h-full object-cover" />
-                                        ) : (
-                                          <img src={alt.gif_url} alt="" className="w-full h-full object-cover"/>
-                                        )
-                                      ) : <Dumbbell className="w-[14px] h-[14px] text-[#6B7A8D]" />}
-                                    </div>
-                                    <div className="flex items-center gap-1.5 min-w-0">
-                                      <span className="px-1.5 py-0.5 bg-[var(--brand-secondary)] text-[var(--brand-primary)] border border-[var(--brand-primary)]/30 rounded text-[9px] font-bold shrink-0">ALT {altIdx + 1}</span>
-                                      <span className="text-[12px] font-medium text-[#0B1929] leading-tight truncate">{alt.nombre}</span>
-                                    </div>
-                                    
-                                    <div className="col-span-3 sm:col-span-2 sm:col-start-3 sm:row-start-1 grid grid-cols-2 gap-2 sm:grid-cols-[56px_76px] sm:gap-1.5 mt-1 sm:mt-0 pt-1.5 sm:pt-0 border-t border-[#E2E8F0] sm:border-none">
-                                      <div className="flex flex-col gap-0.5 sm:block">
-                                        <span className="text-[10px] font-semibold text-[#6B7A8D] sm:hidden text-center w-full">REPS</span>
-                                        <input type="number" className="w-full px-1.5 py-1 rounded-lg border border-[#E2E8F0] bg-white text-[12px] font-semibold text-center focus:outline-none focus:border-[var(--brand-primary)]" value={alt.reps_sugeridas} onChange={ev=>updAlt(i,altIdx,"reps_sugeridas",ev.target.value)} placeholder="10" />
-                                      </div>
-                                      <div className="flex flex-col gap-0.5 sm:block">
-                                        <span className="text-[10px] font-semibold text-[#6B7A8D] sm:hidden text-center w-full">PESO</span>
-                                        <div className="relative w-full">
-                                          <input type="text" inputMode="decimal" className="w-full pl-1.5 pr-6 py-1 rounded-lg border border-[#E2E8F0] bg-white text-[12px] font-semibold text-center focus:outline-none focus:border-[var(--brand-primary)]" value={alt.peso_sugerido||""} onChange={ev=>updAlt(i,altIdx,"peso_sugerido",ev.target.value)} placeholder="-" />
-                                          <button type="button" onClick={() => toggleUnidadAlt(i, altIdx)} className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] font-bold text-[#6B7A8D] uppercase hover:text-[var(--brand-primary)] cursor-pointer">{alt.unidad || 'KG'}</button>
+                                {/* ALTERNATIVES (CON 100% PARIDAD: POR SERIE, MARCAS, %1RM, DESCANSO/RIR/NOTA) */}
+                                {(e.alternativas || []).map((alt, altIdx) => {
+                                  const isAltPerSeriesOpen = Array.isArray(alt.seriesForm) && alt.seriesForm.length > 0;
+                                  const altResolved = resolveCanonicalExercise(alt);
+                                  const altEffSets = countEffectiveSeries({ ...alt, num_series: totalSetsCount });
+                                  const altWarmSets = Math.max(0, totalSetsCount - altEffSets);
+                                  return (
+                                    <div key={`alt-${altIdx}`} className="mt-2 ml-3 sm:ml-[64px] p-2 sm:py-2 sm:px-2.5 bg-white sm:bg-[#F8FAFC] rounded-xl border border-[#E2E8F0]">
+                                      <div className="grid grid-cols-[28px_1fr_auto] sm:grid-cols-[28px_1fr_56px_76px_100px] gap-2 sm:gap-1.5 items-center">
+                                        <div className="w-7 h-7 rounded-md overflow-hidden bg-gray-50 border border-[#E2E8F0] flex items-center justify-center shrink-0">
+                                          {alt.gif_url ? (
+                                            /\.(mp4|webm|mov)($|\?)/i.test(alt.gif_url) ? (
+                                              <video src={alt.gif_url} autoPlay loop muted playsInline className="w-full h-full object-cover" />
+                                            ) : (
+                                              <img src={alt.gif_url} alt="" className="w-full h-full object-cover"/>
+                                            )
+                                          ) : <Dumbbell className="w-[14px] h-[14px] text-[#6B7A8D]" />}
+                                        </div>
+                                        <div className="min-w-0 pr-1">
+                                          <div className="flex items-center gap-1.5 min-w-0">
+                                            <span className="px-1.5 py-0.5 bg-[var(--brand-secondary)] text-[var(--brand-primary)] border border-[var(--brand-primary)]/30 rounded text-[9px] font-bold shrink-0">ALT {altIdx + 1}</span>
+                                            <span className="text-[12px] font-semibold text-[#0B1929] leading-tight truncate">{alt.nombre}</span>
+                                          </div>
+                                          <div className="text-[10px] text-[#6B7A8D] font-normal mt-0.5 truncate">
+                                            {GRUPO_LABELS[normalizeMuscleGroup(altResolved.grupo_muscular)] || altResolved.grupo_muscular || alt.grupo_muscular || ""}
+                                            {altWarmSets > 0 ? ` · ${altEffSets} ef. / ${altWarmSets} cal.` : ""}
+                                          </div>
+                                        </div>
+                                        
+                                        <div className="col-span-3 sm:col-span-2 sm:col-start-3 sm:row-start-1 grid grid-cols-2 gap-2 sm:grid-cols-[56px_76px] sm:gap-1.5 mt-1 sm:mt-0 pt-1.5 sm:pt-0 border-t border-[#E2E8F0] sm:border-none">
+                                          <div className="flex flex-col gap-0.5 sm:block">
+                                            <span className="text-[10px] font-semibold text-[#6B7A8D] sm:hidden text-center w-full">REPS</span>
+                                            <input
+                                              type="number"
+                                              disabled={isAltPerSeriesOpen}
+                                              className="w-full px-1.5 py-1 rounded-lg border border-[#E2E8F0] bg-white disabled:bg-slate-100 disabled:text-slate-400 text-[12px] font-semibold text-center focus:outline-none focus:border-[var(--brand-primary)]"
+                                              value={alt.reps_sugeridas}
+                                              onChange={ev=>updAlt(i,altIdx,"reps_sugeridas",ev.target.value)}
+                                              placeholder="10"
+                                            />
+                                          </div>
+                                          <div className="flex flex-col gap-0.5 sm:block">
+                                            <span className="text-[10px] font-semibold text-[#6B7A8D] sm:hidden text-center w-full">PESO</span>
+                                            <div className="relative w-full">
+                                              <input
+                                                type="text"
+                                                inputMode="decimal"
+                                                disabled={isAltPerSeriesOpen}
+                                                className="w-full pl-1.5 pr-6 py-1 rounded-lg border border-[#E2E8F0] bg-white disabled:bg-slate-100 disabled:text-slate-400 text-[12px] font-semibold text-center focus:outline-none focus:border-[var(--brand-primary)]"
+                                                value={alt.peso_sugerido||""}
+                                                onChange={ev=>updAlt(i,altIdx,"peso_sugerido",ev.target.value)}
+                                                placeholder="-"
+                                              />
+                                              <button type="button" onClick={() => toggleUnidadAlt(i, altIdx)} className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] font-bold text-[#6B7A8D] uppercase hover:text-[var(--brand-primary)] cursor-pointer">{alt.unidad || 'KG'}</button>
+                                            </div>
+                                          </div>
+                                        </div>
+                                
+                                        <div className="col-start-3 row-start-1 sm:col-start-5 sm:row-start-1 flex items-center justify-end self-center gap-1">
+                                          <button
+                                            type="button"
+                                            onClick={() => togglePerSeries(i, altIdx)}
+                                            className={`p-1.5 rounded-lg flex items-center justify-center transition-colors border-none cursor-pointer shrink-0 ${
+                                              isAltPerSeriesOpen
+                                                ? "bg-[var(--brand-primary)] text-white shadow-2xs"
+                                                : "bg-gray-100 text-[#6B7A8D] hover:bg-[var(--brand-secondary)] hover:text-[var(--brand-primary)]"
+                                            }`}
+                                            title={isAltPerSeriesOpen ? "Volver a peso/reps uniforme" : "Configurar reps y peso por serie"}
+                                          >
+                                            <ListOrdered className="w-[14px] h-[14px]" />
+                                          </button>
+                                          <button type="button" onClick={() => promoteAlt(i, altIdx)} className="bg-amber-50 text-amber-600 rounded-lg p-1.5 hover:bg-amber-100 flex items-center justify-center transition-colors border-none cursor-pointer shrink-0" title="Promover a ejercicio principal">
+                                            <ArrowUp className="w-[14px] h-[14px]" />
+                                          </button>
+                                          <button type="button" onClick={() => remAlt(i, altIdx)} className="bg-red-50 text-red-500 rounded-lg p-1.5 hover:bg-red-100 flex items-center justify-center transition-colors border-none cursor-pointer shrink-0" title="Quitar alternativa">
+                                            <X className="w-[14px] h-[14px]" />
+                                          </button>
                                         </div>
                                       </div>
+
+                                      {renderExerciseToolPanels({ item: alt, exIdx: i, altIdx, showLeftPad: false, parentFallback: e })}
                                     </div>
-                            
-                                    <div className="col-start-3 row-start-1 sm:col-start-5 sm:row-start-1 flex items-center justify-end self-center gap-1">
-                                      <button type="button" onClick={() => promoteAlt(i, altIdx)} className="bg-amber-50 text-amber-600 rounded-lg p-1.5 hover:bg-amber-100 flex items-center justify-center transition-colors border-none cursor-pointer" title="Promover a ejercicio principal">
-                                        <ArrowUp className="w-[14px] h-[14px]" />
-                                      </button>
-                                      <button type="button" onClick={() => remAlt(i, altIdx)} className="bg-red-50 text-red-500 rounded-lg p-1.5 hover:bg-red-100 flex items-center justify-center transition-colors border-none cursor-pointer" title="Quitar alternativa">
-                                        <X className="w-[14px] h-[14px]" />
-                                      </button>
-                                    </div>
-                                  </div>
-                                ))}
+                                  );
+                                })}
                                   </div>
                                   {i < rutinaForm.ejercicios.length - 1 && !isSameBlockAsNext && (
                                     isGapBetweenDistinctBlocks ? (
