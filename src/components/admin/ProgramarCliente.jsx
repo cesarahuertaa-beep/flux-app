@@ -1276,8 +1276,9 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     return copy;
   };
 
-  const loadHistorial = useCallback(async () => {
-    if (!clientes || clientes.length === 0 || historialLoadedRef.current) return;
+  const loadHistorial = useCallback(async ({ force = false } = {}) => {
+    if (!clientes || clientes.length === 0) return;
+    if (historialLoadedRef.current && !force) return;
     const ownClientes = activeSpecialistId
       ? clientes.filter((c) => String(c.nutriologo_id) === String(activeSpecialistId))
       : clientes;
@@ -1289,19 +1290,20 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     historialLoadedRef.current = true;
     try {
       const ids = ownClientes.map(c => c.id).join(",");
+      const fetchFn = force ? dbGetFresh : dbGet;
       const [hr, hn] = await Promise.all([
-        dbGet(`rutinas?cliente_id=eq.${selected?.id || ownClientes[0].id}`).catch(() => []),
-        dbGet(`nutricion?cliente_id=in.(${ids})`).catch(() => []),
+        fetchFn(`rutinas?cliente_id=eq.${selected?.id || ownClientes[0].id}`).catch(() => []),
+        fetchFn(`nutricion?cliente_id=in.(${ids})`).catch(() => []),
       ]);
       // Cargar todas las rutinas del especialista en segundo plano sin bloquear
-      dbGet(`rutinas?cliente_id=in.(${ids})`).then(allHr => {
+      fetchFn(`rutinas?cliente_id=in.(${ids})`).then(allHr => {
         if (allHr) setHistorialRutinas(allHr);
       }).catch(() => {});
       if (hr) setHistorialRutinas(hr);
       
       if (hn && hn.length > 0) {
         const nids = hn.map(n => n.id).join(",");
-        const hd = await dbGet(`nutricion_dias?nutricion_id=in.(${nids})`).catch(() => []);
+        const hd = await fetchFn(`nutricion_dias?nutricion_id=in.(${nids})`).catch(() => []);
         if (hd) {
           const hdMapped = hd.map(d => {
             const nut = hn.find(n => n.id === d.nutricion_id);
@@ -2598,7 +2600,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   const openNewDia  = () => { 
     if (interceptNoPlan()) return; 
     if (isEstandarLimit(dias.length)) return;
-    loadHistorial();
+    loadHistorial({ force: true });
     setEditDia(null); 
     const suggestedWater = getClinicalSuggestedWater();
     setDiaForm({ 
@@ -3062,6 +3064,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       }
 
       savingDiaRef.current = false;
+      historialLoadedRef.current = false;
       await loadData(cicloSel, { silent: true, forceFresh: true });
       notifyPlanUpdate("nutricion_dias");
 
@@ -3525,7 +3528,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   const openNewRutina  = () => { 
     if (interceptNoPlan()) return; 
     if (isEstandarLimit(rutinas.length, "rutinas")) return;
-    loadHistorial();
+    loadHistorial({ force: true });
     if (selected?.id) loadPatientExerciseHistory(selected.id, { force: true });
     setEditRutina(null); 
     setActiveAltSlot(null);
@@ -3826,6 +3829,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       }
 
       savingRutinaRef.current = false;
+      historialLoadedRef.current = false;
       await loadData(activeCiclo, { silent: true, forceFresh: true });
       notifyPlanUpdate("rutinas");
 
@@ -4174,15 +4178,25 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       return prog ? { peso: prog.nextPesoInput, reps: prog.nextReps } : null;
     }, altIdx);
 
-  const hasItemAssignedWeight = (item) => {
-    if (!item) return false;
+  const getItemFirstWorkingTargets = (item) => {
+    if (!item) return { reps: "", peso: "" };
     if (Array.isArray(item.seriesForm) && item.seriesForm.length > 0) {
       const firstWorking = item.seriesForm.find((s) => normalizeSeriesType(s.tipo) !== "warmup") || item.seriesForm[0];
-      const w = String(firstWorking?.peso ?? "").trim();
-      return w !== "" && w !== "-";
+      return {
+        reps: String(firstWorking?.reps ?? "").trim(),
+        peso: String(firstWorking?.peso ?? "").trim(),
+      };
     }
-    const w = String(item.peso_sugerido ?? "").trim();
-    return w !== "" && w !== "-";
+    return {
+      reps: String(item.reps_sugeridas ?? "").trim(),
+      peso: String(item.peso_sugerido ?? "").trim(),
+    };
+  };
+
+  /** Devuelve true si tanto las repeticiones como el peso inicial (simple o primera serie efectiva) tienen valor. */
+  const hasItemCompleteTargets = (item) => {
+    const { reps, peso } = getItemFirstWorkingTargets(item);
+    return reps !== "" && reps !== "-" && peso !== "" && peso !== "-";
   };
 
   const applyMarkToExerciseObject = (exObj, mark, parentNumSeries = null) => {
@@ -4224,10 +4238,10 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
   const applyBestMarksWithAlts = (cur, historyMap) => {
     const parentCount = Math.max(1, parseInt(cur.num_series, 10) || 4);
-    const shouldApplyMain = !hasItemAssignedWeight(cur);
+    const shouldApplyMain = !hasItemCompleteTargets(cur);
     const mark = shouldApplyMain ? lookupExerciseHistory(historyMap, cur) : null;
     const nextAlts = (cur.alternativas || []).map((alt) => {
-      if (hasItemAssignedWeight(alt)) return alt;
+      if (hasItemCompleteTargets(alt)) return alt;
       const altMark = lookupExerciseHistory(historyMap, alt);
       return altMark ? applyMarkToExerciseObject(alt, altMark, parentCount) : alt;
     });
@@ -8343,14 +8357,14 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
             <div className="lg:col-span-7 bg-white rounded-none md:rounded-2xl border-0 md:border border-[#E2E8F0] p-4 sm:p-6 shadow-none md:shadow-sm">
               {(() => {
                 const needsMarkForItem = (it) =>
-                  Boolean(lookupExerciseHistory(patientHistoryMarks, it)) && !it?._historyApplied && !hasItemAssignedWeight(it);
+                  Boolean(lookupExerciseHistory(patientHistoryMarks, it)) && !it?._historyApplied && !hasItemCompleteTargets(it);
                 const matchedHistoryCount = rutinaForm.ejercicios.filter((ejItem) =>
                   needsMarkForItem(ejItem) ||
                   (ejItem.alternativas || []).some((altItem) => needsMarkForItem(altItem))
                 ).length;
-                const hasUnassignedWeight = rutinaForm.ejercicios.some((ejItem) =>
-                  !hasItemAssignedWeight(ejItem) ||
-                  (ejItem.alternativas || []).some((altItem) => !hasItemAssignedWeight(altItem))
+                const hasIncompleteTargets = rutinaForm.ejercicios.some((ejItem) =>
+                  !hasItemCompleteTargets(ejItem) ||
+                  (ejItem.alternativas || []).some((altItem) => !hasItemCompleteTargets(altItem))
                 );
                 const sessionVol = computeWeeklyMuscleVolume([{ ejercicios: rutinaForm.ejercicios }]);
                 return (
@@ -8363,7 +8377,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                         <p className="text-xs text-[#6B7A8D] mt-0.5">Arrastra para reordenar, abre &ldquo;Por serie&rdquo; si varía cada serie o pulsa (+) para alternativas</p>
                       </div>
                       <div className="flex items-center gap-2 flex-wrap justify-end">
-                        {loadingPatientHistory && hasUnassignedWeight && matchedHistoryCount === 0 && (
+                        {loadingPatientHistory && hasIncompleteTargets && matchedHistoryCount === 0 && (
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[var(--brand-secondary)]/70 border border-[var(--brand-primary)]/20 text-[var(--brand-primary)] text-[11px] font-semibold">
                             <Loader2 className="w-3 h-3 animate-spin" />
                             <span>Buscando mejores marcas...</span>
@@ -8682,7 +8696,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                   <div className="flex items-center flex-wrap gap-1.5">
                                     {hMark ? (
                                       <>
-                                        {!item._historyApplied && !hasItemAssignedWeight(item) && (
+                                        {!item._historyApplied && !hasItemCompleteTargets(item) && (
                                           <button
                                             type="button"
                                             onClick={() => applyHistoryMarksToExercise(exIdx, altIdx)}
@@ -8712,7 +8726,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                           </button>
                                         )}
                                       </>
-                                    ) : !isAlt && !loadingPatientHistory && !hasItemAssignedWeight(item) ? (
+                                    ) : !isAlt && !loadingPatientHistory && !hasItemCompleteTargets(item) ? (
                                       <span className="text-[10px] text-[#94A3B8] font-normal">Sin marcas previas</span>
                                     ) : null}
                                   </div>
@@ -8907,7 +8921,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                         )
                                       ) : <Dumbbell className="w-[18px] h-[18px] text-[#6B7A8D]" />}
                                     </div>
-                                    <div className="text-[13px] font-semibold text-[#0B1929] leading-tight min-w-0 pr-1">
+                                    <div className={`text-[13px] font-semibold text-[#0B1929] leading-tight min-w-0 pr-1 ${isPerSeriesOpen ? "sm:col-span-4" : ""}`}>
                                       <div className="flex items-center gap-1.5 min-w-0">
                                         {ssMeta.isMember && (
                                           <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded-md bg-[var(--brand-secondary)] text-[var(--brand-primary)] border border-[var(--brand-primary)]/30 text-[10px] font-mono font-extrabold shrink-0">
@@ -8922,13 +8936,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                       </div>
                                     </div>
                                   
-                                  {isPerSeriesOpen ? (
-                                    <div className="hidden sm:flex sm:col-span-3 sm:col-start-4 sm:row-start-1 items-center justify-end pr-1">
-                                      <span className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-[var(--brand-secondary)] text-[var(--brand-primary)] border border-[var(--brand-primary)]/20">
-                                        {e.seriesForm.length} series · por serie
-                                      </span>
-                                    </div>
-                                  ) : (
+                                  {!isPerSeriesOpen && (
                                     <div className="col-span-4 sm:col-span-3 sm:col-start-4 sm:row-start-1 grid grid-cols-3 gap-2 sm:grid-cols-[56px_56px_76px] sm:gap-1.5 mt-1.5 sm:mt-0 pt-2 sm:pt-0 border-t border-[#E2E8F0] sm:border-none">
                                       <div className="flex flex-col gap-0.5 sm:block">
                                         <span className="text-[10px] font-semibold text-[#6B7A8D] sm:hidden text-center w-full">SERIES</span>
@@ -9028,7 +9036,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                             )
                                           ) : <Dumbbell className="w-[14px] h-[14px] text-[#6B7A8D]" />}
                                         </div>
-                                        <div className="min-w-0 pr-1">
+                                        <div className={`min-w-0 pr-1 ${isAltPerSeriesOpen ? "sm:col-span-3" : ""}`}>
                                           <div className="flex items-center gap-1.5 min-w-0">
                                             <span className="px-1.5 py-0.5 bg-[var(--brand-secondary)] text-[var(--brand-primary)] border border-[var(--brand-primary)]/30 rounded text-[9px] font-bold shrink-0">ALT {altIdx + 1}</span>
                                             <span className="text-[12px] font-semibold text-[#0B1929] leading-tight truncate">{alt.nombre}</span>
@@ -9039,13 +9047,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                           </div>
                                         </div>
                                         
-                                        {isAltPerSeriesOpen ? (
-                                          <div className="hidden sm:flex sm:col-span-2 sm:col-start-3 sm:row-start-1 items-center justify-end pr-1">
-                                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[var(--brand-secondary)] text-[var(--brand-primary)] border border-[var(--brand-primary)]/20">
-                                              {alt.seriesForm.length} ser. · por serie
-                                            </span>
-                                          </div>
-                                        ) : (
+                                        {!isAltPerSeriesOpen && (
                                           <div className="col-span-3 sm:col-span-2 sm:col-start-3 sm:row-start-1 grid grid-cols-2 gap-2 sm:grid-cols-[56px_76px] sm:gap-1.5 mt-1 sm:mt-0 pt-1.5 sm:pt-0 border-t border-[#E2E8F0] sm:border-none">
                                             <div className="flex flex-col gap-0.5 sm:block">
                                               <span className="text-[10px] font-semibold text-[#6B7A8D] sm:hidden text-center w-full">REPS</span>
