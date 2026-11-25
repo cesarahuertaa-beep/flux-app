@@ -4033,6 +4033,38 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     return { ...p, ejercicios: es };
   });
 
+  const addSerieRow = (i) => setRutinaForm(p => {
+    const es = [...p.ejercicios];
+    const cur = es[i];
+    if (!cur || !Array.isArray(cur.seriesForm) || cur.seriesForm.length >= 12) return p;
+    const nextCount = cur.seriesForm.length + 1;
+    const last = cur.seriesForm[cur.seriesForm.length - 1] || { reps: String(cur.reps_sugeridas || 10), peso: "", tipo: "normal" };
+    const nextMainRows = [...cur.seriesForm, { reps: last.reps || "", peso: last.peso || "", tipo: "normal" }];
+    const nextAlts = (cur.alternativas || []).map((alt) => ({
+      ...alt,
+      seriesForm: resizeSeriesFormRows(alt.seriesForm, nextCount, alt.reps_sugeridas ?? cur.reps_sugeridas, alt.peso_sugerido),
+    }));
+    es[i] = { ...cur, num_series: nextCount, seriesForm: nextMainRows, alternativas: nextAlts };
+    return { ...p, ejercicios: es };
+  });
+
+  const removeSerieRow = (i, si) => setRutinaForm(p => {
+    const es = [...p.ejercicios];
+    const cur = es[i];
+    if (!cur || !Array.isArray(cur.seriesForm) || cur.seriesForm.length <= 1) return p;
+    const nextMainRows = cur.seriesForm.filter((_, idx) => idx !== si);
+    const nextCount = nextMainRows.length;
+    const nextAlts = (cur.alternativas || []).map((alt) => ({
+      ...alt,
+      seriesForm:
+        Array.isArray(alt.seriesForm) && alt.seriesForm.length > 1
+          ? alt.seriesForm.filter((_, idx) => idx !== si).slice(0, nextCount)
+          : resizeSeriesFormRows(alt.seriesForm, nextCount, alt.reps_sugeridas ?? cur.reps_sugeridas, alt.peso_sugerido),
+    }));
+    es[i] = { ...cur, num_series: nextCount, seriesForm: nextMainRows, alternativas: nextAlts };
+    return { ...p, ejercicios: es };
+  });
+
   const toggleExerciseOptions = (i, altIdx = null) => setRutinaForm(p => {
     const es = [...p.ejercicios];
     updateTargetItem(es, i, altIdx, (cur) => {
@@ -4145,31 +4177,36 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   const applyMarkToExerciseObject = (exObj, mark, parentNumSeries = null) => {
     if (!mark) return exObj;
     const unit = exObj.unidad || "kg";
-    const numSeries = Math.max(1, parseInt(parentNumSeries ?? exObj.num_series, 10) || 4);
-    const repsStr = String(mark.reps_sugeridas || exObj.reps_sugeridas || 10);
-    const pesoStr = mark.peso_sugerido != null ? convertWeightToInput(mark.peso_sugerido, unit) : (exObj.peso_sugerido || "");
-    const existingTypes = Array.isArray(exObj.seriesForm) && exObj.seriesForm.length > 0
-      ? exObj.seriesForm.map((s) => normalizeSeriesType(s.tipo))
-      : normalizeSeriesDetalle(exObj.series_detalle).map((s) => normalizeSeriesType(s.tipo));
-    const hasCoachTypes = existingTypes.some((t) => t !== "normal");
+    const repsStr = String(mark.bestReps ?? mark.reps_sugeridas ?? exObj.reps_sugeridas ?? 10);
+    const pesoKg = mark.bestWeightKg ?? mark.peso_sugerido ?? null;
+    const pesoStr = pesoKg != null ? convertWeightToInput(pesoKg, unit) : (exObj.peso_sugerido || "");
     const keepPerSeriesOpen = Array.isArray(exObj.seriesForm) && exObj.seriesForm.length > 0;
-    const hasVaryingSeries = Array.isArray(mark.series_detalle) && mark.series_detalle.length > 0;
-    const rawSeriesForm =
-      hasVaryingSeries || keepPerSeriesOpen || hasCoachTypes
-        ? seriesDetalleToForm(mark.allSeriesMarks || mark.series_detalle, numSeries, repsStr, pesoStr, unit)
-        : [];
-    const nextSeriesForm = rawSeriesForm.map((row, idx) => ({
-      ...row,
-      tipo: existingTypes[idx] && existingTypes[idx] !== "normal" ? existingTypes[idx] : normalizeSeriesType(row.tipo),
-    }));
+
+    if (keepPerSeriesOpen) {
+      const firstWorkingIdx = exObj.seriesForm.findIndex((s) => normalizeSeriesType(s.tipo) !== "warmup");
+      const targetIdx = firstWorkingIdx !== -1 ? firstWorkingIdx : 0;
+      const nextSeriesForm = exObj.seriesForm.map((row, idx) =>
+        idx === targetIdx
+          ? { ...row, reps: repsStr, peso: pesoStr }
+          : { ...row, reps: "", peso: "" }
+      );
+      const count = Math.max(1, parseInt(parentNumSeries ?? nextSeriesForm.length, 10) || nextSeriesForm.length);
+      return {
+        ...exObj,
+        reps_sugeridas: repsStr,
+        peso_sugerido: pesoStr,
+        series_detalle: seriesFormToDb(nextSeriesForm, unit, count),
+        seriesForm: nextSeriesForm,
+        _historyApplied: true,
+      };
+    }
+
     return {
       ...exObj,
       reps_sugeridas: repsStr,
       peso_sugerido: pesoStr,
-      series_detalle: hasVaryingSeries || hasCoachTypes
-        ? seriesFormToDb(nextSeriesForm, unit, numSeries)
-        : [],
-      seriesForm: nextSeriesForm,
+      series_detalle: [],
+      seriesForm: [],
       _historyApplied: true,
     };
   };
@@ -8489,9 +8526,138 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                               : "mt-1.5 pt-1.5 border-t border-[#E2E8F0]/70";
                             const updateField = (field, val) =>
                               isAlt ? updAlt(exIdx, altIdx, field, val) : updEj(exIdx, field, val);
+                            const handleToggleUnit = () =>
+                              isAlt ? toggleUnidadAlt(exIdx, altIdx) : toggleUnidad(exIdx);
 
                             return (
                               <>
+                                {/* TABLA VERTICAL INTEGRADA (ESTILO HEVY) CUANDO ESTÁ ACTIVO MODO POR SERIE */}
+                                {isPerSeriesOpen && (
+                                  <div className={`mt-2 ${indentPanelCls} rounded-xl border border-[#E2E8F0] bg-white overflow-hidden`}>
+                                    <div className="grid grid-cols-[36px_minmax(76px,104px)_1fr_1fr_28px] sm:grid-cols-[44px_124px_1fr_1fr_32px] gap-1.5 items-center px-2.5 py-1.5 bg-[#F8FAFC] border-b border-[#E2E8F0] text-[10px] font-bold uppercase tracking-wider text-[#6B7A8D]">
+                                      <span className="text-center">Serie</span>
+                                      <span>Tipo</span>
+                                      <span className="text-center">Reps</span>
+                                      <div className="flex items-center justify-center gap-1">
+                                        <span>Peso</span>
+                                        <button
+                                          type="button"
+                                          onClick={handleToggleUnit}
+                                          className="px-1.5 py-0.2 rounded bg-white border border-[#E2E8F0] hover:border-[var(--brand-primary)] text-[9px] font-extrabold text-[var(--brand-primary)] uppercase cursor-pointer transition-colors"
+                                          title="Cambiar unidad KG / LB"
+                                        >
+                                          {u}
+                                        </button>
+                                      </div>
+                                      <span />
+                                    </div>
+
+                                    <div className="divide-y divide-[#F1F5F9]">
+                                      {item.seriesForm.map((sf, si) => {
+                                        const curType = normalizeSeriesType(sf.tipo);
+                                        const typeCfg = SERIES_TYPES[curType] || SERIES_TYPES.normal;
+                                        const vLbl = visualLabels[si] || { label: String(si + 1) };
+                                        const tagCls =
+                                          curType === "warmup"
+                                            ? "bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100"
+                                            : curType === "dropset"
+                                            ? "bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100"
+                                            : curType === "failure"
+                                            ? "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100"
+                                            : "bg-[#F8FAFC] text-[#475569] border-[#E2E8F0] hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)]";
+                                        const numBadgeCls =
+                                          curType === "warmup"
+                                            ? "text-amber-700 bg-amber-100/70"
+                                            : curType === "dropset"
+                                            ? "text-purple-700 bg-purple-100/70"
+                                            : curType === "failure"
+                                            ? "text-rose-700 bg-rose-100/70"
+                                            : "text-[var(--brand-primary)] bg-[var(--brand-secondary)]/70";
+                                        return (
+                                          <div
+                                            key={si}
+                                            className={`grid grid-cols-[36px_minmax(76px,104px)_1fr_1fr_28px] sm:grid-cols-[44px_124px_1fr_1fr_32px] gap-1.5 items-center px-2.5 py-1.5 ${
+                                              curType === "warmup" ? "bg-amber-50/35" : "bg-white"
+                                            }`}
+                                          >
+                                            <div className="flex justify-center">
+                                              <span className={`inline-flex items-center justify-center min-w-[24px] px-1 py-0.5 rounded text-[11px] font-mono font-extrabold ${numBadgeCls}`}>
+                                                #{vLbl.label}
+                                              </span>
+                                            </div>
+                                            <button
+                                              type="button"
+                                              onClick={() => toggleSeriesType(exIdx, si, altIdx)}
+                                              className={`w-full px-2 py-1 rounded-lg border text-[10px] font-bold flex items-center justify-center cursor-pointer transition-colors truncate ${tagCls}`}
+                                              title="Pulsa para cambiar tipo (Normal → Calentamiento → Drop Set → Al fallo)"
+                                            >
+                                              {typeCfg.badge || "Normal"}
+                                            </button>
+                                            <input
+                                              type="number"
+                                              min="1"
+                                              value={sf.reps}
+                                              onChange={(ev) => updSerieField(exIdx, si, "reps", ev.target.value, altIdx)}
+                                              placeholder="—"
+                                              title={`Reps Serie ${si + 1}`}
+                                              className="w-full px-2 py-1 rounded-lg border border-[#E2E8F0] focus:outline-none focus:border-[var(--brand-primary)] text-xs font-semibold text-center bg-white"
+                                            />
+                                            <input
+                                              type="text"
+                                              inputMode="decimal"
+                                              value={sf.peso}
+                                              onChange={(ev) => updSerieField(exIdx, si, "peso", ev.target.value, altIdx)}
+                                              placeholder="—"
+                                              title={`Peso Serie ${si + 1} (${u})`}
+                                              className="w-full px-2 py-1 rounded-lg border border-[#E2E8F0] focus:outline-none focus:border-[var(--brand-primary)] text-xs font-semibold text-center bg-white"
+                                            />
+                                            <div className="flex justify-center">
+                                              {!isAlt && item.seriesForm.length > 1 ? (
+                                                <button
+                                                  type="button"
+                                                  onClick={() => removeSerieRow(exIdx, si)}
+                                                  className="p-1 rounded-md text-[#94A3B8] hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
+                                                  title={`Quitar serie #${vLbl.label}`}
+                                                >
+                                                  <X className="w-3.5 h-3.5" />
+                                                </button>
+                                              ) : null}
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+
+                                    <div className="px-2.5 py-1.5 bg-[#F8FAFC] border-t border-[#E2E8F0] flex items-center justify-between gap-2 flex-wrap">
+                                      {!isAlt ? (
+                                        item.seriesForm.length < 12 ? (
+                                          <button
+                                            type="button"
+                                            onClick={() => addSerieRow(exIdx)}
+                                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-[#E2E8F0] hover:border-[var(--brand-primary)] text-[10px] font-bold text-[var(--brand-primary)] cursor-pointer transition-colors"
+                                          >
+                                            <Plus className="w-3 h-3 shrink-0" />
+                                            <span>Añadir serie</span>
+                                          </button>
+                                        ) : (
+                                          <span className="text-[10px] text-[#94A3B8]">Máx. 12 series</span>
+                                        )
+                                      ) : (
+                                        <span className="text-[10px] text-[#6B7A8D]">
+                                          {item.seriesForm.length} series (sincronizado con principal)
+                                        </span>
+                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={() => togglePerSeries(exIdx, altIdx)}
+                                        className="text-[10px] font-bold text-[#6B7A8D] hover:text-[var(--brand-primary)] cursor-pointer"
+                                      >
+                                        Volver a modo simple
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+
                                 {/* SUB-BARRA COMPACTA */}
                                 <div className={`${indentSubbarCls} flex items-center justify-between flex-wrap gap-1.5`}>
                                   <div className="flex items-center flex-wrap gap-1.5">
@@ -8661,77 +8827,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                     </div>
                                   </div>
                                 )}
-
-                                {/* DESGLOSE POR SERIE (SIN BOTÓN DUPLICADO NI TEXTO LARGO) */}
-                                {isPerSeriesOpen && (
-                                  <div className={`mt-2 ${indentPanelCls} p-2.5 rounded-xl bg-[var(--brand-secondary)]/45 border border-[var(--brand-primary)]/25 space-y-2`}>
-                                    <div className="flex items-center justify-between gap-2 flex-wrap">
-                                      <div className="flex items-center gap-2 flex-wrap">
-                                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--brand-primary)]">
-                                          Por serie ({item.seriesForm.length} · {u.toUpperCase()})
-                                        </span>
-                                        <span className="text-[10px] text-[#6B7A8D] hidden sm:inline">
-                                          · Toca # para Warm-up / Drop / Fallo
-                                        </span>
-                                      </div>
-                                      <button
-                                        type="button"
-                                        onClick={() => togglePerSeries(exIdx, altIdx)}
-                                        className="text-[10px] font-bold text-[var(--brand-primary)] hover:underline cursor-pointer"
-                                      >
-                                        Usar uniforme
-                                      </button>
-                                    </div>
-                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                      {item.seriesForm.map((sf, si) => {
-                                        const curType = normalizeSeriesType(sf.tipo);
-                                        const typeCfg = SERIES_TYPES[curType] || SERIES_TYPES.normal;
-                                        const vLbl = visualLabels[si] || { label: String(si + 1) };
-                                        const tagCls =
-                                          curType === "warmup"
-                                            ? "bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100"
-                                            : curType === "dropset"
-                                            ? "bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100"
-                                            : curType === "failure"
-                                            ? "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100"
-                                            : "bg-[var(--brand-secondary)]/70 text-[var(--brand-primary)] border-[var(--brand-primary)]/20 hover:bg-[var(--brand-secondary)]";
-                                        return (
-                                          <div key={si} className={`bg-white rounded-lg border p-1.5 space-y-1 ${curType === "warmup" ? "border-amber-200/90" : "border-[var(--brand-primary)]/20"}`}>
-                                            <button
-                                              type="button"
-                                              onClick={() => toggleSeriesType(exIdx, si, altIdx)}
-                                              className={`w-full px-1 py-0.5 rounded border text-[9px] font-extrabold uppercase flex items-center justify-between gap-1 cursor-pointer transition-colors ${tagCls}`}
-                                              title="Pulsa para cambiar tipo (Normal → Calentamiento → Drop Set → Al fallo)"
-                                            >
-                                              <span>#{vLbl.label}</span>
-                                              <span>{typeCfg.short || "Normal"}</span>
-                                            </button>
-                                            <div className="grid grid-cols-2 gap-1">
-                                              <input
-                                                type="number"
-                                                min="1"
-                                                value={sf.reps}
-                                                onChange={(ev) => updSerieField(exIdx, si, "reps", ev.target.value, altIdx)}
-                                                placeholder="Reps"
-                                                title={`Reps Serie ${si + 1}`}
-                                                className="w-full px-1 py-1 rounded border border-[#E2E8F0] focus:outline-none focus:border-[var(--brand-primary)] text-[11px] font-semibold text-center"
-                                              />
-                                              <input
-                                                type="text"
-                                                inputMode="decimal"
-                                                value={sf.peso}
-                                                onChange={(ev) => updSerieField(exIdx, si, "peso", ev.target.value, altIdx)}
-                                                placeholder={u}
-                                                title={`Peso Serie ${si + 1}`}
-                                                className="w-full px-1 py-1 rounded border border-[#E2E8F0] focus:outline-none focus:border-[var(--brand-primary)] text-[11px] font-semibold text-center"
-                                              />
-                                            </div>
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  </div>
-                                )}
                               </>
                             );
                           };
@@ -8812,38 +8907,44 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                       </div>
                                     </div>
                                   
-                                  <div className="col-span-4 sm:col-span-3 sm:col-start-4 sm:row-start-1 grid grid-cols-3 gap-2 sm:grid-cols-[56px_56px_76px] sm:gap-1.5 mt-1.5 sm:mt-0 pt-2 sm:pt-0 border-t border-[#E2E8F0] sm:border-none">
-                                    <div className="flex flex-col gap-0.5 sm:block">
-                                      <span className="text-[10px] font-semibold text-[#6B7A8D] sm:hidden text-center w-full">SERIES</span>
-                                      <input type="number" className="w-full px-1.5 py-1.5 rounded-lg border border-[#E2E8F0] bg-white text-[13px] font-semibold text-center focus:outline-none focus:border-[var(--brand-primary)]" value={e.num_series} onChange={ev=>updEj(i,"num_series",ev.target.value)} placeholder="4" />
+                                  {isPerSeriesOpen ? (
+                                    <div className="hidden sm:flex sm:col-span-3 sm:col-start-4 sm:row-start-1 items-center justify-end pr-1">
+                                      <span className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-[var(--brand-secondary)] text-[var(--brand-primary)] border border-[var(--brand-primary)]/20">
+                                        {e.seriesForm.length} series · por serie
+                                      </span>
                                     </div>
-                                    <div className="flex flex-col gap-0.5 sm:block">
-                                      <span className="text-[10px] font-semibold text-[#6B7A8D] sm:hidden text-center w-full">REPS</span>
-                                      <input
-                                        type="number"
-                                        disabled={isPerSeriesOpen}
-                                        className="w-full px-1.5 py-1.5 rounded-lg border border-[#E2E8F0] bg-white disabled:bg-slate-100 disabled:text-slate-400 text-[13px] font-semibold text-center focus:outline-none focus:border-[var(--brand-primary)]"
-                                        value={e.reps_sugeridas}
-                                        onChange={ev=>updEj(i,"reps_sugeridas",ev.target.value)}
-                                        placeholder="10"
-                                      />
-                                    </div>
-                                    <div className="flex flex-col gap-0.5 sm:block">
-                                      <span className="text-[10px] font-semibold text-[#6B7A8D] sm:hidden text-center w-full">PESO</span>
-                                      <div className="relative w-full">
+                                  ) : (
+                                    <div className="col-span-4 sm:col-span-3 sm:col-start-4 sm:row-start-1 grid grid-cols-3 gap-2 sm:grid-cols-[56px_56px_76px] sm:gap-1.5 mt-1.5 sm:mt-0 pt-2 sm:pt-0 border-t border-[#E2E8F0] sm:border-none">
+                                      <div className="flex flex-col gap-0.5 sm:block">
+                                        <span className="text-[10px] font-semibold text-[#6B7A8D] sm:hidden text-center w-full">SERIES</span>
+                                        <input type="number" className="w-full px-1.5 py-1.5 rounded-lg border border-[#E2E8F0] bg-white text-[13px] font-semibold text-center focus:outline-none focus:border-[var(--brand-primary)]" value={e.num_series} onChange={ev=>updEj(i,"num_series",ev.target.value)} placeholder="4" />
+                                      </div>
+                                      <div className="flex flex-col gap-0.5 sm:block">
+                                        <span className="text-[10px] font-semibold text-[#6B7A8D] sm:hidden text-center w-full">REPS</span>
                                         <input
-                                          type="text"
-                                          inputMode="decimal"
-                                          disabled={isPerSeriesOpen}
-                                          className="w-full pl-1.5 pr-6 py-1.5 rounded-lg border border-[#E2E8F0] bg-white disabled:bg-slate-100 disabled:text-slate-400 text-[13px] font-semibold text-center focus:outline-none focus:border-[var(--brand-primary)]"
-                                          value={e.peso_sugerido||""}
-                                          onChange={ev=>updEj(i,"peso_sugerido",ev.target.value)}
-                                          placeholder="-"
+                                          type="number"
+                                          className="w-full px-1.5 py-1.5 rounded-lg border border-[#E2E8F0] bg-white text-[13px] font-semibold text-center focus:outline-none focus:border-[var(--brand-primary)]"
+                                          value={e.reps_sugeridas}
+                                          onChange={ev=>updEj(i,"reps_sugeridas",ev.target.value)}
+                                          placeholder="10"
                                         />
-                                        <button type="button" onClick={() => toggleUnidad(i)} className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] font-bold text-[#6B7A8D] uppercase hover:text-[var(--brand-primary)] cursor-pointer">{e.unidad || 'KG'}</button>
+                                      </div>
+                                      <div className="flex flex-col gap-0.5 sm:block">
+                                        <span className="text-[10px] font-semibold text-[#6B7A8D] sm:hidden text-center w-full">PESO</span>
+                                        <div className="relative w-full">
+                                          <input
+                                            type="text"
+                                            inputMode="decimal"
+                                            className="w-full pl-1.5 pr-6 py-1.5 rounded-lg border border-[#E2E8F0] bg-white text-[13px] font-semibold text-center focus:outline-none focus:border-[var(--brand-primary)]"
+                                            value={e.peso_sugerido||""}
+                                            onChange={ev=>updEj(i,"peso_sugerido",ev.target.value)}
+                                            placeholder="-"
+                                          />
+                                          <button type="button" onClick={() => toggleUnidad(i)} className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] font-bold text-[#6B7A8D] uppercase hover:text-[var(--brand-primary)] cursor-pointer">{e.unidad || 'KG'}</button>
+                                        </div>
                                       </div>
                                     </div>
-                                  </div>
+                                  )}
                             
                                   <div className="col-start-4 row-start-1 sm:col-start-7 sm:row-start-1 flex items-center justify-end gap-1 self-center">
                                     <button
@@ -8923,34 +9024,40 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                           </div>
                                         </div>
                                         
-                                        <div className="col-span-3 sm:col-span-2 sm:col-start-3 sm:row-start-1 grid grid-cols-2 gap-2 sm:grid-cols-[56px_76px] sm:gap-1.5 mt-1 sm:mt-0 pt-1.5 sm:pt-0 border-t border-[#E2E8F0] sm:border-none">
-                                          <div className="flex flex-col gap-0.5 sm:block">
-                                            <span className="text-[10px] font-semibold text-[#6B7A8D] sm:hidden text-center w-full">REPS</span>
-                                            <input
-                                              type="number"
-                                              disabled={isAltPerSeriesOpen}
-                                              className="w-full px-1.5 py-1 rounded-lg border border-[#E2E8F0] bg-white disabled:bg-slate-100 disabled:text-slate-400 text-[12px] font-semibold text-center focus:outline-none focus:border-[var(--brand-primary)]"
-                                              value={alt.reps_sugeridas}
-                                              onChange={ev=>updAlt(i,altIdx,"reps_sugeridas",ev.target.value)}
-                                              placeholder="10"
-                                            />
+                                        {isAltPerSeriesOpen ? (
+                                          <div className="hidden sm:flex sm:col-span-2 sm:col-start-3 sm:row-start-1 items-center justify-end pr-1">
+                                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[var(--brand-secondary)] text-[var(--brand-primary)] border border-[var(--brand-primary)]/20">
+                                              {alt.seriesForm.length} ser. · por serie
+                                            </span>
                                           </div>
-                                          <div className="flex flex-col gap-0.5 sm:block">
-                                            <span className="text-[10px] font-semibold text-[#6B7A8D] sm:hidden text-center w-full">PESO</span>
-                                            <div className="relative w-full">
+                                        ) : (
+                                          <div className="col-span-3 sm:col-span-2 sm:col-start-3 sm:row-start-1 grid grid-cols-2 gap-2 sm:grid-cols-[56px_76px] sm:gap-1.5 mt-1 sm:mt-0 pt-1.5 sm:pt-0 border-t border-[#E2E8F0] sm:border-none">
+                                            <div className="flex flex-col gap-0.5 sm:block">
+                                              <span className="text-[10px] font-semibold text-[#6B7A8D] sm:hidden text-center w-full">REPS</span>
                                               <input
-                                                type="text"
-                                                inputMode="decimal"
-                                                disabled={isAltPerSeriesOpen}
-                                                className="w-full pl-1.5 pr-6 py-1 rounded-lg border border-[#E2E8F0] bg-white disabled:bg-slate-100 disabled:text-slate-400 text-[12px] font-semibold text-center focus:outline-none focus:border-[var(--brand-primary)]"
-                                                value={alt.peso_sugerido||""}
-                                                onChange={ev=>updAlt(i,altIdx,"peso_sugerido",ev.target.value)}
-                                                placeholder="-"
+                                                type="number"
+                                                className="w-full px-1.5 py-1 rounded-lg border border-[#E2E8F0] bg-white text-[12px] font-semibold text-center focus:outline-none focus:border-[var(--brand-primary)]"
+                                                value={alt.reps_sugeridas}
+                                                onChange={ev=>updAlt(i,altIdx,"reps_sugeridas",ev.target.value)}
+                                                placeholder="10"
                                               />
-                                              <button type="button" onClick={() => toggleUnidadAlt(i, altIdx)} className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] font-bold text-[#6B7A8D] uppercase hover:text-[var(--brand-primary)] cursor-pointer">{alt.unidad || 'KG'}</button>
+                                            </div>
+                                            <div className="flex flex-col gap-0.5 sm:block">
+                                              <span className="text-[10px] font-semibold text-[#6B7A8D] sm:hidden text-center w-full">PESO</span>
+                                              <div className="relative w-full">
+                                                <input
+                                                  type="text"
+                                                  inputMode="decimal"
+                                                  className="w-full pl-1.5 pr-6 py-1 rounded-lg border border-[#E2E8F0] bg-white text-[12px] font-semibold text-center focus:outline-none focus:border-[var(--brand-primary)]"
+                                                  value={alt.peso_sugerido||""}
+                                                  onChange={ev=>updAlt(i,altIdx,"peso_sugerido",ev.target.value)}
+                                                  placeholder="-"
+                                                />
+                                                <button type="button" onClick={() => toggleUnidadAlt(i, altIdx)} className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] font-bold text-[#6B7A8D] uppercase hover:text-[var(--brand-primary)] cursor-pointer">{alt.unidad || 'KG'}</button>
+                                              </div>
                                             </div>
                                           </div>
-                                        </div>
+                                        )}
                                 
                                         <div className="col-start-3 row-start-1 sm:col-start-5 sm:row-start-1 flex items-center justify-end self-center gap-1">
                                           <button

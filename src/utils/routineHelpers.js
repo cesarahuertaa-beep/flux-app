@@ -99,11 +99,19 @@ export function seriesDetalleToForm(rawDetalle, numSeries, fallbackReps = 10, fa
   if (list.length === 0) return [];
   const count = Math.max(1, parseInt(numSeries, 10) || list.length || 4);
   return Array.from({ length: count }, (_, idx) => {
+    const hasExplicitRow = idx < list.length;
     const item = list[idx];
+    if (hasExplicitRow) {
+      return {
+        reps: item?.reps != null ? String(item.reps) : "",
+        peso: item?.peso != null ? convertWeightToInput(item.peso, unit) : "",
+        tipo: normalizeSeriesType(item?.tipo),
+      };
+    }
     return {
-      reps: item?.reps != null ? String(item.reps) : String(fallbackReps || 10),
-      peso: item?.peso != null ? convertWeightToInput(item.peso, unit) : String(fallbackPesoInput || ""),
-      tipo: normalizeSeriesType(item?.tipo),
+      reps: String(fallbackReps || 10),
+      peso: String(fallbackPesoInput || ""),
+      tipo: "normal",
     };
   });
 }
@@ -143,14 +151,16 @@ export function hasCustomSeriesBreakdown(seriesList, scalarReps, scalarPesoKg) {
 /** Obtiene la sugerencia inicial (Semana 1 o sin historial en ciclo) para una serie puntual `si`. */
 export function getSeriesSuggestion(exObj, serieIdx) {
   const list = normalizeSeriesDetalle(exObj?.series_detalle);
+  const hasExplicitRow = serieIdx < list.length;
   const item = list[serieIdx];
-  const reps = item?.reps != null ? String(item.reps) : String(exObj?.reps_sugeridas || "10");
-  const peso =
-    item?.peso !== null && item?.peso !== undefined && item?.peso !== ""
-      ? String(item.peso)
-      : exObj?.peso_sugerido !== null && exObj?.peso_sugerido !== undefined && exObj?.peso_sugerido !== ""
-      ? String(exObj.peso_sugerido)
-      : "-";
+  const reps = hasExplicitRow
+    ? (item?.reps != null ? String(item.reps) : "-")
+    : String(exObj?.reps_sugeridas || "10");
+  const peso = hasExplicitRow
+    ? (item?.peso !== null && item?.peso !== undefined && item?.peso !== "" ? String(item.peso) : "-")
+    : (exObj?.peso_sugerido !== null && exObj?.peso_sugerido !== undefined && exObj?.peso_sugerido !== ""
+        ? String(exObj.peso_sugerido)
+        : "-");
   return { reps, peso };
 }
 
