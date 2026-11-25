@@ -1102,6 +1102,123 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   
   const getClientName = (id) => clientes?.find(c => c.id === id)?.nombre ||"Desconocido";
 
+  const DAY_ORDER_MAP = {
+    LUN: 1,
+    MAR: 2,
+    MIE: 3,
+    JUE: 4,
+    VIE: 5,
+    SAB: 6,
+    DOM: 7,
+    "S/D": 8,
+  };
+
+  const historialRutinasOptions = useMemo(() => {
+    if (!historialRutinas || historialRutinas.length === 0) return [];
+    const mapped = historialRutinas.map(hr => {
+      const rawParts = String(hr.nombre || "").split("|");
+      const firstPart = (rawParts[0] || "").trim().toUpperCase();
+      const isDayCode = ["LUN", "MAR", "MIE", "JUE", "VIE", "SAB", "DOM", "S/D"].includes(firstPart);
+      const dayCode = isDayCode ? firstPart : "S/D";
+      const cleanDayCode = dayCode.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+      const titulo = isDayCode ? rawParts.slice(1).join(" ").trim() : String(hr.nombre || "").trim();
+      const patientName = getClientName(hr.cliente_id);
+      const label = titulo
+        ? `${dayCode} - ${titulo} - ${patientName}`
+        : `${dayCode} - ${patientName}`;
+      const isCurrentClient = (selected?.id && String(hr.cliente_id) === String(selected.id)) ? 0 : 1;
+      const planDate = new Date(hr.created_at || hr.updated_at || 0).getTime();
+      const dayOrder = DAY_ORDER_MAP[cleanDayCode] || 8;
+      return {
+        value: hr.id,
+        label,
+        isCurrentClient,
+        patientName,
+        planDate,
+        dayOrder,
+        titulo,
+      };
+    });
+
+    mapped.sort((a, b) => {
+      // 1. Paciente actual primero
+      if (a.isCurrentClient !== b.isCurrentClient) {
+        return a.isCurrentClient - b.isCurrentClient;
+      }
+      // 2. Paciente por orden alfabético
+      const nameComp = (a.patientName || "").localeCompare(b.patientName || "", "es", { sensitivity: "base" });
+      if (nameComp !== 0) return nameComp;
+
+      // 3. Plan / Ciclo / Fecha más reciente primero
+      if (b.planDate !== a.planDate) {
+        return b.planDate - a.planDate;
+      }
+      // 4. Día de la semana en orden natural (LUN -> DOM -> S/D)
+      if (a.dayOrder !== b.dayOrder) {
+        return a.dayOrder - b.dayOrder;
+      }
+      // 5. Título alfabético
+      return (a.titulo || "").localeCompare(b.titulo || "", "es", { sensitivity: "base" });
+    });
+
+    return [
+      { value: "", label: "-- Seleccionar rutina preexistente --" },
+      ...mapped.map(item => ({ value: item.value, label: item.label }))
+    ];
+  }, [historialRutinas, selected?.id, clientes]);
+
+  const historialDiasOptions = useMemo(() => {
+    if (!historialDias || historialDias.length === 0) return [];
+    const mapped = historialDias.map(hd => {
+      const meta = parseDiaMetadata(hd.dia || "");
+      const dayCode = (meta.dayCode && meta.dayCode !== "S/D") ? meta.dayCode.trim().toUpperCase() : "S/D";
+      const cleanDayCode = dayCode.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+      const titulo = (meta.titulo || "").trim();
+      const patientName = getClientName(hd.cliente_id);
+      const label = titulo
+        ? `${dayCode} - ${titulo} - ${patientName}`
+        : `${dayCode} - ${patientName}`;
+      const isCurrentClient = (selected?.id && String(hd.cliente_id) === String(selected.id)) ? 0 : 1;
+      const planDate = new Date(hd.created_at || hd.nutricion_created_at || hd.fecha_inicio || 0).getTime();
+      const dayOrder = DAY_ORDER_MAP[cleanDayCode] || 8;
+      return {
+        value: hd.id,
+        label,
+        isCurrentClient,
+        patientName,
+        planDate,
+        dayOrder,
+        titulo,
+      };
+    });
+
+    mapped.sort((a, b) => {
+      // 1. Paciente actual primero
+      if (a.isCurrentClient !== b.isCurrentClient) {
+        return a.isCurrentClient - b.isCurrentClient;
+      }
+      // 2. Paciente por orden alfabético
+      const nameComp = (a.patientName || "").localeCompare(b.patientName || "", "es", { sensitivity: "base" });
+      if (nameComp !== 0) return nameComp;
+
+      // 3. Plan / Ciclo / Fecha más reciente primero
+      if (b.planDate !== a.planDate) {
+        return b.planDate - a.planDate;
+      }
+      // 4. Día de la semana en orden natural (LUN -> DOM -> S/D)
+      if (a.dayOrder !== b.dayOrder) {
+        return a.dayOrder - b.dayOrder;
+      }
+      // 5. Título alfabético
+      return (a.titulo || "").localeCompare(b.titulo || "", "es", { sensitivity: "base" });
+    });
+
+    return [
+      { value: "", label: "-- Seleccionar día preexistente --" },
+      ...mapped.map(item => ({ value: item.value, label: item.label }))
+    ];
+  }, [historialDias, selected?.id, clientes]);
+
   const notifyPlanUpdate = (table) => {
     if (table) invalidateCache(table);
     if (typeof window !== "undefined") {
@@ -1307,7 +1424,12 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         if (hd) {
           const hdMapped = hd.map(d => {
             const nut = hn.find(n => n.id === d.nutricion_id);
-            return { ...d, cliente_id: nut?.cliente_id };
+            return {
+              ...d,
+              cliente_id: nut?.cliente_id,
+              nutricion_created_at: nut?.created_at,
+              nutricion_fecha_inicio: nut?.fecha_inicio
+            };
           });
           setHistorialDias(hdMapped);
         }
@@ -6289,21 +6411,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                         value=""
                         onChange={onSelectHistorialDia}
                         placeholder="-- Seleccionar día preexistente --"
-                        options={[
-                          { value: "", label: "-- Seleccionar día preexistente --" },
-                          ...historialDias.map(hd => {
-                            const meta = parseDiaMetadata(hd.dia || "");
-                            const dayCode = (meta.dayCode && meta.dayCode !== "S/D") ? meta.dayCode.trim().toUpperCase() : "S/D";
-                            const titulo = (meta.titulo || "").trim();
-                            const patientName = getClientName(hd.cliente_id);
-                            return {
-                              value: hd.id,
-                              label: titulo
-                                ? `${dayCode} - ${titulo} - ${patientName}`
-                                : `${dayCode} - ${patientName}`,
-                            };
-                          })
-                        ]}
+                        options={historialDiasOptions}
                       />
                     </div>
                   )}
@@ -8254,23 +8362,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                       value=""
                       onChange={onSelectHistorialRutina}
                       placeholder="-- Seleccionar rutina preexistente --"
-                      options={[
-                        { value: "", label: "-- Seleccionar rutina preexistente --" },
-                        ...historialRutinas.map(hr => {
-                          const rawParts = String(hr.nombre || "").split("|");
-                          const firstPart = (rawParts[0] || "").trim().toUpperCase();
-                          const isDayCode = ["LUN","MAR","MIE","JUE","VIE","SAB","DOM","S/D"].includes(firstPart);
-                          const dayCode = isDayCode ? firstPart : "S/D";
-                          const titulo = (isDayCode ? rawParts.slice(1).join(" ").trim() : String(hr.nombre || "").trim());
-                          const patientName = getClientName(hr.cliente_id);
-                          return {
-                            value: hr.id,
-                            label: titulo
-                              ? `${dayCode} - ${titulo} - ${patientName}`
-                              : `${dayCode} - ${patientName}`,
-                          };
-                        })
-                      ]}
+                      options={historialRutinasOptions}
                     />
                   </div>
                 )}
@@ -8518,11 +8610,15 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                   <p className="text-sm font-semibold text-[#0B1929]">No hay ejercicios seleccionados</p>
                   <p className="text-xs text-[#6B7A8D]">Utiliza el catálogo de ejercicios para armar la sesión</p>
                 </div>
-              ) : (
+              ) : (() => {
+                const hasAnySimpleExercise = rutinaForm.ejercicios.some(
+                  (ejItem) => !(Array.isArray(ejItem.seriesForm) && ejItem.seriesForm.length > 0)
+                );
+                return (
                 <div className="mt-3">
-                  <div className="hidden sm:grid grid-cols-[24px_40px_1fr_56px_56px_76px_100px] gap-1.5 mb-2 items-center px-1">
+                  <div className="hidden sm:grid grid-cols-[24px_40px_1fr_56px_56px_76px_100px] gap-1.5 mb-2 items-center border border-transparent px-2.5 sm:px-2">
                     <span/><span/><span className="text-[11px] text-[#6B7A8D] font-bold uppercase tracking-wider">EJERCICIO</span>
-                    <span className="text-[11px] text-[#6B7A8D] font-bold uppercase tracking-wider text-center">SERIES</span>
+                    <span className="text-[11px] text-[#6B7A8D] font-bold uppercase tracking-wider text-center">{hasAnySimpleExercise ? "SERIES" : ""}</span>
                     <span className="text-[11px] text-[#6B7A8D] font-bold uppercase tracking-wider text-center">REPS</span>
                     <span className="text-[11px] text-[#6B7A8D] font-bold uppercase tracking-wider text-center">PESO</span>
                     <span/>
@@ -8553,141 +8649,145 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                               (item.rir_objetivo && String(item.rir_objetivo).trim()) ||
                               (item.nota_tecnica && String(item.nota_tecnica).trim())
                             );
-                            const indentPanelCls = showLeftPad ? "sm:ml-[64px]" : "";
+                            const indentPanelCls = showLeftPad ? "sm:ml-[76px]" : "sm:ml-[34px]";
                             const indentSubbarCls = showLeftPad
-                              ? "mt-2 pt-1.5 border-t border-[#F1F5F9] sm:border-t-0 sm:pt-0 sm:pl-[70px]"
-                              : "mt-1.5 pt-1.5 border-t border-[#E2E8F0]/70";
+                              ? (isPerSeriesOpen
+                                ? "mt-2 pt-2 border-t border-[#F1F5F9] sm:ml-[76px]"
+                                : "mt-2 pt-1.5 border-t border-[#F1F5F9] sm:border-t-0 sm:pt-0 sm:ml-[76px]")
+                              : "mt-1.5 pt-1.5 border-t border-[#E2E8F0]/70 sm:ml-[34px]";
                             const updateField = (field, val) =>
                               isAlt ? updAlt(exIdx, altIdx, field, val) : updEj(exIdx, field, val);
                             const handleToggleUnit = () =>
                               isAlt ? toggleUnidadAlt(exIdx, altIdx) : toggleUnidad(exIdx);
+                            const rowInputDensityCls = isAlt ? "py-1 text-[12px]" : "py-1.5 text-[13px]";
 
                             return (
                               <>
-                                {/* TABLA VERTICAL INTEGRADA (ESTILO HEVY) CUANDO ESTÁ ACTIVO MODO POR SERIE */}
+                                {/* DESGLOSE POR SERIE INTEGRADO EN LA MISMA CUADRÍCULA QUE EL MODO SIMPLE */}
                                 {isPerSeriesOpen && (
-                                  <div className={`mt-2 ${indentPanelCls} rounded-xl border border-[#E2E8F0] bg-white overflow-hidden`}>
-                                    <div className="grid grid-cols-[36px_minmax(76px,104px)_1fr_1fr_28px] sm:grid-cols-[44px_124px_1fr_1fr_32px] gap-1.5 items-center px-2.5 py-1.5 bg-[#F8FAFC] border-b border-[#E2E8F0] text-[10px] font-bold uppercase tracking-wider text-[#6B7A8D]">
-                                      <span className="text-center">Serie</span>
-                                      <span>Tipo</span>
+                                  <div className="mt-2 space-y-1.5">
+                                    <div className={`${indentPanelCls} border-t ${isAlt ? "border-[#E2E8F0]/70" : "border-[#F1F5F9]"} pt-0.5`} />
+                                    <div
+                                      className={`grid gap-1.5 sm:hidden text-[10px] font-semibold text-[#6B7A8D] uppercase ${
+                                        isAlt ? "grid-cols-[minmax(0,1fr)_54px_76px]" : "grid-cols-[minmax(0,1fr)_54px_76px_24px]"
+                                      }`}
+                                    >
+                                      <span>Serie / Tipo</span>
                                       <span className="text-center">Reps</span>
-                                      <div className="flex items-center justify-center gap-1">
-                                        <span>Peso</span>
-                                        <button
-                                          type="button"
-                                          onClick={handleToggleUnit}
-                                          className="px-1.5 py-0.2 rounded bg-white border border-[#E2E8F0] hover:border-[var(--brand-primary)] text-[9px] font-extrabold text-[var(--brand-primary)] uppercase cursor-pointer transition-colors"
-                                          title="Cambiar unidad KG / LB"
-                                        >
-                                          {u}
-                                        </button>
-                                      </div>
-                                      <span />
+                                      <span className="text-center">Peso</span>
+                                      {!isAlt && <span />}
                                     </div>
 
-                                    <div className="divide-y divide-[#F1F5F9]">
-                                      {item.seriesForm.map((sf, si) => {
-                                        const curType = normalizeSeriesType(sf.tipo);
-                                        const typeCfg = SERIES_TYPES[curType] || SERIES_TYPES.normal;
-                                        const vLbl = visualLabels[si] || { label: String(si + 1) };
-                                        const tagCls =
-                                          curType === "warmup"
-                                            ? "bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100"
-                                            : curType === "dropset"
-                                            ? "bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100"
-                                            : curType === "failure"
-                                            ? "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100"
-                                            : "bg-[#F8FAFC] text-[#475569] border-[#E2E8F0] hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)]";
-                                        const numBadgeCls =
-                                          curType === "warmup"
-                                            ? "text-amber-700 bg-amber-100/70"
-                                            : curType === "dropset"
-                                            ? "text-purple-700 bg-purple-100/70"
-                                            : curType === "failure"
-                                            ? "text-rose-700 bg-rose-100/70"
-                                            : "text-[var(--brand-primary)] bg-[var(--brand-secondary)]/70";
-                                        return (
-                                          <div
-                                            key={si}
-                                            className={`grid grid-cols-[36px_minmax(76px,104px)_1fr_1fr_28px] sm:grid-cols-[44px_124px_1fr_1fr_32px] gap-1.5 items-center px-2.5 py-1.5 ${
-                                              curType === "warmup" ? "bg-amber-50/35" : "bg-white"
-                                            }`}
-                                          >
-                                            <div className="flex justify-center">
-                                              <span className={`inline-flex items-center justify-center min-w-[24px] px-1 py-0.5 rounded text-[11px] font-mono font-extrabold ${numBadgeCls}`}>
-                                                #{vLbl.label}
-                                              </span>
-                                            </div>
+                                    {item.seriesForm.map((sf, si) => {
+                                      const curType = normalizeSeriesType(sf.tipo);
+                                      const typeCfg = SERIES_TYPES[curType] || SERIES_TYPES.normal;
+                                      const vLbl = visualLabels[si] || { label: String(si + 1) };
+                                      const tagCls =
+                                        curType === "warmup"
+                                          ? "bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100"
+                                          : curType === "dropset"
+                                          ? "bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100"
+                                          : curType === "failure"
+                                          ? "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100"
+                                          : "bg-[#F8FAFC] text-[#475569] border-[#E2E8F0] hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)]";
+                                      const numBadgeCls =
+                                        curType === "warmup"
+                                          ? "text-amber-700 bg-amber-100/70"
+                                          : curType === "dropset"
+                                          ? "text-purple-700 bg-purple-100/70"
+                                          : curType === "failure"
+                                          ? "text-rose-700 bg-rose-100/70"
+                                          : "text-[#475569] bg-[#F1F5F9]";
+                                      const rowGridCls = isAlt
+                                        ? "grid-cols-[minmax(0,1fr)_54px_76px] sm:grid-cols-[28px_1fr_56px_76px_100px]"
+                                        : "grid-cols-[minmax(0,1fr)_54px_76px_24px] sm:grid-cols-[24px_40px_1fr_56px_56px_76px_100px]";
+                                      return (
+                                        <div key={si} className={`grid ${rowGridCls} gap-1.5 items-center`}>
+                                          {isAlt ? (
+                                            <span className="hidden sm:block" />
+                                          ) : (
+                                            <>
+                                              <span className="hidden sm:block" />
+                                              <span className="hidden sm:block" />
+                                            </>
+                                          )}
+                                          <div className={`flex items-center gap-1.5 min-w-0 ${isAlt ? "" : "sm:col-span-2"}`}>
+                                            <span className={`inline-flex items-center justify-center min-w-[26px] px-1.5 py-1 rounded-lg text-[11px] font-mono font-extrabold shrink-0 ${numBadgeCls}`}>
+                                              #{vLbl.label}
+                                            </span>
                                             <button
                                               type="button"
                                               onClick={() => toggleSeriesType(exIdx, si, altIdx)}
-                                              className={`w-full px-2 py-1 rounded-lg border text-[10px] font-bold flex items-center justify-center cursor-pointer transition-colors truncate ${tagCls}`}
+                                              className={`px-2.5 ${rowInputDensityCls} rounded-lg border text-[11px] font-semibold inline-flex items-center justify-center cursor-pointer transition-colors truncate max-w-[130px] focus:outline-none ${tagCls}`}
                                               title="Pulsa para cambiar tipo (Normal → Calentamiento → Drop Set → Al fallo)"
                                             >
                                               {typeCfg.badge || "Normal"}
                                             </button>
-                                            <input
-                                              type="number"
-                                              min="1"
-                                              value={sf.reps}
-                                              onChange={(ev) => updSerieField(exIdx, si, "reps", ev.target.value, altIdx)}
-                                              placeholder="—"
-                                              title={`Reps Serie ${si + 1}`}
-                                              className="w-full px-2 py-1 rounded-lg border border-[#E2E8F0] focus:outline-none focus:border-[var(--brand-primary)] text-xs font-semibold text-center bg-white"
-                                            />
+                                          </div>
+                                          <input
+                                            type="number"
+                                            min="1"
+                                            value={sf.reps}
+                                            onChange={(ev) => updSerieField(exIdx, si, "reps", ev.target.value, altIdx)}
+                                            placeholder="-"
+                                            title={`Reps Serie ${si + 1}`}
+                                            className={`w-full px-1.5 ${rowInputDensityCls} rounded-lg border border-[#E2E8F0] bg-white font-semibold text-center focus:outline-none focus:border-[var(--brand-primary)]`}
+                                          />
+                                          <div className="relative w-full">
                                             <input
                                               type="text"
                                               inputMode="decimal"
                                               value={sf.peso}
                                               onChange={(ev) => updSerieField(exIdx, si, "peso", ev.target.value, altIdx)}
-                                              placeholder="—"
+                                              placeholder="-"
                                               title={`Peso Serie ${si + 1} (${u})`}
-                                              className="w-full px-2 py-1 rounded-lg border border-[#E2E8F0] focus:outline-none focus:border-[var(--brand-primary)] text-xs font-semibold text-center bg-white"
+                                              className={`w-full pl-1.5 pr-6 ${rowInputDensityCls} rounded-lg border border-[#E2E8F0] bg-white font-semibold text-center focus:outline-none focus:border-[var(--brand-primary)]`}
                                             />
-                                            <div className="flex justify-center">
-                                              {!isAlt && item.seriesForm.length > 1 ? (
+                                            <button
+                                              type="button"
+                                              onClick={handleToggleUnit}
+                                              className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] font-bold text-[#6B7A8D] uppercase hover:text-[var(--brand-primary)] cursor-pointer focus:outline-none"
+                                              title="Cambiar unidad KG / LB"
+                                            >
+                                              {u}
+                                            </button>
+                                          </div>
+                                          {isAlt ? (
+                                            <span className="hidden sm:block" />
+                                          ) : (
+                                            <div className="flex items-center justify-center sm:justify-start sm:pl-1">
+                                              {item.seriesForm.length > 1 ? (
                                                 <button
                                                   type="button"
                                                   onClick={() => removeSerieRow(exIdx, si)}
-                                                  className="p-1 rounded-md text-[#94A3B8] hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
+                                                  className="p-1 rounded-md text-[#94A3B8] hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer focus:outline-none"
                                                   title={`Quitar serie #${vLbl.label}`}
                                                 >
                                                   <X className="w-3.5 h-3.5" />
                                                 </button>
                                               ) : null}
                                             </div>
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
 
-                                    <div className="px-2.5 py-1.5 bg-[#F8FAFC] border-t border-[#E2E8F0] flex items-center justify-between gap-2 flex-wrap">
-                                      {!isAlt ? (
-                                        item.seriesForm.length < 12 ? (
+                                    {!isAlt && (
+                                      <div className={`${indentPanelCls} pt-0.5`}>
+                                        {item.seriesForm.length < 12 ? (
                                           <button
                                             type="button"
                                             onClick={() => addSerieRow(exIdx)}
-                                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-[#E2E8F0] hover:border-[var(--brand-primary)] text-[10px] font-bold text-[var(--brand-primary)] cursor-pointer transition-colors"
+                                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-[#F8FAFC] hover:bg-[var(--brand-secondary)] border border-[#E2E8F0] hover:border-[var(--brand-primary)]/40 text-[10px] font-bold text-[#475569] hover:text-[var(--brand-primary)] cursor-pointer transition-colors focus:outline-none"
                                           >
                                             <Plus className="w-3 h-3 shrink-0" />
                                             <span>Añadir serie</span>
                                           </button>
                                         ) : (
                                           <span className="text-[10px] text-[#94A3B8]">Máx. 12 series</span>
-                                        )
-                                      ) : (
-                                        <span className="text-[10px] text-[#6B7A8D]">
-                                          {item.seriesForm.length} series (sincronizado con principal)
-                                        </span>
-                                      )}
-                                      <button
-                                        type="button"
-                                        onClick={() => togglePerSeries(exIdx, altIdx)}
-                                        className="text-[10px] font-bold text-[#6B7A8D] hover:text-[var(--brand-primary)] cursor-pointer"
-                                      >
-                                        Volver a modo simple
-                                      </button>
-                                    </div>
+                                        )}
+                                      </div>
+                                    )}
                                   </div>
                                 )}
 
@@ -8700,7 +8800,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                           <button
                                             type="button"
                                             onClick={() => applyHistoryMarksToExercise(exIdx, altIdx)}
-                                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold border transition-colors cursor-pointer bg-[var(--brand-secondary)] text-[var(--brand-primary)] border-[var(--brand-primary)]/35 hover:bg-[var(--brand-primary)] hover:text-white"
+                                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold border transition-colors cursor-pointer bg-[var(--brand-secondary)] text-[var(--brand-primary)] border-[var(--brand-primary)]/35 hover:bg-[var(--brand-primary)] hover:text-white focus:outline-none"
                                             title="Importar la mejor marca histórica registrada por este paciente en este ejercicio"
                                           >
                                             <Trophy className="w-3 h-3 shrink-0" />
@@ -8715,7 +8815,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                           <button
                                             type="button"
                                             onClick={() => toggleRmPicker(exIdx, altIdx)}
-                                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold border transition-colors cursor-pointer ${
+                                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold border transition-colors cursor-pointer focus:outline-none ${
                                               item._showRmPicker
                                                 ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)]"
                                                 : "bg-white text-[#475569] border-[#E2E8F0] hover:text-[var(--brand-primary)] hover:border-[var(--brand-primary)]/40"
@@ -8734,7 +8834,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                     <button
                                       type="button"
                                       onClick={() => toggleExerciseOptions(exIdx, altIdx)}
-                                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold border transition-colors cursor-pointer ${
+                                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold border transition-colors cursor-pointer focus:outline-none ${
                                         item._showOptions || hasOptValues
                                           ? "bg-[var(--brand-secondary)] text-[var(--brand-primary)] border-[var(--brand-primary)]/30"
                                           : "bg-white text-[#6B7A8D] border-[#E2E8F0] hover:text-[var(--brand-primary)]"
@@ -8963,7 +9063,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                             onChange={ev=>updEj(i,"peso_sugerido",ev.target.value)}
                                             placeholder="-"
                                           />
-                                          <button type="button" onClick={() => toggleUnidad(i)} className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] font-bold text-[#6B7A8D] uppercase hover:text-[var(--brand-primary)] cursor-pointer">{e.unidad || 'KG'}</button>
+                                          <button type="button" onClick={() => toggleUnidad(i)} className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] font-bold text-[#6B7A8D] uppercase hover:text-[var(--brand-primary)] cursor-pointer focus:outline-none">{e.unidad || 'KG'}</button>
                                         </div>
                                       </div>
                                     </div>
@@ -8973,7 +9073,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                     <button
                                       type="button"
                                       onClick={() => togglePerSeries(i)}
-                                      className={`p-1.5 rounded-lg flex items-center justify-center transition-colors border-none cursor-pointer shrink-0 ${
+                                      className={`p-1.5 rounded-lg flex items-center justify-center transition-colors border-none cursor-pointer shrink-0 focus:outline-none ${
                                         isPerSeriesOpen
                                           ? "bg-[var(--brand-primary)] text-white shadow-2xs"
                                           : "bg-gray-100 text-[#6B7A8D] hover:bg-[var(--brand-secondary)] hover:text-[var(--brand-primary)]"
@@ -8992,13 +9092,13 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                             catalogRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
                                           }
                                         }}
-                                        className={`p-1.5 rounded-lg flex items-center justify-center transition-colors border-none cursor-pointer shrink-0 ${activeAltSlot === i ? 'bg-[var(--brand-primary)] text-white shadow-2xs' : 'bg-gray-100 text-[#6B7A8D] hover:bg-[var(--brand-secondary)] hover:text-[var(--brand-primary)]'}`}
+                                        className={`p-1.5 rounded-lg flex items-center justify-center transition-colors border-none cursor-pointer shrink-0 focus:outline-none ${activeAltSlot === i ? 'bg-[var(--brand-primary)] text-white shadow-2xs' : 'bg-gray-100 text-[#6B7A8D] hover:bg-[var(--brand-secondary)] hover:text-[var(--brand-primary)]'}`}
                                         title="Añadir ejercicio alternativo"
                                       >
                                         <Plus className="w-[14px] h-[14px]" />
                                       </button>
                                     )}
-                                    <button type="button" onClick={() => remEj(i)} className="bg-red-50 text-red-500 rounded-lg p-1.5 hover:bg-red-100 flex items-center justify-center transition-colors border-none cursor-pointer shrink-0" title="Eliminar ejercicio">
+                                    <button type="button" onClick={() => remEj(i)} className="bg-red-50 text-red-500 rounded-lg p-1.5 hover:bg-red-100 flex items-center justify-center transition-colors border-none cursor-pointer shrink-0 focus:outline-none" title="Eliminar ejercicio">
                                       <Trash2 className="w-[14px] h-[14px]" />
                                     </button>
                                   </div>
@@ -9008,11 +9108,11 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                             
                                 {/* ACTIVE ALT SLOT INDICATOR */}
                                 {activeAltSlot === i && (
-                                  <div className="mt-2 sm:ml-[64px] p-2.5 border-2 border-dashed border-[var(--brand-primary)] rounded-xl bg-[var(--brand-secondary)]/70 flex items-center justify-between gap-2">
+                                  <div className="mt-2 sm:ml-[76px] p-2.5 border-2 border-dashed border-[var(--brand-primary)] rounded-xl bg-[var(--brand-secondary)]/70 flex items-center justify-between gap-2">
                                     <div className="text-xs font-semibold text-[#0B1929]">
                                       Selecciona un ejercicio del catálogo para añadirlo como alternativa de <span className="text-[var(--brand-primary)]">{e.nombre}</span>
                                     </div>
-                                    <button type="button" onClick={() => setActiveAltSlot(null)} className="text-[11px] font-bold text-[#6B7A8D] hover:text-[#0B1929] px-2 py-1 rounded bg-white border border-[#E2E8F0] shrink-0">
+                                    <button type="button" onClick={() => setActiveAltSlot(null)} className="text-[11px] font-bold text-[#6B7A8D] hover:text-[#0B1929] px-2 py-1 rounded bg-white border border-[#E2E8F0] shrink-0 focus:outline-none">
                                       Cancelar
                                     </button>
                                   </div>
@@ -9025,7 +9125,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                   const altEffSets = countEffectiveSeries({ ...alt, num_series: totalSetsCount });
                                   const altWarmSets = Math.max(0, totalSetsCount - altEffSets);
                                   return (
-                                    <div key={`alt-${altIdx}`} className="mt-2 ml-3 sm:ml-[64px] p-2 sm:py-2 sm:px-2.5 bg-white sm:bg-[#F8FAFC] rounded-xl border border-[#E2E8F0]">
+                                    <div key={`alt-${altIdx}`} className="mt-2 ml-3 sm:ml-[76px] p-2 sm:p-2 bg-white sm:bg-[#F8FAFC] rounded-xl border border-[#E2E8F0]">
                                       <div className="grid grid-cols-[28px_1fr_auto] sm:grid-cols-[28px_1fr_56px_76px_100px] gap-2 sm:gap-1.5 items-center">
                                         <div className="w-7 h-7 rounded-md overflow-hidden bg-gray-50 border border-[#E2E8F0] flex items-center justify-center shrink-0">
                                           {alt.gif_url ? (
@@ -9070,7 +9170,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                   onChange={ev=>updAlt(i,altIdx,"peso_sugerido",ev.target.value)}
                                                   placeholder="-"
                                                 />
-                                                <button type="button" onClick={() => toggleUnidadAlt(i, altIdx)} className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] font-bold text-[#6B7A8D] uppercase hover:text-[var(--brand-primary)] cursor-pointer">{alt.unidad || 'KG'}</button>
+                                                <button type="button" onClick={() => toggleUnidadAlt(i, altIdx)} className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] font-bold text-[#6B7A8D] uppercase hover:text-[var(--brand-primary)] cursor-pointer focus:outline-none">{alt.unidad || 'KG'}</button>
                                               </div>
                                             </div>
                                           </div>
@@ -9080,7 +9180,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                           <button
                                             type="button"
                                             onClick={() => togglePerSeries(i, altIdx)}
-                                            className={`p-1.5 rounded-lg flex items-center justify-center transition-colors border-none cursor-pointer shrink-0 ${
+                                            className={`p-1.5 rounded-lg flex items-center justify-center transition-colors border-none cursor-pointer shrink-0 focus:outline-none ${
                                               isAltPerSeriesOpen
                                                 ? "bg-[var(--brand-primary)] text-white shadow-2xs"
                                                 : "bg-gray-100 text-[#6B7A8D] hover:bg-[var(--brand-secondary)] hover:text-[var(--brand-primary)]"
@@ -9089,10 +9189,10 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                           >
                                             <ListOrdered className="w-[14px] h-[14px]" />
                                           </button>
-                                          <button type="button" onClick={() => promoteAlt(i, altIdx)} className="bg-amber-50 text-amber-600 rounded-lg p-1.5 hover:bg-amber-100 flex items-center justify-center transition-colors border-none cursor-pointer shrink-0" title="Promover a ejercicio principal">
+                                          <button type="button" onClick={() => promoteAlt(i, altIdx)} className="bg-amber-50 text-amber-600 rounded-lg p-1.5 hover:bg-amber-100 flex items-center justify-center transition-colors border-none cursor-pointer shrink-0 focus:outline-none" title="Promover a ejercicio principal">
                                             <ArrowUp className="w-[14px] h-[14px]" />
                                           </button>
-                                          <button type="button" onClick={() => remAlt(i, altIdx)} className="bg-red-50 text-red-500 rounded-lg p-1.5 hover:bg-red-100 flex items-center justify-center transition-colors border-none cursor-pointer shrink-0" title="Quitar alternativa">
+                                          <button type="button" onClick={() => remAlt(i, altIdx)} className="bg-red-50 text-red-500 rounded-lg p-1.5 hover:bg-red-100 flex items-center justify-center transition-colors border-none cursor-pointer shrink-0 focus:outline-none" title="Quitar alternativa">
                                             <X className="w-[14px] h-[14px]" />
                                           </button>
                                         </div>
@@ -9136,7 +9236,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                       </SortableContext>
                     </DndContext>
                 </div>
-              )}
+                );
+              })()}
 
             </div>
 
