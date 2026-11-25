@@ -1074,6 +1074,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   // ── Historial para Plantillas ──
   const [historialRutinas, setHistorialRutinas] = useState([]);
   const [historialDias, setHistorialDias] = useState([]);
+  const [historialCiclos, setHistorialCiclos] = useState([]);
   const historialLoadedRef = useRef(false);
 
   // ── Crop de foto de comida y subidas en segundo plano ──
@@ -1113,6 +1114,31 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     "S/D": 8,
   };
 
+  const allActiveCicloIds = useMemo(() => {
+    const activeMap = new Map();
+    // 1. Guardar ciclos marcados como activo === true desde historialCiclos
+    (historialCiclos || []).forEach(c => {
+      if (c.activo) {
+        activeMap.set(String(c.cliente_id), String(c.id));
+      }
+    });
+    // 2. Si un cliente tiene ciclos pero ninguno con activo: true, tomar el primero (más reciente)
+    (historialCiclos || []).forEach(c => {
+      const cid = String(c.cliente_id);
+      if (!activeMap.has(cid)) {
+        activeMap.set(cid, String(c.id));
+      }
+    });
+    // 3. El ciclo activo del cliente seleccionado en el estado local 'ciclos' tiene máxima prioridad
+    if (selected?.id && ciclos && ciclos.length > 0) {
+      const act = ciclos.find(c => c.activo) || ciclos[0];
+      if (act) {
+        activeMap.set(String(selected.id), String(act.id));
+      }
+    }
+    return activeMap;
+  }, [historialCiclos, ciclos, selected?.id]);
+
   const historialRutinasOptions = useMemo(() => {
     if (!historialRutinas || historialRutinas.length === 0) return [];
     const mapped = historialRutinas.map(hr => {
@@ -1126,38 +1152,55 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       const label = titulo
         ? `${dayCode} - ${titulo} - ${patientName}`
         : `${dayCode} - ${patientName}`;
-      const isCurrentClient = (selected?.id && String(hr.cliente_id) === String(selected.id)) ? 0 : 1;
+      
+      const cid = String(hr.cliente_id);
+      const activeCicloId = allActiveCicloIds.get(cid);
+      const isCycleActive = activeCicloId
+        ? (hr.ciclo_id && String(hr.ciclo_id) === activeCicloId)
+        : true; // Si el cliente no tiene ciclos registrados, su plan es el activo
+
+      const isCurrentClient = (selected?.id && cid === String(selected.id));
+      const clientIdx = clientes ? clientes.findIndex(c => String(c.id) === cid) : -1;
+      const patientOrder = isCurrentClient ? -1 : (clientIdx >= 0 ? clientIdx : 9999);
       const planDate = new Date(hr.created_at || hr.updated_at || 0).getTime();
       const dayOrder = DAY_ORDER_MAP[cleanDayCode] || 8;
+      const itemOrder = Number(hr.orden) || 0;
+
       return {
         value: hr.id,
         label,
-        isCurrentClient,
+        isCycleActive: isCycleActive ? 0 : 1, // 0 = Activo (arriba), 1 = Pasado (abajo)
+        patientOrder,
         patientName,
         planDate,
         dayOrder,
+        itemOrder,
         titulo,
       };
     });
 
     mapped.sort((a, b) => {
-      // 1. Paciente actual primero
-      if (a.isCurrentClient !== b.isCurrentClient) {
-        return a.isCurrentClient - b.isCurrentClient;
+      // 1. Prioridad: Ciclos Activos arriba (0), Inactivos/Pasados abajo (1)
+      if (a.isCycleActive !== b.isCycleActive) {
+        return a.isCycleActive - b.isCycleActive;
       }
-      // 2. Paciente por orden alfabético
-      const nameComp = (a.patientName || "").localeCompare(b.patientName || "", "es", { sensitivity: "base" });
-      if (nameComp !== 0) return nameComp;
-
-      // 3. Plan / Ciclo / Fecha más reciente primero
+      // 2. Agrupado por Paciente (Paciente actual primero, luego en orden de clientes)
+      if (a.patientOrder !== b.patientOrder) {
+        return a.patientOrder - b.patientOrder;
+      }
+      // 3. Si son ciclos pasados del mismo paciente, del más reciente al más antiguo
       if (b.planDate !== a.planDate) {
         return b.planDate - a.planDate;
       }
-      // 4. Día de la semana en orden natural (LUN -> DOM -> S/D)
+      // 4. Internamente dentro del ciclo: Días en orden (Día 1 a Día N: LUN -> DOM -> S/D)
       if (a.dayOrder !== b.dayOrder) {
         return a.dayOrder - b.dayOrder;
       }
-      // 5. Título alfabético
+      // 5. Orden de la rutina en el día
+      if (a.itemOrder !== b.itemOrder) {
+        return a.itemOrder - b.itemOrder;
+      }
+      // 6. Título alfabético
       return (a.titulo || "").localeCompare(b.titulo || "", "es", { sensitivity: "base" });
     });
 
@@ -1165,7 +1208,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       { value: "", label: "-- Seleccionar rutina preexistente --" },
       ...mapped.map(item => ({ value: item.value, label: item.label }))
     ];
-  }, [historialRutinas, selected?.id, clientes]);
+  }, [historialRutinas, allActiveCicloIds, selected?.id, clientes]);
 
   const historialDiasOptions = useMemo(() => {
     if (!historialDias || historialDias.length === 0) return [];
@@ -1178,38 +1221,55 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       const label = titulo
         ? `${dayCode} - ${titulo} - ${patientName}`
         : `${dayCode} - ${patientName}`;
-      const isCurrentClient = (selected?.id && String(hd.cliente_id) === String(selected.id)) ? 0 : 1;
+
+      const cid = String(hd.cliente_id);
+      const activeCicloId = allActiveCicloIds.get(cid);
+      const isCycleActive = activeCicloId
+        ? (hd.ciclo_id && String(hd.ciclo_id) === activeCicloId)
+        : true; // Si el cliente no tiene ciclos registrados, su plan es el activo
+
+      const isCurrentClient = (selected?.id && cid === String(selected.id));
+      const clientIdx = clientes ? clientes.findIndex(c => String(c.id) === cid) : -1;
+      const patientOrder = isCurrentClient ? -1 : (clientIdx >= 0 ? clientIdx : 9999);
       const planDate = new Date(hd.created_at || hd.nutricion_created_at || hd.fecha_inicio || 0).getTime();
       const dayOrder = DAY_ORDER_MAP[cleanDayCode] || 8;
+      const itemOrder = Number(hd.orden) || 0;
+
       return {
         value: hd.id,
         label,
-        isCurrentClient,
+        isCycleActive: isCycleActive ? 0 : 1, // 0 = Activo (arriba), 1 = Pasado (abajo)
+        patientOrder,
         patientName,
         planDate,
         dayOrder,
+        itemOrder,
         titulo,
       };
     });
 
     mapped.sort((a, b) => {
-      // 1. Paciente actual primero
-      if (a.isCurrentClient !== b.isCurrentClient) {
-        return a.isCurrentClient - b.isCurrentClient;
+      // 1. Prioridad: Ciclos Activos arriba (0), Inactivos/Pasados abajo (1)
+      if (a.isCycleActive !== b.isCycleActive) {
+        return a.isCycleActive - b.isCycleActive;
       }
-      // 2. Paciente por orden alfabético
-      const nameComp = (a.patientName || "").localeCompare(b.patientName || "", "es", { sensitivity: "base" });
-      if (nameComp !== 0) return nameComp;
-
-      // 3. Plan / Ciclo / Fecha más reciente primero
+      // 2. Agrupado por Paciente (Paciente actual primero, luego en orden de clientes)
+      if (a.patientOrder !== b.patientOrder) {
+        return a.patientOrder - b.patientOrder;
+      }
+      // 3. Si son ciclos pasados del mismo paciente, del más reciente al más antiguo
       if (b.planDate !== a.planDate) {
         return b.planDate - a.planDate;
       }
-      // 4. Día de la semana en orden natural (LUN -> DOM -> S/D)
+      // 4. Internamente dentro del ciclo: Días en orden (Día 1 a Día N: LUN -> DOM -> S/D)
       if (a.dayOrder !== b.dayOrder) {
         return a.dayOrder - b.dayOrder;
       }
-      // 5. Título alfabético
+      // 5. Orden del día en la nutrición
+      if (a.itemOrder !== b.itemOrder) {
+        return a.itemOrder - b.itemOrder;
+      }
+      // 6. Título alfabético
       return (a.titulo || "").localeCompare(b.titulo || "", "es", { sensitivity: "base" });
     });
 
@@ -1217,7 +1277,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       { value: "", label: "-- Seleccionar día preexistente --" },
       ...mapped.map(item => ({ value: item.value, label: item.label }))
     ];
-  }, [historialDias, selected?.id, clientes]);
+  }, [historialDias, allActiveCicloIds, selected?.id, clientes]);
 
   const notifyPlanUpdate = (table) => {
     if (table) invalidateCache(table);
@@ -1402,16 +1462,19 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     if (ownClientes.length === 0) {
       setHistorialDias([]);
       setHistorialRutinas([]);
+      setHistorialCiclos([]);
       return;
     }
     historialLoadedRef.current = true;
     try {
       const ids = ownClientes.map(c => c.id).join(",");
       const fetchFn = force ? dbGetFresh : dbGet;
-      const [hr, hn] = await Promise.all([
+      const [hr, hn, hc] = await Promise.all([
         fetchFn(`rutinas?cliente_id=eq.${selected?.id || ownClientes[0].id}`).catch(() => []),
         fetchFn(`nutricion?cliente_id=in.(${ids})`).catch(() => []),
+        fetchFn(`ciclos?cliente_id=in.(${ids})&order=created_at.desc`).catch(() => []),
       ]);
+      if (hc) setHistorialCiclos(hc);
       // Cargar todas las rutinas del especialista en segundo plano sin bloquear
       fetchFn(`rutinas?cliente_id=in.(${ids})`).then(allHr => {
         if (allHr) setHistorialRutinas(allHr);
@@ -1427,6 +1490,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
             return {
               ...d,
               cliente_id: nut?.cliente_id,
+              ciclo_id: nut?.ciclo_id,
               nutricion_created_at: nut?.created_at,
               nutricion_fecha_inicio: nut?.fecha_inicio
             };
@@ -8610,15 +8674,11 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                   <p className="text-sm font-semibold text-[#0B1929]">No hay ejercicios seleccionados</p>
                   <p className="text-xs text-[#6B7A8D]">Utiliza el catálogo de ejercicios para armar la sesión</p>
                 </div>
-              ) : (() => {
-                const hasAnySimpleExercise = rutinaForm.ejercicios.some(
-                  (ejItem) => !(Array.isArray(ejItem.seriesForm) && ejItem.seriesForm.length > 0)
-                );
-                return (
+              ) : (
                 <div className="mt-3">
-                  <div className="hidden sm:grid grid-cols-[24px_40px_1fr_56px_56px_76px_100px] gap-1.5 mb-2 items-center border border-transparent px-2.5 sm:px-2">
+                  <div className="hidden sm:grid grid-cols-[24px_40px_1fr_60px_64px_88px_100px] gap-1.5 mb-2 items-center border border-transparent px-2.5 sm:px-2">
                     <span/><span/><span className="text-[11px] text-[#6B7A8D] font-bold uppercase tracking-wider">EJERCICIO</span>
-                    <span className="text-[11px] text-[#6B7A8D] font-bold uppercase tracking-wider text-center">{hasAnySimpleExercise ? "SERIES" : ""}</span>
+                    <span className="text-[11px] text-[#6B7A8D] font-bold uppercase tracking-wider text-center">SERIES</span>
                     <span className="text-[11px] text-[#6B7A8D] font-bold uppercase tracking-wider text-center">REPS</span>
                     <span className="text-[11px] text-[#6B7A8D] font-bold uppercase tracking-wider text-center">PESO</span>
                     <span/>
@@ -8669,10 +8729,11 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                     <div className={`${indentPanelCls} border-t ${isAlt ? "border-[#E2E8F0]/70" : "border-[#F1F5F9]"} pt-0.5`} />
                                     <div
                                       className={`grid gap-1.5 sm:hidden text-[10px] font-semibold text-[#6B7A8D] uppercase ${
-                                        isAlt ? "grid-cols-[minmax(0,1fr)_54px_76px]" : "grid-cols-[minmax(0,1fr)_54px_76px_24px]"
+                                        isAlt ? "grid-cols-[28px_minmax(0,1fr)_52px_76px]" : "grid-cols-[28px_minmax(0,1fr)_52px_76px_24px]"
                                       }`}
                                     >
-                                      <span>Serie / Tipo</span>
+                                      <span className="text-center">#</span>
+                                      <span>Tipo</span>
                                       <span className="text-center">Reps</span>
                                       <span className="text-center">Peso</span>
                                       {!isAlt && <span />}
@@ -8699,31 +8760,47 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                           ? "text-rose-700 bg-rose-100/70"
                                           : "text-[#475569] bg-[#F1F5F9]";
                                       const rowGridCls = isAlt
-                                        ? "grid-cols-[minmax(0,1fr)_54px_76px] sm:grid-cols-[28px_1fr_56px_76px_100px]"
-                                        : "grid-cols-[minmax(0,1fr)_54px_76px_24px] sm:grid-cols-[24px_40px_1fr_56px_56px_76px_100px]";
+                                        ? "grid-cols-[28px_minmax(0,1fr)_52px_76px] sm:grid-cols-[28px_1fr_64px_88px_100px]"
+                                        : "grid-cols-[28px_minmax(0,1fr)_52px_76px_24px] sm:grid-cols-[24px_40px_1fr_60px_64px_88px_100px]";
+                                      const numBadgeEl = (
+                                        <span className={`inline-flex items-center justify-center min-w-[28px] px-1.5 py-1 rounded-lg text-[11px] font-mono font-extrabold shrink-0 ${numBadgeCls}`}>
+                                          #{vLbl.label}
+                                        </span>
+                                      );
+                                      const typeBtnEl = (
+                                        <button
+                                          type="button"
+                                          onClick={() => toggleSeriesType(exIdx, si, altIdx)}
+                                          className={`px-2.5 ${rowInputDensityCls} rounded-lg border text-[11px] font-semibold inline-flex items-center justify-between gap-1 cursor-pointer transition-colors w-full sm:max-w-[200px] focus:outline-none ${tagCls}`}
+                                          title="Pulsa para cambiar tipo (Normal → Calentamiento → Drop Set → Al fallo)"
+                                        >
+                                          <span className="truncate sm:hidden">{typeCfg.badge || "Normal"}</span>
+                                          <span className="hidden sm:inline truncate">{curType === "normal" ? "Serie normal" : typeCfg.badge}</span>
+                                          <ChevronDown className="w-3 h-3 opacity-55 shrink-0" />
+                                        </button>
+                                      );
                                       return (
                                         <div key={si} className={`grid ${rowGridCls} gap-1.5 items-center`}>
                                           {isAlt ? (
-                                            <span className="hidden sm:block" />
+                                            <>
+                                              <span className="hidden sm:block" />
+                                              <div className="col-span-2 sm:col-span-1 flex items-center gap-1.5 min-w-0">
+                                                {numBadgeEl}
+                                                {typeBtnEl}
+                                              </div>
+                                            </>
                                           ) : (
                                             <>
                                               <span className="hidden sm:block" />
                                               <span className="hidden sm:block" />
+                                              <div className="order-2 sm:order-none min-w-0">
+                                                {typeBtnEl}
+                                              </div>
+                                              <div className="order-1 sm:order-none flex justify-center">
+                                                {numBadgeEl}
+                                              </div>
                                             </>
                                           )}
-                                          <div className={`flex items-center gap-1.5 min-w-0 ${isAlt ? "" : "sm:col-span-2"}`}>
-                                            <span className={`inline-flex items-center justify-center min-w-[26px] px-1.5 py-1 rounded-lg text-[11px] font-mono font-extrabold shrink-0 ${numBadgeCls}`}>
-                                              #{vLbl.label}
-                                            </span>
-                                            <button
-                                              type="button"
-                                              onClick={() => toggleSeriesType(exIdx, si, altIdx)}
-                                              className={`px-2.5 ${rowInputDensityCls} rounded-lg border text-[11px] font-semibold inline-flex items-center justify-center cursor-pointer transition-colors truncate max-w-[130px] focus:outline-none ${tagCls}`}
-                                              title="Pulsa para cambiar tipo (Normal → Calentamiento → Drop Set → Al fallo)"
-                                            >
-                                              {typeCfg.badge || "Normal"}
-                                            </button>
-                                          </div>
                                           <input
                                             type="number"
                                             min="1"
@@ -8731,9 +8808,9 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                             onChange={(ev) => updSerieField(exIdx, si, "reps", ev.target.value, altIdx)}
                                             placeholder="-"
                                             title={`Reps Serie ${si + 1}`}
-                                            className={`w-full px-1.5 ${rowInputDensityCls} rounded-lg border border-[#E2E8F0] bg-white font-semibold text-center focus:outline-none focus:border-[var(--brand-primary)]`}
+                                            className={`order-3 sm:order-none w-full px-1.5 ${rowInputDensityCls} rounded-lg border border-[#E2E8F0] bg-white font-semibold text-center focus:outline-none focus:border-[var(--brand-primary)]`}
                                           />
-                                          <div className="relative w-full">
+                                          <div className="order-4 sm:order-none relative w-full">
                                             <input
                                               type="text"
                                               inputMode="decimal"
@@ -8755,7 +8832,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                           {isAlt ? (
                                             <span className="hidden sm:block" />
                                           ) : (
-                                            <div className="flex items-center justify-center sm:justify-start sm:pl-1">
+                                            <div className="order-5 sm:order-none flex items-center justify-center">
                                               {item.seriesForm.length > 1 ? (
                                                 <button
                                                   type="button"
@@ -8771,27 +8848,10 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                         </div>
                                       );
                                     })}
-
-                                    {!isAlt && (
-                                      <div className={`${indentPanelCls} pt-0.5`}>
-                                        {item.seriesForm.length < 12 ? (
-                                          <button
-                                            type="button"
-                                            onClick={() => addSerieRow(exIdx)}
-                                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-[#F8FAFC] hover:bg-[var(--brand-secondary)] border border-[#E2E8F0] hover:border-[var(--brand-primary)]/40 text-[10px] font-bold text-[#475569] hover:text-[var(--brand-primary)] cursor-pointer transition-colors focus:outline-none"
-                                          >
-                                            <Plus className="w-3 h-3 shrink-0" />
-                                            <span>Añadir serie</span>
-                                          </button>
-                                        ) : (
-                                          <span className="text-[10px] text-[#94A3B8]">Máx. 12 series</span>
-                                        )}
-                                      </div>
-                                    )}
                                   </div>
                                 )}
 
-                                {/* SUB-BARRA COMPACTA */}
+                                {/* SUB-BARRA COMPACTA (+ SERIE EN LA MISMA LÍNEA CUANDO ESTÁ DESPLEGADO) */}
                                 <div className={`${indentSubbarCls} flex items-center justify-between flex-wrap gap-1.5`}>
                                   <div className="flex items-center flex-wrap gap-1.5">
                                     {hMark ? (
@@ -8830,7 +8890,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                       <span className="text-[10px] text-[#94A3B8] font-normal">Sin marcas previas</span>
                                     ) : null}
                                   </div>
-                                  <div className="flex items-center flex-wrap gap-1.5">
+                                  <div className="flex items-center flex-wrap gap-1.5 justify-end ml-auto">
                                     <button
                                       type="button"
                                       onClick={() => toggleExerciseOptions(exIdx, altIdx)}
@@ -8860,12 +8920,27 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                       <button
                                         type="button"
                                         onClick={() => detachFromSuperset(exIdx)}
-                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold border bg-white text-[#64748B] border-[#E2E8F0] hover:text-red-600 hover:bg-red-50 hover:border-red-200 transition-colors cursor-pointer"
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold border bg-white text-[#64748B] border-[#E2E8F0] hover:text-red-600 hover:bg-red-50 hover:border-red-200 transition-colors cursor-pointer focus:outline-none"
                                         title={`Sacar ${ssMeta.codeLabel} de ${ssMeta.blockTitle}`}
                                       >
                                         <Unlink2 className="w-2.5 h-2.5 shrink-0" />
                                         <span>Salir del bloque</span>
                                       </button>
+                                    )}
+                                    {isPerSeriesOpen && !isAlt && (
+                                      item.seriesForm.length < 12 ? (
+                                        <button
+                                          type="button"
+                                          onClick={() => addSerieRow(exIdx)}
+                                          className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-[#F8FAFC] hover:bg-[var(--brand-secondary)] border border-[#E2E8F0] hover:border-[var(--brand-primary)]/40 text-[10px] font-bold text-[#0B1929] hover:text-[var(--brand-primary)] cursor-pointer transition-colors focus:outline-none"
+                                          title="Añadir otra serie al ejercicio"
+                                        >
+                                          <Plus className="w-3 h-3 text-[var(--brand-primary)] shrink-0" />
+                                          <span>Serie</span>
+                                        </button>
+                                      ) : (
+                                        <span className="text-[10px] text-[#94A3B8]">Máx. 12</span>
+                                      )
                                     )}
                                   </div>
                                 </div>
@@ -9010,7 +9085,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                   )}
                                   <div className={`p-2.5 sm:p-2 ${cardShellCls} ${isDragging ? 'bg-white shadow-md z-10' : ''}`}>
                                   {/* MAIN EXERCISE */}
-                                  <div className="grid grid-cols-[24px_40px_1fr_auto] sm:grid-cols-[24px_40px_1fr_56px_56px_76px_100px] gap-2 sm:gap-1.5 items-center">
+                                  <div className="grid grid-cols-[24px_40px_1fr_auto] sm:grid-cols-[24px_40px_1fr_60px_64px_88px_100px] gap-2 sm:gap-1.5 items-center">
                                     <div className="flex items-center justify-center">{dragHandle}</div>
                                     <div className="w-9 h-9 rounded-md overflow-hidden bg-white sm:bg-gray-50 border border-[#E2E8F0] flex items-center justify-center shrink-0">
                                       {e.gif_url ? (
@@ -9037,7 +9112,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                     </div>
                                   
                                   {!isPerSeriesOpen && (
-                                    <div className="col-span-4 sm:col-span-3 sm:col-start-4 sm:row-start-1 grid grid-cols-3 gap-2 sm:grid-cols-[56px_56px_76px] sm:gap-1.5 mt-1.5 sm:mt-0 pt-2 sm:pt-0 border-t border-[#E2E8F0] sm:border-none">
+                                    <div className="col-span-4 sm:col-span-3 sm:col-start-4 sm:row-start-1 grid grid-cols-3 gap-2 sm:grid-cols-[60px_64px_88px] sm:gap-1.5 mt-1.5 sm:mt-0 pt-2 sm:pt-0 border-t border-[#E2E8F0] sm:border-none">
                                       <div className="flex flex-col gap-0.5 sm:block">
                                         <span className="text-[10px] font-semibold text-[#6B7A8D] sm:hidden text-center w-full">SERIES</span>
                                         <input type="number" className="w-full px-1.5 py-1.5 rounded-lg border border-[#E2E8F0] bg-white text-[13px] font-semibold text-center focus:outline-none focus:border-[var(--brand-primary)]" value={e.num_series} onChange={ev=>updEj(i,"num_series",ev.target.value)} placeholder="4" />
@@ -9126,7 +9201,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                   const altWarmSets = Math.max(0, totalSetsCount - altEffSets);
                                   return (
                                     <div key={`alt-${altIdx}`} className="mt-2 ml-3 sm:ml-[76px] p-2 sm:p-2 bg-white sm:bg-[#F8FAFC] rounded-xl border border-[#E2E8F0]">
-                                      <div className="grid grid-cols-[28px_1fr_auto] sm:grid-cols-[28px_1fr_56px_76px_100px] gap-2 sm:gap-1.5 items-center">
+                                      <div className="grid grid-cols-[28px_1fr_auto] sm:grid-cols-[28px_1fr_64px_88px_100px] gap-2 sm:gap-1.5 items-center">
                                         <div className="w-7 h-7 rounded-md overflow-hidden bg-gray-50 border border-[#E2E8F0] flex items-center justify-center shrink-0">
                                           {alt.gif_url ? (
                                             /\.(mp4|webm|mov)($|\?)/i.test(alt.gif_url) ? (
@@ -9148,7 +9223,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                         </div>
                                         
                                         {!isAltPerSeriesOpen && (
-                                          <div className="col-span-3 sm:col-span-2 sm:col-start-3 sm:row-start-1 grid grid-cols-2 gap-2 sm:grid-cols-[56px_76px] sm:gap-1.5 mt-1 sm:mt-0 pt-1.5 sm:pt-0 border-t border-[#E2E8F0] sm:border-none">
+                                          <div className="col-span-3 sm:col-span-2 sm:col-start-3 sm:row-start-1 grid grid-cols-2 gap-2 sm:grid-cols-[64px_88px] sm:gap-1.5 mt-1 sm:mt-0 pt-1.5 sm:pt-0 border-t border-[#E2E8F0] sm:border-none">
                                             <div className="flex flex-col gap-0.5 sm:block">
                                               <span className="text-[10px] font-semibold text-[#6B7A8D] sm:hidden text-center w-full">REPS</span>
                                               <input
@@ -9236,8 +9311,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                       </SortableContext>
                     </DndContext>
                 </div>
-                );
-              })()}
+              )}
 
             </div>
 
