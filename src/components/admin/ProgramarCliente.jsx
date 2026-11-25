@@ -4174,6 +4174,17 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       return prog ? { peso: prog.nextPesoInput, reps: prog.nextReps } : null;
     }, altIdx);
 
+  const hasItemAssignedWeight = (item) => {
+    if (!item) return false;
+    if (Array.isArray(item.seriesForm) && item.seriesForm.length > 0) {
+      const firstWorking = item.seriesForm.find((s) => normalizeSeriesType(s.tipo) !== "warmup") || item.seriesForm[0];
+      const w = String(firstWorking?.peso ?? "").trim();
+      return w !== "" && w !== "-";
+    }
+    const w = String(item.peso_sugerido ?? "").trim();
+    return w !== "" && w !== "-";
+  };
+
   const applyMarkToExerciseObject = (exObj, mark, parentNumSeries = null) => {
     if (!mark) return exObj;
     const unit = exObj.unidad || "kg";
@@ -4213,8 +4224,10 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
   const applyBestMarksWithAlts = (cur, historyMap) => {
     const parentCount = Math.max(1, parseInt(cur.num_series, 10) || 4);
-    const mark = lookupExerciseHistory(historyMap, cur);
+    const shouldApplyMain = !hasItemAssignedWeight(cur);
+    const mark = shouldApplyMain ? lookupExerciseHistory(historyMap, cur) : null;
     const nextAlts = (cur.alternativas || []).map((alt) => {
+      if (hasItemAssignedWeight(alt)) return alt;
       const altMark = lookupExerciseHistory(historyMap, alt);
       return altMark ? applyMarkToExerciseObject(alt, altMark, parentCount) : alt;
     });
@@ -8329,10 +8342,16 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
             {/* Right Column: Ejercicios Programados & Alternativas */}
             <div className="lg:col-span-7 bg-white rounded-none md:rounded-2xl border-0 md:border border-[#E2E8F0] p-4 sm:p-6 shadow-none md:shadow-sm">
               {(() => {
+                const needsMarkForItem = (it) =>
+                  Boolean(lookupExerciseHistory(patientHistoryMarks, it)) && !it?._historyApplied && !hasItemAssignedWeight(it);
                 const matchedHistoryCount = rutinaForm.ejercicios.filter((ejItem) =>
-                  Boolean(lookupExerciseHistory(patientHistoryMarks, ejItem)) ||
-                  (ejItem.alternativas || []).some((altItem) => Boolean(lookupExerciseHistory(patientHistoryMarks, altItem)))
+                  needsMarkForItem(ejItem) ||
+                  (ejItem.alternativas || []).some((altItem) => needsMarkForItem(altItem))
                 ).length;
+                const hasUnassignedWeight = rutinaForm.ejercicios.some((ejItem) =>
+                  !hasItemAssignedWeight(ejItem) ||
+                  (ejItem.alternativas || []).some((altItem) => !hasItemAssignedWeight(altItem))
+                );
                 const sessionVol = computeWeeklyMuscleVolume([{ ejercicios: rutinaForm.ejercicios }]);
                 return (
                   <div className="mb-4 space-y-2.5">
@@ -8344,7 +8363,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                         <p className="text-xs text-[#6B7A8D] mt-0.5">Arrastra para reordenar, abre &ldquo;Por serie&rdquo; si varía cada serie o pulsa (+) para alternativas</p>
                       </div>
                       <div className="flex items-center gap-2 flex-wrap justify-end">
-                        {loadingPatientHistory && matchedHistoryCount === 0 && (
+                        {loadingPatientHistory && hasUnassignedWeight && matchedHistoryCount === 0 && (
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[var(--brand-secondary)]/70 border border-[var(--brand-primary)]/20 text-[var(--brand-primary)] text-[11px] font-semibold">
                             <Loader2 className="w-3 h-3 animate-spin" />
                             <span>Buscando mejores marcas...</span>
@@ -8663,25 +8682,21 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                   <div className="flex items-center flex-wrap gap-1.5">
                                     {hMark ? (
                                       <>
-                                        <button
-                                          type="button"
-                                          onClick={() => applyHistoryMarksToExercise(exIdx, altIdx)}
-                                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold border transition-colors cursor-pointer ${
-                                            item._historyApplied
-                                              ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-2xs"
-                                              : "bg-[var(--brand-secondary)] text-[var(--brand-primary)] border-[var(--brand-primary)]/35 hover:bg-[var(--brand-primary)] hover:text-white"
-                                          }`}
-                                          title="Importar la mejor marca histórica registrada por este paciente en este ejercicio"
-                                        >
-                                          {item._historyApplied ? <CheckCircle2 className="w-3 h-3 shrink-0" /> : <Trophy className="w-3 h-3 shrink-0" />}
-                                          <span>
-                                            {item._historyApplied
-                                              ? `Marca aplicada${markSummaryLabel ? ` · ${markSummaryLabel}` : ""}`
-                                              : markSummaryLabel
-                                              ? `Marca: ${markSummaryLabel}`
-                                              : "Importar mejor marca"}
-                                          </span>
-                                        </button>
+                                        {!item._historyApplied && !hasItemAssignedWeight(item) && (
+                                          <button
+                                            type="button"
+                                            onClick={() => applyHistoryMarksToExercise(exIdx, altIdx)}
+                                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold border transition-colors cursor-pointer bg-[var(--brand-secondary)] text-[var(--brand-primary)] border-[var(--brand-primary)]/35 hover:bg-[var(--brand-primary)] hover:text-white"
+                                            title="Importar la mejor marca histórica registrada por este paciente en este ejercicio"
+                                          >
+                                            <Trophy className="w-3 h-3 shrink-0" />
+                                            <span>
+                                              {markSummaryLabel
+                                                ? `Marca: ${markSummaryLabel}`
+                                                : "Importar mejor marca"}
+                                            </span>
+                                          </button>
+                                        )}
                                         {hMark.best1RM > 0 && (
                                           <button
                                             type="button"
@@ -8697,7 +8712,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                           </button>
                                         )}
                                       </>
-                                    ) : !isAlt && !loadingPatientHistory ? (
+                                    ) : !isAlt && !loadingPatientHistory && !hasItemAssignedWeight(item) ? (
                                       <span className="text-[10px] text-[#94A3B8] font-normal">Sin marcas previas</span>
                                     ) : null}
                                   </div>
