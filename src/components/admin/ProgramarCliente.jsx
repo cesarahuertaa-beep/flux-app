@@ -4176,10 +4176,13 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     updateTargetItem(es, i, altIdx, (cur, parentCount) => {
       if (Array.isArray(cur.seriesForm) && cur.seriesForm.length > 0) {
         const firstWorking = cur.seriesForm.find((s) => normalizeSeriesType(s.tipo) !== "warmup") || cur.seriesForm[0] || {};
+        const hasWorkingPeso = String(firstWorking.peso ?? "").trim() !== "" && String(firstWorking.peso ?? "").trim() !== "-";
+        const hasWorkingReps = String(firstWorking.reps ?? "").trim() !== "" && String(firstWorking.reps ?? "").trim() !== "-";
         return {
           ...cur,
           reps_sugeridas: firstWorking.reps || cur.reps_sugeridas || 10,
           peso_sugerido: firstWorking.peso !== undefined ? firstWorking.peso : (cur.peso_sugerido || ""),
+          _historyApplied: hasWorkingPeso && hasWorkingReps ? cur._historyApplied : false,
           series_detalle: [],
           seriesForm: [],
         };
@@ -4218,7 +4221,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         const nextType = SERIES_TYPES[curType]?.next || "normal";
         return { ...s, tipo: nextType };
       });
-      return { ...cur, seriesForm: nextSeries };
+      return { ...cur, _historyApplied: false, seriesForm: nextSeries };
     });
     return { ...p, ejercicios: es };
   });
@@ -4232,9 +4235,10 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     const nextMainRows = [...cur.seriesForm, { reps: last.reps || "", peso: last.peso || "", tipo: "normal" }];
     const nextAlts = (cur.alternativas || []).map((alt) => ({
       ...alt,
+      _historyApplied: false,
       seriesForm: resizeSeriesFormRows(alt.seriesForm, nextCount, alt.reps_sugeridas ?? cur.reps_sugeridas, alt.peso_sugerido),
     }));
-    es[i] = { ...cur, num_series: nextCount, seriesForm: nextMainRows, alternativas: nextAlts };
+    es[i] = { ...cur, num_series: nextCount, _historyApplied: false, seriesForm: nextMainRows, alternativas: nextAlts };
     return { ...p, ejercicios: es };
   });
 
@@ -4244,14 +4248,30 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     if (!cur || !Array.isArray(cur.seriesForm) || cur.seriesForm.length <= 1) return p;
     const nextMainRows = cur.seriesForm.filter((_, idx) => idx !== si);
     const nextCount = nextMainRows.length;
-    const nextAlts = (cur.alternativas || []).map((alt) => ({
-      ...alt,
-      seriesForm:
-        Array.isArray(alt.seriesForm) && alt.seriesForm.length > 1
-          ? alt.seriesForm.filter((_, idx) => idx !== si).slice(0, nextCount)
-          : resizeSeriesFormRows(alt.seriesForm, nextCount, alt.reps_sugeridas ?? cur.reps_sugeridas, alt.peso_sugerido),
-    }));
-    es[i] = { ...cur, num_series: nextCount, seriesForm: nextMainRows, alternativas: nextAlts };
+    const nextFirstMain = nextMainRows.find((s) => normalizeSeriesType(s.tipo) !== "warmup") || nextMainRows[0] || {};
+    const nextAlts = (cur.alternativas || []).map((alt) => {
+      const hasAltRows = Array.isArray(alt.seriesForm) && alt.seriesForm.length > 1;
+      const nextAltRows = hasAltRows
+        ? alt.seriesForm.filter((_, idx) => idx !== si).slice(0, nextCount)
+        : resizeSeriesFormRows(alt.seriesForm, nextCount, alt.reps_sugeridas ?? cur.reps_sugeridas, alt.peso_sugerido);
+      const nextFirstAlt = nextAltRows.find((s) => normalizeSeriesType(s.tipo) !== "warmup") || nextAltRows[0] || {};
+      return {
+        ...alt,
+        peso_sugerido: hasAltRows ? (nextFirstAlt.peso ?? "") : alt.peso_sugerido,
+        reps_sugeridas: hasAltRows && nextFirstAlt.reps ? nextFirstAlt.reps : alt.reps_sugeridas,
+        _historyApplied: false,
+        seriesForm: nextAltRows,
+      };
+    });
+    es[i] = {
+      ...cur,
+      num_series: nextCount,
+      peso_sugerido: nextFirstMain.peso ?? "",
+      reps_sugeridas: nextFirstMain.reps || cur.reps_sugeridas,
+      _historyApplied: false,
+      seriesForm: nextMainRows,
+      alternativas: nextAlts,
+    };
     return { ...p, ejercicios: es };
   });
 
@@ -4399,6 +4419,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       const nextSeriesForm = exObj.seriesForm.map((row, idx) =>
         idx === targetIdx
           ? { ...row, reps: repsStr, peso: pesoStr }
+          : normalizeSeriesType(row.tipo) === "warmup"
+          ? row
           : { ...row, reps: "", peso: "" }
       );
       const count = Math.max(1, parseInt(parentNumSeries ?? nextSeriesForm.length, 10) || nextSeriesForm.length);
