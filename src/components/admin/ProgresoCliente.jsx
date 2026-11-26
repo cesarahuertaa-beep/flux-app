@@ -3906,7 +3906,18 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                 const sLbl = seriesVisualLabels[si] || { label: String(si + 1), isWarmup: false, tipo: "normal" };
                                 return (
                                 <tr key={`${ej.id}-${vid}-${si}`} className={sLbl.isWarmup ? "bg-slate-50/80 opacity-85" : highlight}>
-                                  {si === 0 && (
+                                  {si === 0 && (() => {
+                                    const exSeriesInfo = isCycleFuture
+                                      ? { points: [], hasData: false }
+                                      : buildExerciseChartSeries({
+                                          ex: ej,
+                                          activeObj: exObj,
+                                          variantId: vid,
+                                          progreso,
+                                          totalSemanas: maxVisibleWeekNum,
+                                          weightUnit: trackingWeightUnit,
+                                        });
+                                    return (
                                     <td 
                                       rowSpan={rowSeriesCount} 
                                       style={{ width: "32%" }}
@@ -3974,44 +3985,31 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                           )}
                                         </div>
                                         <div className="text-[10px] text-[#6B7A8D] font-normal mt-0.5 truncate">{GRUPO_LABELS[normalizeMuscleGroup(exObj.grupo_muscular || ej.grupo_muscular)] || exObj.grupo_muscular || ej.grupo_muscular}</div>
-                                        {(() => {
-                                          const exSeriesInfo = isCycleFuture
-                                            ? { points: [], hasData: false }
-                                            : buildExerciseChartSeries({
-                                                ex: ej,
-                                                activeObj: exObj,
-                                                variantId: vid,
-                                                progreso,
-                                                totalSemanas: maxVisibleWeekNum,
-                                                weightUnit: trackingWeightUnit,
-                                              });
-                                          if (!exSeriesInfo.hasData) return null;
-                                          return (
-                                            <div className="mt-1 flex items-center flex-wrap gap-1 text-[9.5px] font-medium">
-                                              <button
-                                                type="button"
-                                                onClick={() => {
-                                                  setChartMetricMode("1rm");
-                                                  setExerciseChartModal({
-                                                    routineId: r.id,
-                                                    routineNombre: String(r.nombre || "").replace("|", " · "),
-                                                    exId: ej.id,
-                                                    variantId: vid,
-                                                  });
-                                                }}
-                                                className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-white border border-[var(--brand-primary)]/35 text-[var(--brand-primary)] hover:bg-[var(--brand-primary)] hover:text-white font-bold transition-colors cursor-pointer"
-                                                title="Ver gráfica de progresión 1RM / Volumen"
-                                              >
-                                                <TrendingUp className="w-2.5 h-2.5" />
-                                                <span>Gráfica</span>
-                                              </button>
-                                            </div>
-                                          );
-                                        })()}
                                       </div>
+
+                                      {exSeriesInfo.hasData && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setChartMetricMode("1rm");
+                                            setExerciseChartModal({
+                                              routineId: r.id,
+                                              routineNombre: String(r.nombre || "").replace("|", " · "),
+                                              exId: ej.id,
+                                              variantId: vid,
+                                            });
+                                          }}
+                                          className="w-9 h-9 rounded-lg shrink-0 bg-white border border-[var(--brand-primary)]/35 text-[var(--brand-primary)] hover:bg-[var(--brand-primary)] hover:text-white flex flex-col items-center justify-center gap-0.5 overflow-hidden transition-colors cursor-pointer"
+                                          title="Ver gráfica de progresión 1RM / Volumen"
+                                        >
+                                          <BarChart2 className="w-3.5 h-3.5 shrink-0" />
+                                          <span className="text-[7.5px] font-bold leading-none tracking-tight">Gráfica</span>
+                                        </button>
+                                      )}
                                     </div>
                                   </td>
-                                )}
+                                    );
+                                  })()}
                                 <td className="px-1.5 py-1.5 border border-[#E2E8F0] text-center font-bold font-['Rajdhani']" title={sLbl.shortTag || `Serie ${si + 1}`}>
                                   <span className={sLbl.isWarmup ? "text-[#6B7A8D] text-[10px]" : "text-[var(--brand-primary)]"}>
                                     {sLbl.label}
