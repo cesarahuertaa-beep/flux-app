@@ -3659,34 +3659,6 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                     </div>
                   </div>
 
-                  {/* Distribución muscular real completada hasta la fecha (sin recorte) */}
-                  {kpis.completedMuscleList.length > 0 && (
-                    <div className="bg-white rounded-xl border border-[#E2E8F0] px-3.5 py-2.5 flex items-center flex-wrap gap-1.5 min-w-0">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#6B7A8D] mr-1">
-                        Series ef. completadas/músculo:
-                      </span>
-                      {kpis.completedMuscleList.map((m) => {
-                        const isFull = m.expectedSets > 0 && m.sets >= m.expectedSets;
-                        const pillCls = isFull
-                          ? "bg-emerald-50 border-emerald-200 text-emerald-800"
-                          : "bg-[#F8FAFC] border-[#E2E8F0] text-[#0B1929]";
-                        const countCls = isFull
-                          ? "text-emerald-700"
-                          : m.sets > 0
-                          ? "text-[var(--brand-primary)]"
-                          : "text-[#94A3B8]";
-                        return (
-                          <span key={m.id} className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border ${pillCls}`}>
-                            {m.label} <strong className={countCls}>{m.sets}</strong>
-                            {m.expectedSets > 0 && (
-                              <span className="text-[#6B7A8D] font-normal">/{m.expectedSets}</span>
-                            )}
-                          </span>
-                        );
-                      })}
-                    </div>
-                  )}
-
                   {rutinas.length > 1 && (
                     <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scroll-hide">
                       <button
