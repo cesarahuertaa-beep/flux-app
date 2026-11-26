@@ -3630,9 +3630,9 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
 
                     <div className="bg-white rounded-xl border border-[#E2E8F0] p-3 shadow-2xs">
                       <span className="text-[10px] font-bold text-[#6B7A8D] uppercase tracking-wider block">
-                        Sesiones / Selladas
+                        Sesiones (Hasta Hoy)
                       </span>
-                      <div className="flex items-baseline gap-1.5 mt-1">
+                      <div className="flex items-baseline gap-1.5 mt-1 flex-wrap">
                         <span className="text-xl font-extrabold font-mono text-[#0B1929]">
                           {kpis.activeSessionsCount}/{kpis.expectedSessions}
                         </span>
@@ -3640,6 +3640,11 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                           · {kpis.sealedSessionsCount} sellada{kpis.sealedSessionsCount === 1 ? "" : "s"}
                         </span>
                       </div>
+                      {kpis.hasActiveCurrentWeek && kpis.currentWeekExpectedSessions > 0 && (
+                        <div className="text-[10px] text-[#6B7A8D] mt-0.5 font-medium">
+                          Sem. actual: {kpis.currentWeekActiveCount}/{kpis.currentWeekExpectedSessions} reg. · {kpis.currentWeekSealedCount} sellada{kpis.currentWeekSealedCount === 1 ? "" : "s"}
+                        </div>
+                      )}
                     </div>
 
                     <div className="bg-white rounded-xl border border-[#E2E8F0] p-3 shadow-2xs">
@@ -3678,12 +3683,21 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                         const titleTag = parts.length > 1 ? parts.slice(1).join("|").trim() : parts[0];
                         const isTabActive = String(activeRoutineFilter) === String(rTab.id);
                         const tabSummary = kpis.routineSummaries[rTab.id];
-                        const hasActivity = Boolean(tabSummary?.completedSets > 0 || tabSummary?.sealedWeeks?.length > 0);
+                        const wkStatus = tabSummary?.currentWeekStatus || "pending";
+                        const tabTooltip =
+                          wkStatus === "sealed"
+                            ? "Semana actual: sesión sellada"
+                            : wkStatus === "complete"
+                            ? "Semana actual: 100% completada"
+                            : wkStatus === "partial"
+                            ? `Semana actual: parcial (${tabSummary?.currentWeekCompletedSets || 0}/${tabSummary?.currentWeekExpectedSets || 0} ser.)`
+                            : "Semana actual: sin registros";
                         return (
                           <button
                             key={rTab.id}
                             type="button"
                             onClick={() => setSelectedTrackingRoutineId(String(rTab.id))}
+                            title={tabTooltip}
                             className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 cursor-pointer ${
                               isTabActive
                                 ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-xs"
@@ -3698,8 +3712,19 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                               </span>
                             )}
                             <span>{titleTag || "Rutina"}</span>
-                            {hasActivity && (
-                              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isTabActive ? "bg-emerald-300" : "bg-emerald-500"}`} />
+                            {(wkStatus === "sealed" || wkStatus === "complete") && (
+                              <span
+                                className={`w-2 h-2 rounded-full shrink-0 ${
+                                  isTabActive ? "bg-emerald-300" : "bg-emerald-500"
+                                }`}
+                              />
+                            )}
+                            {wkStatus === "partial" && (
+                              <span
+                                className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                                  isTabActive ? "bg-amber-200" : "bg-amber-400"
+                                }`}
+                              />
                             )}
                           </button>
                         );
@@ -3738,11 +3763,6 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                         {rSummary.adherencePct}% ({rSummary.completedSets}/{rSummary.expectedSets} ser.)
                       </span>
                     )}
-                    {rSummary?.sealedWeeks?.map((sw) => (
-                      <span key={sw} className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                        ✓ Sem {sw} sellada
-                      </span>
-                    ))}
                     {!tieneData && <span className="text-[11px] text-[#6B7A8D] font-normal">Sin registros aún</span>}
                   </div>
                   {canEditTracking && (r.ejercicios || []).length > 0 && (
@@ -3784,7 +3804,9 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                           >
                             Serie
                           </th>
-                          {semanas.map((s,i)=>(
+                          {semanas.map((s,i)=>{
+                            const isWeekSealed = Boolean(finalizedSessions?.[`${r.id}-${s.weekNum}`]?.finalizada);
+                            return (
                             <th 
                               key={i} 
                               colSpan={2} 
@@ -3792,19 +3814,32 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                               className={`px-1 py-1.5 border border-[#E2E8F0] text-center text-[10px] font-bold whitespace-nowrap ${
                                 s.isCurrent
                                   ? "bg-[var(--brand-primary)]/10 text-[var(--brand-primary)]"
+                                  : isWeekSealed
+                                  ? "bg-emerald-50/70 text-[#0B1929]"
                                   : "bg-gray-50 text-[var(--brand-primary)]"
                               }`}
                             >
                               <div className="flex flex-col items-center gap-0.5">
                                 <span>{s.label}</span>
-                                {s.isCurrent && (
-                                  <span className="text-[8px] px-1.5 py-0.2 rounded-full bg-[var(--brand-primary)] text-white font-extrabold uppercase leading-tight">
-                                    Actual
-                                  </span>
+                                {(s.isCurrent || isWeekSealed) && (
+                                  <div className="flex items-center justify-center gap-1 flex-wrap">
+                                    {s.isCurrent && (
+                                      <span className="text-[8px] px-1.5 py-0.2 rounded-full bg-[var(--brand-primary)] text-white font-extrabold uppercase leading-tight">
+                                        Actual
+                                      </span>
+                                    )}
+                                    {isWeekSealed && (
+                                      <span className="inline-flex items-center gap-0.5 text-[8px] px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200 font-extrabold uppercase leading-tight">
+                                        <Lock className="w-2.5 h-2.5" />
+                                        Sellada
+                                      </span>
+                                    )}
+                                  </div>
                                 )}
                               </div>
                             </th>
-                          ))}
+                            );
+                          })}
                         </tr>
                         <tr>
                           {semanas.map((_,i)=>(

@@ -7,7 +7,7 @@ import { timerStore } from "../../lib/timerStore";
 import { GRUPO_LABELS, normalizeMuscleGroup } from "../../lib/constants";
 import { ConfirmModal } from "../ui/ConfirmModal";
 import { dbPeek } from "../../lib/supabase";
-import { getSeriesSuggestion, lookupExerciseHistory, getSeriesVisualLabels, getEffectiveSeriesIndices, isWarmupSeries, groupExercisesIntoBlocks, formatRestLabel } from "../../utils/routineHelpers";
+import { getSeriesSuggestion, lookupExerciseHistory, getSeriesVisualLabels, getEffectiveSeriesIndices, isWarmupSeries, groupExercisesIntoBlocks, formatRestLabel, parseRawWeightToKg, evaluateRoutineWeekStatus } from "../../utils/routineHelpers";
 
 function TimerCard({ brandColor }) {
   const [tState, setTState] = useState(() => timerStore.getState());
@@ -732,9 +732,10 @@ export default function Training({
   const isSessionFinalized = Boolean(currentSessionRec?.finalizada);
   const inputsDisabled = isLocked || isSessionFinalized;
 
-  // ── Métricas en vivo de la sesión del día (100% exige reps + peso en cada serie) ──
+  // ── Métricas en vivo de la sesión del día (reales vs resueltas con 'Falta') ──
   let totalSetsDay = 0;
   let completedSetsDay = 0;
+  let faltaSetsDay = 0;
   let totalVolumeKg = 0;
   const sessionPRs = [];
   const musclesTrainedMap = {};
@@ -752,21 +753,16 @@ export default function Training({
       const pVal = progreso[`${ex.id}-${wi}-${s}-peso-${variantId}`];
       const setIsFalta = rVal === "Falta";
       const rStr = String(rVal ?? "").trim();
-      const pStr = String(pVal ?? "").trim();
-      const hasReps = rStr !== "" && (setIsFalta || (!isNaN(Number(rStr)) && Number(rStr) > 0));
-      const hasPeso = setIsFalta || (pStr !== "" && !isNaN(Number(pStr)) && Number(pStr) >= 0);
+      const rNum = parseFloat(rStr);
+      const pKg = parseRawWeightToKg(pVal);
 
-      if (hasReps && hasPeso) {
+      if (setIsFalta) {
+        faltaSetsDay++;
+      } else if (rStr !== "" && !isNaN(rNum) && rNum > 0 && pKg !== null && pKg >= 0) {
         completedSetsDay++;
-      }
-      if (rStr !== "") {
         exHasCompletedSet = true;
-        if (!setIsFalta) {
-          const rNum = parseFloat(rStr);
-          const pNum = parseFloat(pStr);
-          if (!isNaN(rNum) && rNum > 0 && !isNaN(pNum) && pNum > 0) {
-            totalVolumeKg += rNum * pNum;
-          }
+        if (pKg > 0) {
+          totalVolumeKg += rNum * pKg;
         }
       }
     }
@@ -795,6 +791,8 @@ export default function Training({
     }
   });
 
+  const resolvedSetsDay = completedSetsDay + faltaSetsDay;
+  const allSetsResolved = totalSetsDay > 0 && resolvedSetsDay === totalSetsDay;
   const completionPct =
     totalSetsDay > 0 ? Math.min(100, Math.round((completedSetsDay / totalSetsDay) * 100)) : 0;
 
@@ -852,6 +850,7 @@ export default function Training({
               }
             }
 
+            const rStatus = evaluateRoutineWeekStatus(r, wi, progreso, finalizedSessions).status;
             return (
               <button
                 key={r.id || i}
@@ -862,7 +861,15 @@ export default function Training({
                     : "bg-white text-[#6B7A8D] hover:bg-[#E8F1FB] border border-[#E2E8F0]"
                 }`}
               >
-                <span className="uppercase">{shortTab}</span>
+                <span className="uppercase inline-flex items-center gap-1">
+                  <span>{shortTab}</span>
+                  {(rStatus === "sealed" || rStatus === "complete") && (
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isActive ? "bg-emerald-300" : "bg-emerald-500"}`} />
+                  )}
+                  {rStatus === "partial" && (
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isActive ? "bg-amber-200" : "bg-amber-400"}`} />
+                  )}
+                </span>
               </button>
             );
           })}
@@ -890,6 +897,11 @@ export default function Training({
           <div className="flex items-center justify-between text-xs">
             <span className="font-bold text-[#0B1929]">
               Progreso del Día: {completedSetsDay}/{totalSetsDay} series
+              {faltaSetsDay > 0 && (
+                <span className="text-[#6B7A8D] font-medium ml-1">
+                  ({faltaSetsDay} falta{faltaSetsDay === 1 ? "" : "s"})
+                </span>
+              )}
             </span>
             <div className="flex items-center gap-2">
               {sessionPRs.length > 0 && (
@@ -916,28 +928,26 @@ export default function Training({
           </div>
         </div>
 
-        {/* Aviso de Sesión Finalizada (bloqueo seguro contra ediciones accidentales) */}
+        {/* Aviso compacto de Sesión Sellada (bloqueo seguro contra ediciones accidentales) */}
         {isSessionFinalized && !isLocked && (
-          <div className="bg-[var(--brand-secondary)] border-b md:border border-[var(--brand-primary)]/30 rounded-none md:rounded-xl px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-7 h-7 rounded-lg bg-[var(--brand-primary)] text-white flex items-center justify-center shrink-0">
-                <CheckCircle2 size={16} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs font-bold text-[#0B1929]">Sesión finalizada y bloqueada</p>
-                <p className="text-[11px] text-[#475569]">
-                  Tus marcas están protegidas contra toques accidentales durante esta semana.
-                </p>
-              </div>
+          <div className="bg-emerald-50/90 border-b md:border border-emerald-200 rounded-none md:rounded-xl px-3.5 py-2 flex items-center justify-between gap-2.5 flex-wrap">
+            <div className="flex items-center gap-2 min-w-0">
+              <Lock size={14} className="text-emerald-600 shrink-0" />
+              <span className="text-xs font-bold text-emerald-900 truncate">
+                Sesión sellada (Sem {semanaActualCiclo})
+              </span>
+              <span className="hidden sm:inline text-[11px] text-emerald-700">
+                · Marcas protegidas contra edición accidental
+              </span>
             </div>
             {typeof onSetSessionFinalized === "function" && (
               <button
                 type="button"
                 onClick={() => setConfirmReopenSession(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-[var(--brand-primary)]/40 text-[var(--brand-primary)] hover:bg-[var(--brand-primary)] hover:text-white text-[11px] font-bold transition-colors cursor-pointer shrink-0"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-600 hover:text-white text-[11px] font-bold transition-colors cursor-pointer shrink-0"
               >
-                <Unlock size={12} />
-                <span>Desbloquear para editar</span>
+                <Unlock size={11} />
+                <span>Desbloquear</span>
               </button>
             )}
           </div>
@@ -1789,7 +1799,7 @@ export default function Training({
       )}
 
         {/* Botón para abrir Resumen y Finalizar Entrenamiento */}
-        {(completedSetsDay > 0 || isSessionFinalized) && (
+        {(resolvedSetsDay > 0 || isSessionFinalized) && (
           <div className="pt-3 px-4 md:px-0">
             <button
               onClick={() => setShowResumen(true)}
@@ -1797,7 +1807,7 @@ export default function Training({
               style={{
                 background: isSessionFinalized
                   ? "linear-gradient(135deg, #0B1929 0%, #1E293B 100%)"
-                  : completionPct === 100
+                  : allSetsResolved
                   ? "linear-gradient(135deg, #10B981 0%, #059669 100%)"
                   : "var(--brand-primary)",
               }}
@@ -1808,6 +1818,8 @@ export default function Training({
                   ? "Sesión Finalizada • Ver Resumen y Récords"
                   : completionPct === 100
                   ? "¡Entrenamiento al 100%! Finalizar y Ver Resumen"
+                  : allSetsResolved
+                  ? `Día listo (${completedSetsDay}/${totalSetsDay}) • Finalizar y Sellar`
                   : "Ver Resumen de Sesión y Récords (PR)"}
               </span>
             </button>
@@ -1844,6 +1856,8 @@ export default function Training({
                   ? "¡Sesión Finalizada!"
                   : completionPct === 100
                   ? "¡Sesión Completada al 100%!"
+                  : allSetsResolved
+                  ? "¡Sesión Lista para Sellar!"
                   : "Avance de Entrenamiento"}
               </h2>
               <p className="text-xs text-[#6B7A8D] mt-1">
@@ -1851,6 +1865,8 @@ export default function Training({
                   ? "Tus series quedaron protegidas contra ediciones accidentales mientras siga activa la semana."
                   : completionPct === 100
                   ? "Todas tus series (reps y peso) están completas. Puedes sellar el día ahora."
+                  : allSetsResolved
+                  ? `Completaste ${completedSetsDay} series y marcaste ${faltaSetsDay} con falta. Puedes sellar el día ahora.`
                   : "Cada serie registrada (reps y peso) suma XP a tu mapa muscular."}
               </p>
             </div>
@@ -1936,7 +1952,7 @@ export default function Training({
               </div>
             )}
 
-            {completionPct === 100 && !isSessionFinalized && !isLocked && typeof onSetSessionFinalized === "function" ? (
+            {allSetsResolved && !isSessionFinalized && !isLocked && typeof onSetSessionFinalized === "function" ? (
               <div className="space-y-2">
                 <button
                   type="button"
@@ -1946,6 +1962,7 @@ export default function Training({
                     try {
                       await onSetSessionFinalized(rutinaActiva.id, semanaActualCiclo, true, {
                         series: `${completedSetsDay}/${totalSetsDay}`,
+                        ...(faltaSetsDay > 0 ? { faltas: faltaSetsDay } : {}),
                         volumeKg: Math.round(totalVolumeKg),
                         prs: sessionPRs.length,
                       });

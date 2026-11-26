@@ -1150,6 +1150,88 @@ function hasRoutineSessionArrived({ routine, routineIdx, totalRoutines, weekIdx,
   return sessionDate.getTime() <= todayNoon.getTime();
 }
 
+/** Evalúa ejecución real, faltas y estado ('sealed' | 'complete' | 'partial' | 'pending') de una rutina en una semana 0-based. */
+export function evaluateRoutineWeekStatus(routine, weekIdx, progreso = {}, finalizedSessions = {}) {
+  const ejs = Array.isArray(routine?.ejercicios) ? routine.ejercicios : [];
+  const isSealed = Boolean(routine?.id && finalizedSessions?.[`${routine.id}-${weekIdx + 1}`]?.finalizada);
+
+  let expectedSets = 0;
+  let completedSets = 0;
+  let faltaSets = 0;
+  let volumeKg = 0;
+  const completedByMuscle = {};
+  const expectedByMuscle = {};
+
+  for (const ej of ejs) {
+    const nSeries = parseInt(ej?.num_series, 10) || 4;
+    const effIdx = getEffectiveSeriesIndices(ej, nSeries);
+    const variantsList = [
+      "original",
+      ...(Array.isArray(ej?.alternativas) ? ej.alternativas.map((_, altI) => `alt_${altI}`) : []),
+    ];
+    const principalGrp = normalizeMuscleGroup(ej?.grupo_muscular) || "general";
+    expectedSets += effIdx.length;
+    expectedByMuscle[principalGrp] = (expectedByMuscle[principalGrp] || 0) + effIdx.length;
+
+    for (const s of effIdx) {
+      let setCompleted = false;
+      let setFalta = false;
+      let setMaxVol = 0;
+      let completedVid = "original";
+
+      for (const vid of variantsList) {
+        const rRaw = progreso[`${ej.id}-${weekIdx}-${s}-reps-${vid}`];
+        const pRaw = progreso[`${ej.id}-${weekIdx}-${s}-peso-${vid}`];
+        const rStr = String(rRaw ?? "").trim();
+        if (!rStr) continue;
+        if (rStr === "Falta") {
+          setFalta = true;
+          continue;
+        }
+        const rNum = parseFloat(rStr);
+        const pKg = parseRawWeightToKg(pRaw);
+        if (!isNaN(rNum) && rNum > 0 && pKg !== null && pKg >= 0) {
+          if (!setCompleted) completedVid = vid;
+          setCompleted = true;
+          if (pKg > 0) setMaxVol = Math.max(setMaxVol, pKg * rNum);
+        }
+      }
+
+      if (setCompleted) {
+        completedSets++;
+        volumeKg += setMaxVol;
+        let completedGrp = principalGrp;
+        if (completedVid !== "original") {
+          const altIdxNum = parseInt(completedVid.replace("alt_", ""), 10);
+          const altObj = !isNaN(altIdxNum) ? (ej?.alternativas || [])[altIdxNum] : null;
+          if (altObj?.grupo_muscular) {
+            completedGrp = normalizeMuscleGroup(altObj.grupo_muscular) || principalGrp;
+          }
+        }
+        completedByMuscle[completedGrp] = (completedByMuscle[completedGrp] || 0) + 1;
+      } else if (setFalta) {
+        faltaSets++;
+      }
+    }
+  }
+
+  let status = "pending";
+  if (isSealed) status = "sealed";
+  else if (expectedSets > 0 && completedSets >= expectedSets) status = "complete";
+  else if (completedSets > 0 || faltaSets > 0) status = "partial";
+
+  return {
+    isSealed,
+    status,
+    expectedSets,
+    completedSets,
+    faltaSets,
+    volumeKg,
+    completedByMuscle,
+    expectedByMuscle,
+  };
+}
+
 /** Calcula KPIs globales del ciclo y por rutina para la vista Tracking del especialista (sin contar semanas/días futuros no trabajados). */
 export function computeCycleTrainingKpis({
   rutinas = [],
@@ -1170,6 +1252,10 @@ export function computeCycleTrainingKpis({
   let activeSessionsCount = 0;
   let sealedSessionsCount = 0;
   let expectedSessions = 0;
+  let currentWeekActiveCount = 0;
+  let currentWeekSealedCount = 0;
+  let currentWeekExpectedSessions = 0;
+  let hasAnyCurrentWeek = false;
   let prsCount = 0;
   const routineSummaries = {};
   const completedByMuscle = {};
@@ -1186,63 +1272,31 @@ export function computeCycleTrainingKpis({
     const maxAllowedWeekIdx = rWeekInfo.isFuture
       ? -1
       : Math.min(weeksLen - 1, Math.max(0, (rWeekInfo.currentCycleWeek || 1) - 1));
+    const isRoutineInCurrentWeek = !rWeekInfo.isFuture && (rWeekInfo.currentCycleWeek || 1) <= weeksLen;
+    if (isRoutineInCurrentWeek) hasAnyCurrentWeek = true;
 
     let rExpectedSets = 0;
     let rCompletedSets = 0;
     const sealedWeeks = [];
+    let currentWkEval = null;
 
     for (let w = 0; w <= maxAllowedWeekIdx; w++) {
-      const isSealed = Boolean(finalizedSessions?.[`${r.id}-${w + 1}`]?.finalizada);
+      const wkEval = evaluateRoutineWeekStatus(r, w, progreso, finalizedSessions);
+      const isSealed = wkEval.isSealed;
+      const sessionHasCompleted = wkEval.completedSets > 0;
+      if (isRoutineInCurrentWeek && w === maxAllowedWeekIdx) {
+        currentWkEval = wkEval;
+      }
+
       if (isSealed) {
         sealedSessionsCount++;
         sealedWeeks.push(w + 1);
       }
 
-      let sessionHasCompleted = false;
-      const sessionExpectedEntries = [];
-
-      for (const ej of ejs) {
-        const nSeries = parseInt(ej?.num_series, 10) || 4;
-        const effIdx = getEffectiveSeriesIndices(ej, nSeries);
-        const variantsList = [
-          "original",
-          ...(Array.isArray(ej?.alternativas) ? ej.alternativas.map((_, altI) => `alt_${altI}`) : []),
-        ];
-        const principalGrp = normalizeMuscleGroup(ej?.grupo_muscular) || "general";
-        sessionExpectedEntries.push({ grp: principalGrp, count: effIdx.length });
-
-        for (const s of effIdx) {
-          let setCompleted = false;
-          let setMaxVol = 0;
-          let completedVid = "original";
-          for (const vid of variantsList) {
-            const rRaw = progreso[`${ej.id}-${w}-${s}-reps-${vid}`];
-            const pRaw = progreso[`${ej.id}-${w}-${s}-peso-${vid}`];
-            const rStr = String(rRaw ?? "").trim();
-            if (!rStr || rStr === "Falta") continue;
-            const rNum = parseFloat(rStr);
-            const pKg = parseRawWeightToKg(pRaw);
-            if (!isNaN(rNum) && rNum > 0 && pKg !== null && pKg >= 0) {
-              if (!setCompleted) completedVid = vid;
-              setCompleted = true;
-              if (pKg > 0) setMaxVol = Math.max(setMaxVol, pKg * rNum);
-            }
-          }
-          if (setCompleted) {
-            sessionHasCompleted = true;
-            rCompletedSets++;
-            totalVolumeKg += setMaxVol;
-            let completedGrp = principalGrp;
-            if (completedVid !== "original") {
-              const altIdxNum = parseInt(completedVid.replace("alt_", ""), 10);
-              const altObj = !isNaN(altIdxNum) ? (ej?.alternativas || [])[altIdxNum] : null;
-              if (altObj?.grupo_muscular) {
-                completedGrp = normalizeMuscleGroup(altObj.grupo_muscular) || principalGrp;
-              }
-            }
-            completedByMuscle[completedGrp] = (completedByMuscle[completedGrp] || 0) + 1;
-          }
-        }
+      rCompletedSets += wkEval.completedSets;
+      totalVolumeKg += wkEval.volumeKg;
+      for (const [grp, cnt] of Object.entries(wkEval.completedByMuscle)) {
+        completedByMuscle[grp] = (completedByMuscle[grp] || 0) + cnt;
       }
 
       const hasArrived = hasRoutineSessionArrived({
@@ -1256,12 +1310,18 @@ export function computeCycleTrainingKpis({
       const countsInExpected = hasArrived || sessionHasCompleted || isSealed;
       if (countsInExpected) {
         if (ejs.length > 0) expectedSessions++;
-        for (const entry of sessionExpectedEntries) {
-          rExpectedSets += entry.count;
-          expectedByMuscle[entry.grp] = (expectedByMuscle[entry.grp] || 0) + entry.count;
+        rExpectedSets += wkEval.expectedSets;
+        for (const [grp, cnt] of Object.entries(wkEval.expectedByMuscle)) {
+          expectedByMuscle[grp] = (expectedByMuscle[grp] || 0) + cnt;
         }
       }
       if (sessionHasCompleted) activeSessionsCount++;
+
+      if (isRoutineInCurrentWeek && w === maxAllowedWeekIdx) {
+        if (countsInExpected && ejs.length > 0) currentWeekExpectedSessions++;
+        if (sessionHasCompleted) currentWeekActiveCount++;
+        if (isSealed) currentWeekSealedCount++;
+      }
     }
 
     // Contar mejoras de 1RM dentro del ciclo solo hasta la semana actual (sin semanas futuras)
@@ -1280,6 +1340,14 @@ export function computeCycleTrainingKpis({
       }
     }
 
+    let currentWeekStatus = "pending";
+    if (currentWkEval) {
+      currentWeekStatus = currentWkEval.status;
+    } else if (!rWeekInfo.isFuture && maxAllowedWeekIdx >= 0) {
+      if (rExpectedSets > 0 && rCompletedSets >= rExpectedSets) currentWeekStatus = "complete";
+      else if (rCompletedSets > 0) currentWeekStatus = "partial";
+    }
+
     expectedSetsToDate += rExpectedSets;
     completedSetsToDate += rCompletedSets;
     routineSummaries[r.id] = {
@@ -1287,6 +1355,11 @@ export function computeCycleTrainingKpis({
       completedSets: rCompletedSets,
       adherencePct: rExpectedSets > 0 ? Math.min(100, Math.round((rCompletedSets / rExpectedSets) * 100)) : 0,
       sealedWeeks,
+      currentWeekStatus,
+      currentWeekCompletedSets: currentWkEval ? currentWkEval.completedSets : 0,
+      currentWeekExpectedSets: currentWkEval ? currentWkEval.expectedSets : 0,
+      currentWeekFaltaSets: currentWkEval ? currentWkEval.faltaSets : 0,
+      currentWeekSealed: Boolean(currentWkEval?.isSealed),
     };
   }
 
@@ -1316,6 +1389,10 @@ export function computeCycleTrainingKpis({
     expectedSessions,
     activeSessionsCount,
     sealedSessionsCount,
+    hasActiveCurrentWeek: hasAnyCurrentWeek,
+    currentWeekActiveCount,
+    currentWeekSealedCount,
+    currentWeekExpectedSessions,
     totalVolumeKg: Math.round(totalVolumeKg),
     prsCount,
     routineSummaries,
