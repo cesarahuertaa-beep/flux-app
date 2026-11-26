@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, lazy, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { AppLayout } from "../components/ui/AppLayout";
 import { dbPeek, dbGet, dbGetFresh, dbUpsert, getPendingMutations } from "../lib/supabase";
 import { useBackButton } from "../lib/backButtonHandler";
@@ -12,22 +12,7 @@ import { enrichMetrica } from "../lib/bodyComposition";
 import { ListSkeleton } from "../components/ui/Skeleton";
 
 import { peekClinicalRecord, fetchClinicalRecord } from "../lib/clinicalRecord";
-
-const lazyRetry = (importer) =>
-  lazy(() =>
-    importer().catch((err) => {
-      try {
-        const key = "flux_chunk_retry";
-        const last = Number(sessionStorage.getItem(key) || 0);
-        if (Date.now() - last > 15000 && navigator.onLine !== false) {
-          sessionStorage.setItem(key, String(Date.now()));
-          window.location.reload();
-          return new Promise(() => {});
-        }
-      } catch {}
-      throw err;
-    })
-  );
+import { lazyWithRetry as lazyRetry } from "../lib/chunkRecovery";
 
 const CitasCliente = lazyRetry(() => import("../components/CitasCliente").then((m) => ({ default: m.CitasCliente })));
 const Nutrition = lazyRetry(() => import("../components/cliente/Nutrition"));

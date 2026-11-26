@@ -4,6 +4,7 @@ import './index.css'
 import App from './App.jsx'
 import { hydrateOfflineCache } from './lib/supabase'
 import { initVersionWatcher } from './lib/versionWatcher'
+import { tryAutoRecoverChunk } from './lib/chunkRecovery'
 
 // Sin Service Worker de caché de código en ninguna plataforma: la web/PWA siempre carga la
 // versión más reciente desde el servidor y la app nativa (Play Store) ya trae todo empaquetado.
@@ -23,8 +24,22 @@ try {
 // Detector de despliegues nuevos (solo web/PWA): se actualiza solo cuando el usuario no está editando
 initVersionWatcher()
 
-// Prevenir desplazamiento residual del viewport en iOS Safari / PWA tras cerrar el teclado virtual
+// Limpiar parámetro cache-buster (_cb) tras recarga de recuperación y capturar errores de precarga Vite
 if (typeof window !== 'undefined') {
+  try {
+    const curUrl = new URL(window.location.href)
+    if (curUrl.searchParams.has('_cb')) {
+      curUrl.searchParams.delete('_cb')
+      window.history.replaceState(null, '', curUrl.pathname + curUrl.search + curUrl.hash)
+    }
+  } catch { /* ignore */ }
+
+  window.addEventListener('vite:preloadError', (e) => {
+    e.preventDefault()
+    tryAutoRecoverChunk(e?.payload || new Error('vite:preloadError'))
+  })
+
+  // Prevenir desplazamiento residual del viewport en iOS Safari / PWA tras cerrar el teclado virtual
   window.addEventListener('focusout', (e) => {
     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target?.tagName)) {
       setTimeout(() => {

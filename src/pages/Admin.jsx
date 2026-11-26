@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, lazy, Suspense } from "react";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { createPortal } from "react-dom";
 import { 
   Users, Folder, CalendarDays, UsersRound, Building2, 
@@ -20,22 +20,7 @@ import { CachedImage } from "../lib/mediaCache";
 import { checkAndCleanOrphanedEmail, deletePatientAccount } from "../lib/authRoles";
 import { getRatesForCutoff } from "../utils/tarifas";
 import { getCycleServices } from "../utils/helpers";
-
-const lazyRetry = (importer) =>
-  lazy(() =>
-    importer().catch((err) => {
-      try {
-        const key = "flux_chunk_retry";
-        const last = Number(sessionStorage.getItem(key) || 0);
-        if (Date.now() - last > 15000 && navigator.onLine !== false) {
-          sessionStorage.setItem(key, String(Date.now()));
-          window.location.reload();
-          return new Promise(() => {});
-        }
-      } catch {}
-      throw err;
-    })
-  );
+import { lazyWithRetry as lazyRetry } from "../lib/chunkRecovery";
 
 const Biblioteca = lazyRetry(() => import("../components/admin/Biblioteca").then((m) => ({ default: m.Biblioteca })));
 const ProgramarCliente = lazyRetry(() => import("../components/admin/ProgramarCliente").then((m) => ({ default: m.ProgramarCliente })));

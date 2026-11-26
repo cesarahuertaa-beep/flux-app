@@ -86,6 +86,14 @@ const applyWhenIdle = () => {
   tick();
 };
 
+export const hasNewServerVersion = async () => {
+  if (typeof navigator === "undefined" || navigator.onLine === false) return false;
+  const running = currentBundle();
+  if (!running) return false;
+  const server = await fetchServerBundle();
+  return Boolean(server && server !== running);
+};
+
 export const checkForNewVersion = async () => {
   if (pendingVersion || typeof navigator === "undefined" || navigator.onLine === false) return;
   const running = currentBundle();
