@@ -58,7 +58,6 @@ import {
   computeCycleTrainingKpis,
   buildExerciseChartSeries,
   convertWeightToInput,
-  countEffectiveSeries,
 } from "../../utils/routineHelpers";
 import { ListSkeleton } from "../ui/Skeleton";
 import { ConfirmModal } from "../ui/ConfirmModal";
@@ -3976,12 +3975,6 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                         </div>
                                         <div className="text-[10px] text-[#6B7A8D] font-normal mt-0.5 truncate">{GRUPO_LABELS[normalizeMuscleGroup(exObj.grupo_muscular || ej.grupo_muscular)] || exObj.grupo_muscular || ej.grupo_muscular}</div>
                                         {(() => {
-                                          const effTarget = countEffectiveSeries(exObj);
-                                          const repsTarget = exObj.reps_sugeridas || ej.reps_sugeridas || 10;
-                                          const pesoRaw = exObj.peso_sugerido ?? ej.peso_sugerido;
-                                          const pesoTargetStr = pesoRaw != null && pesoRaw !== "" && !isNaN(parseFloat(pesoRaw)) && parseFloat(pesoRaw) > 0
-                                            ? `${convertWeightToInput(pesoRaw, trackingWeightUnit)} ${trackingWeightUnit}`
-                                            : null;
                                           const exSeriesInfo = isCycleFuture
                                             ? { points: [], hasData: false }
                                             : buildExerciseChartSeries({
@@ -3992,36 +3985,26 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                                 totalSemanas: maxVisibleWeekNum,
                                                 weightUnit: trackingWeightUnit,
                                               });
-                                          const lastPt = exSeriesInfo.points.length > 0 ? exSeriesInfo.points[exSeriesInfo.points.length - 1] : null;
+                                          if (!exSeriesInfo.hasData) return null;
                                           return (
                                             <div className="mt-1 flex items-center flex-wrap gap-1 text-[9.5px] font-medium">
-                                              <span className="px-1.5 py-0.2 rounded bg-[#F8FAFC] border border-[#E2E8F0] text-[#475569]">
-                                                Meta: {effTarget}×{repsTarget}{pesoTargetStr ? ` · ${pesoTargetStr}` : ""}
-                                              </span>
-                                              {lastPt?.bestReps && (
-                                                <span className="px-1.5 py-0.2 rounded bg-[var(--brand-secondary)]/70 text-[var(--brand-primary)] font-bold">
-                                                  Últ: {lastPt.bestReps}{lastPt.bestWeightDisplay ? `×${lastPt.bestWeightDisplay}${trackingWeightUnit}` : " reps"}
-                                                </span>
-                                              )}
-                                              {exSeriesInfo.hasData && (
-                                                <button
-                                                  type="button"
-                                                  onClick={() => {
-                                                    setChartMetricMode("1rm");
-                                                    setExerciseChartModal({
-                                                      routineId: r.id,
-                                                      routineNombre: String(r.nombre || "").replace("|", " · "),
-                                                      exId: ej.id,
-                                                      variantId: vid,
-                                                    });
-                                                  }}
-                                                  className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-white border border-[var(--brand-primary)]/35 text-[var(--brand-primary)] hover:bg-[var(--brand-primary)] hover:text-white font-bold transition-colors cursor-pointer"
-                                                  title="Ver gráfica de progresión 1RM / Volumen"
-                                                >
-                                                  <TrendingUp className="w-2.5 h-2.5" />
-                                                  <span>Gráfica</span>
-                                                </button>
-                                              )}
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  setChartMetricMode("1rm");
+                                                  setExerciseChartModal({
+                                                    routineId: r.id,
+                                                    routineNombre: String(r.nombre || "").replace("|", " · "),
+                                                    exId: ej.id,
+                                                    variantId: vid,
+                                                  });
+                                                }}
+                                                className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-white border border-[var(--brand-primary)]/35 text-[var(--brand-primary)] hover:bg-[var(--brand-primary)] hover:text-white font-bold transition-colors cursor-pointer"
+                                                title="Ver gráfica de progresión 1RM / Volumen"
+                                              >
+                                                <TrendingUp className="w-2.5 h-2.5" />
+                                                <span>Gráfica</span>
+                                              </button>
                                             </div>
                                           );
                                         })()}
