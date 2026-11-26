@@ -102,6 +102,28 @@ export const getSemanasConFecha = (item, ciclo = null) => {
 };
 
 /**
+ * Filtra las semanas generadas por `getSemanasConFecha` para mostrar únicamente hasta la semana actual:
+ * - Ciclo futuro (aún no inicia): solo Semana 1 (sin exponer semanas futuras).
+ * - Ciclo en curso: semanas 1..actual.
+ * - Ciclo concluido: todas las semanas del ciclo.
+ */
+export const getVisibleCycleWeeks = (item, ciclo = null) => {
+  const all = getSemanasConFecha(item, ciclo);
+  if (all.length === 0) return [];
+  const startRaw = item?.fecha_inicio || ciclo?.fecha_inicio || ciclo?.created_at || item?.created_at;
+  const { isFuture } = getCurrentCycleWeekInfo(startRaw);
+
+  if (isFuture) {
+    return all.slice(0, 1);
+  }
+  const currentIdx = all.findIndex((s) => s.isCurrent);
+  if (currentIdx !== -1) {
+    return all.slice(0, currentIdx + 1);
+  }
+  return all;
+};
+
+/**
  * Comprime y redimensiona una imagen antes de subirla para evitar timeouts,
  * optimizar ancho de banda móvil y acelerar la carga en la galería.
  * Si el archivo no es imagen o falla el procesamiento, retorna el archivo original.

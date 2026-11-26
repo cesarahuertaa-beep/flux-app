@@ -32,7 +32,7 @@ import { dbPeek, dbGet, dbGetFresh, updateQueryCache, invalidateCache, dbPost, d
 import { useBrand } from "../BrandContext";
 import { useBackButton } from "../../lib/backButtonHandler";
 import { generateProgresoPDF } from "../../utils/pdf";
-import { parseFotos, parseLocalDateNoon, getSemanasConFecha, getCurrentCycleWeekInfo, compressImageIfNeeded } from "../../utils/helpers";
+import { parseFotos, parseLocalDateNoon, getSemanasConFecha, getCurrentCycleWeekInfo, getVisibleCycleWeeks, compressImageIfNeeded } from "../../utils/helpers";
 import {
   ResponsiveContainer,
   LineChart,
@@ -3583,7 +3583,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
             </div>
           ) : (() => {
             const refSemanas = getSemanasConFecha(rutinas[0], cicloSel);
-            const refStartRaw = rutinas[0]?.fecha_inicio || cicloSel?.fecha_inicio || cicloSel?.created_at || rutinas[0]?.created_at;
+            const refStartRaw = cicloSel?.fecha_inicio || rutinas[0]?.fecha_inicio || cicloSel?.created_at || rutinas[0]?.created_at;
             const refWeekInfo = getCurrentCycleWeekInfo(refStartRaw);
             const refCurrentIdx = refWeekInfo.isFuture ? -1 : Math.max(0, (refWeekInfo.currentCycleWeek || 1) - 1);
             const kpis = computeCycleTrainingKpis({
@@ -3592,6 +3592,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
               finalizedSessions,
               currentWeekIdx: refCurrentIdx,
               totalSemanas: refSemanas.length || 4,
+              cycleStartDate: refStartRaw,
             });
             const displayMovedVol = Math.round(
               kpis.totalVolumeKg * (trackingWeightUnit === "lb" ? 2.20462262 : 1)
@@ -3610,7 +3611,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
               <>
                 {/* Cabecera de KPIs de Entrenamiento del Ciclo */}
                 <div className="mb-5 space-y-3">
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                     <div className="bg-white rounded-xl border border-[#E2E8F0] p-3 shadow-2xs">
                       <span className="text-[10px] font-bold text-[#6B7A8D] uppercase tracking-wider block">
                         Adherencia Efectiva
@@ -3643,20 +3644,6 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
 
                     <div className="bg-white rounded-xl border border-[#E2E8F0] p-3 shadow-2xs">
                       <span className="text-[10px] font-bold text-[#6B7A8D] uppercase tracking-wider block">
-                        Volumen Semanal Base
-                      </span>
-                      <div className="flex items-baseline gap-1.5 mt-1">
-                        <span className="text-xl font-extrabold font-mono text-[var(--brand-primary)]">
-                          {kpis.weeklyVol.totalEffectiveSets}
-                        </span>
-                        <span className="text-[11px] text-[#6B7A8D] font-medium">
-                          ser./sem{kpis.weeklyVol.totalWarmupSets > 0 ? ` (+${kpis.weeklyVol.totalWarmupSets} cal.)` : ""}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="bg-white rounded-xl border border-[#E2E8F0] p-3 shadow-2xs">
-                      <span className="text-[10px] font-bold text-[#6B7A8D] uppercase tracking-wider block">
                         Carga &amp; Progreso 1RM
                       </span>
                       <div className="flex items-baseline gap-1.5 mt-1 flex-wrap">
@@ -3672,17 +3659,31 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                     </div>
                   </div>
 
-                  {/* Distribución muscular + Filtro por Día (estilo paciente) */}
-                  {kpis.weeklyVol.muscleList.length > 0 && (
+                  {/* Distribución muscular real completada hasta la fecha (sin recorte) */}
+                  {kpis.completedMuscleList.length > 0 && (
                     <div className="bg-white rounded-xl border border-[#E2E8F0] px-3.5 py-2.5 flex items-center flex-wrap gap-1.5 min-w-0">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-[#6B7A8D] mr-1">
-                        Series ef./músculo:
+                        Series ef. completadas/músculo:
                       </span>
-                      {kpis.weeklyVol.muscleList.slice(0, 6).map((m) => (
-                        <span key={m.id} className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-[#F8FAFC] border border-[#E2E8F0] text-[#0B1929]">
-                          {m.label} <strong className="text-[var(--brand-primary)]">{m.sets}</strong>
-                        </span>
-                      ))}
+                      {kpis.completedMuscleList.map((m) => {
+                        const isFull = m.expectedSets > 0 && m.sets >= m.expectedSets;
+                        const pillCls = isFull
+                          ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+                          : "bg-[#F8FAFC] border-[#E2E8F0] text-[#0B1929]";
+                        const countCls = isFull
+                          ? "text-emerald-700"
+                          : m.sets > 0
+                          ? "text-[var(--brand-primary)]"
+                          : "text-[#94A3B8]";
+                        return (
+                          <span key={m.id} className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border ${pillCls}`}>
+                            {m.label} <strong className={countCls}>{m.sets}</strong>
+                            {m.expectedSets > 0 && (
+                              <span className="text-[#6B7A8D] font-normal">/{m.expectedSets}</span>
+                            )}
+                          </span>
+                        );
+                      })}
                     </div>
                   )}
 
@@ -3736,15 +3737,21 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                 </div>
 
                 {visibleRutinas.map(r=>{
-            const semanas = getSemanasConFecha(r, cicloSel);
+            const semanas = getVisibleCycleWeeks(r, cicloSel);
             const startRaw = r?.fecha_inicio || cicloSel?.fecha_inicio || cicloSel?.created_at || r?.created_at;
             const { currentCycleWeek, isFuture: isCycleFuture } = getCurrentCycleWeekInfo(startRaw);
             const currentWeekIdx = isCycleFuture ? -1 : Math.max(0, (currentCycleWeek || 1) - 1);
             const numSemanas = Math.max(1, semanas.length);
+            const maxVisibleWeekNum = semanas.length > 0 ? semanas[semanas.length - 1].weekNum : 1;
             const metricColPercent = (62 / (numSemanas * 2)).toFixed(2);
-            const tableMinPx = Math.max(740, 240 + 50 + (numSemanas * 2 * 56));
-            const tieneData = r.ejercicios.some(ej =>
-              Object.entries(progreso).some(([key, val]) => key.startsWith(`${ej.id}-`) && val !== "" && val != null)
+            const tableMinPx = Math.max(540, 240 + 50 + (numSemanas * 2 * 64));
+            const visibleWeekIdxSet = new Set(semanas.map((s) => String(s.idx)));
+            const tieneData = (r.ejercicios || []).some(ej =>
+              Object.entries(progreso).some(([key, val]) => {
+                if (!key.startsWith(`${ej.id}-`) || val === "" || val == null) return false;
+                const wk = key.slice(`${ej.id}-`.length).split("-")[0];
+                return visibleWeekIdxSet.has(wk);
+              })
             );
             const showTable = tieneData || (canEditTracking && (r.ejercicios || []).length > 0);
             const rSummary = kpis.routineSummaries[r.id];
@@ -3968,14 +3975,16 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                           const pesoTargetStr = pesoRaw != null && pesoRaw !== "" && !isNaN(parseFloat(pesoRaw)) && parseFloat(pesoRaw) > 0
                                             ? `${convertWeightToInput(pesoRaw, trackingWeightUnit)} ${trackingWeightUnit}`
                                             : null;
-                                          const exSeriesInfo = buildExerciseChartSeries({
-                                            ex: ej,
-                                            activeObj: exObj,
-                                            variantId: vid,
-                                            progreso,
-                                            totalSemanas: numSemanas,
-                                            weightUnit: trackingWeightUnit,
-                                          });
+                                          const exSeriesInfo = isCycleFuture
+                                            ? { points: [], hasData: false }
+                                            : buildExerciseChartSeries({
+                                                ex: ej,
+                                                activeObj: exObj,
+                                                variantId: vid,
+                                                progreso,
+                                                totalSemanas: maxVisibleWeekNum,
+                                                weightUnit: trackingWeightUnit,
+                                              });
                                           const lastPt = exSeriesInfo.points.length > 0 ? exSeriesInfo.points[exSeriesInfo.points.length - 1] : null;
                                           return (
                                             <div className="mt-1 flex items-center flex-wrap gap-1 text-[9.5px] font-medium">
@@ -4018,7 +4027,8 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                     {sLbl.label}
                                   </span>
                                 </td>
-                                {semanas.map((s, wi) => {
+                                {semanas.map((s) => {
+                                  const wi = s.idx;
                                   const pVal = progreso[`${ej.id}-${wi}-${si}-peso-${vid}`] || "";
                                   const rVal = progreso[`${ej.id}-${wi}-${si}-reps-${vid}`] || "";
                                   const isManualFalta = rVal === "Falta";
@@ -4131,16 +4141,10 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
               <div className="text-[15px] font-bold text-[#0B1929] mb-1.5">Sin dieta asignada</div>
             </div>
           ) : (() => {
-            const semanasNutri = getSemanasConFecha(rutinas[0] || null, cicloSel);
-            const currentWeekIndex = semanasNutri.findIndex(s => s.isCurrent);
-            const hasCurrent = currentWeekIndex !== -1;
-            const currentWeekObj = hasCurrent ? semanasNutri[currentWeekIndex] : (semanasNutri[0] || null);
-            const currentWeekNum = currentWeekObj?.weekNum || 1;
-
-            // Filtrar semanas futuras: solo semanas hasta la actual
-            const validWeeks = hasCurrent 
-              ? semanasNutri.filter(s => s.weekNum <= currentWeekNum)
-              : (semanasNutri.length > 0 ? semanasNutri : [{ weekNum: 1, label: "Semana 1", isCurrent: true }]);
+            const visibleNutriWeeks = getVisibleCycleWeeks(rutinas[0] || null, cicloSel);
+            const validWeeks = visibleNutriWeeks.length > 0
+              ? visibleNutriWeeks
+              : [{ weekNum: 1, label: "Semana 1", isCurrent: true }];
 
             return (
               <div className="bg-white rounded-none md:rounded-2xl border-b md:border border-[#E2E8F0] shadow-none md:shadow-sm overflow-hidden">
@@ -7424,8 +7428,10 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
       {exerciseChartModal && (() => {
         const modalRutina = rutinas.find((rt) => String(rt.id) === String(exerciseChartModal.routineId));
         if (!modalRutina) return null;
-        const modalSems = getSemanasConFecha(modalRutina, cicloSel);
-        const totalModalSems = Math.max(1, modalSems.length || modalRutina.semanas || 4);
+        const modalSems = getVisibleCycleWeeks(modalRutina, cicloSel);
+        const modalStartRaw = modalRutina?.fecha_inicio || cicloSel?.fecha_inicio || cicloSel?.created_at || modalRutina?.created_at;
+        const { isFuture: isModalFuture } = getCurrentCycleWeekInfo(modalStartRaw);
+        const totalModalSems = isModalFuture ? 0 : Math.max(1, modalSems[modalSems.length - 1]?.weekNum || modalSems.length || 1);
         const dayExerciseTabs = [];
 
         (modalRutina.ejercicios || []).forEach((ejItem) => {
@@ -7433,14 +7439,16 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
           vidList.forEach((vid) => {
             const altIdxNum = vid === "original" ? -1 : parseInt(vid.replace("alt_", ""), 10);
             const obj = vid === "original" ? ejItem : (ejItem.alternativas || [])[altIdxNum] || ejItem;
-            const series = buildExerciseChartSeries({
-              ex: ejItem,
-              activeObj: obj,
-              variantId: vid,
-              progreso,
-              totalSemanas: totalModalSems,
-              weightUnit: trackingWeightUnit,
-            });
+            const series = totalModalSems > 0
+              ? buildExerciseChartSeries({
+                  ex: ejItem,
+                  activeObj: obj,
+                  variantId: vid,
+                  progreso,
+                  totalSemanas: totalModalSems,
+                  weightUnit: trackingWeightUnit,
+                })
+              : { points: [], hasData: false };
             if (series.hasData) {
               dayExerciseTabs.push({
                 tabKey: `${ejItem.id}__${vid}`,

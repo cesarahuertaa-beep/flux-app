@@ -1,6 +1,7 @@
 // Utilidades compartidas para rutinas híbridas (plano + por serie),
 // etiquetas de serie, superseries, volumen semanal, migración y cálculo histórico 1RM/PR.
 import { GRUPO_LABELS, normalizeMuscleGroup } from "../lib/constants.js";
+import { getCurrentCycleWeekInfo, parseLocalDateNoon } from "./helpers.js";
 
 const LB_TO_KG = 0.45359237;
 const KG_TO_LB = 2.20462262;
@@ -1113,17 +1114,55 @@ export function buildExerciseChartSeries({
   };
 }
 
-/** Calcula KPIs globales del ciclo y por rutina para la vista Tracking del especialista. */
+const ROUTINE_WEEKDAY_MAP = {
+  DOM: 0, DOMINGO: 0,
+  LUN: 1, LUNES: 1,
+  MAR: 2, MARTES: 2,
+  MIE: 3, MIÉ: 3, MIERCOLES: 3, MIÉRCOLES: 3,
+  JUE: 4, JUEVES: 4,
+  VIE: 5, VIERNES: 5,
+  SAB: 6, SÁB: 6, SABADO: 6, SÁBADO: 6,
+};
+
+function getRoutineJsWeekday(routine) {
+  const parts = String(routine?.nombre || "").split("|");
+  const rawTag = (parts.length > 1 ? parts[0] : parts[0] || "").trim().toUpperCase();
+  return Object.prototype.hasOwnProperty.call(ROUTINE_WEEKDAY_MAP, rawTag)
+    ? ROUTINE_WEEKDAY_MAP[rawTag]
+    : null;
+}
+
+function hasRoutineSessionArrived({ routine, routineIdx, totalRoutines, weekIdx, startStr, todayNoon }) {
+  if (!startStr) return true;
+  const inicioNoon = parseLocalDateNoon(startStr);
+  const weekStart = new Date(inicioNoon.getFullYear(), inicioNoon.getMonth(), inicioNoon.getDate() + weekIdx * 7, 12, 0, 0, 0);
+  const weekEnd = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 6, 12, 0, 0, 0);
+
+  if (weekEnd.getTime() < todayNoon.getTime()) return true;
+  if (weekStart.getTime() > todayNoon.getTime()) return false;
+
+  const jsWeekday = getRoutineJsWeekday(routine);
+  const offsetDays = jsWeekday !== null
+    ? (jsWeekday - weekStart.getDay() + 7) % 7
+    : (totalRoutines <= 1 ? 0 : Math.floor((routineIdx * 7) / totalRoutines));
+
+  const sessionDate = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + offsetDays, 12, 0, 0, 0);
+  return sessionDate.getTime() <= todayNoon.getTime();
+}
+
+/** Calcula KPIs globales del ciclo y por rutina para la vista Tracking del especialista (sin contar semanas/días futuros no trabajados). */
 export function computeCycleTrainingKpis({
   rutinas = [],
   progreso = {},
   finalizedSessions = {},
   currentWeekIdx = 0,
   totalSemanas = 4,
+  cycleStartDate = null,
 }) {
   const safeRutinas = Array.isArray(rutinas) ? rutinas : [];
   const weeklyVol = computeWeeklyMuscleVolume(safeRutinas);
-  const variantsList = ["original", "alt_0", "alt_1"];
+  const now = new Date();
+  const todayNoon = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0, 0);
 
   let expectedSetsToDate = 0;
   let completedSetsToDate = 0;
@@ -1133,57 +1172,49 @@ export function computeCycleTrainingKpis({
   let expectedSessions = 0;
   let prsCount = 0;
   const routineSummaries = {};
+  const completedByMuscle = {};
+  const expectedByMuscle = {};
 
-  for (const r of safeRutinas) {
+  for (let rIdx = 0; rIdx < safeRutinas.length; rIdx++) {
+    const r = safeRutinas[rIdx];
     const ejs = Array.isArray(r?.ejercicios) ? r.ejercicios : [];
     const weeksLen = Math.max(1, parseInt(r?.semanas || totalSemanas, 10) || 4);
-
-    // Detectar última semana con algún dato registrado en esta rutina
-    let maxLoggedW = -1;
-    for (const ej of ejs) {
-      const nSeries = parseInt(ej?.num_series, 10) || 4;
-      for (let w = 0; w < weeksLen; w++) {
-        for (let s = 0; s < nSeries; s++) {
-          for (const vid of variantsList) {
-            const rv = String(progreso[`${ej.id}-${w}-${s}-reps-${vid}`] ?? "").trim();
-            if (rv && rv !== "Falta") {
-              if (w > maxLoggedW) maxLoggedW = w;
-            }
-          }
-        }
-      }
-    }
-
-    const elapsedWeeks =
-      currentWeekIdx < 0
-        ? maxLoggedW >= 0
-          ? maxLoggedW + 1
-          : 0
-        : Math.min(weeksLen, Math.max(currentWeekIdx + 1, maxLoggedW + 1));
+    const rStartRaw = r?.fecha_inicio || cycleStartDate || r?.created_at;
+    const rWeekInfo = rStartRaw
+      ? getCurrentCycleWeekInfo(rStartRaw)
+      : { currentCycleWeek: currentWeekIdx >= 0 ? currentWeekIdx + 1 : 1, isFuture: currentWeekIdx < 0 };
+    const maxAllowedWeekIdx = rWeekInfo.isFuture
+      ? -1
+      : Math.min(weeksLen - 1, Math.max(0, (rWeekInfo.currentCycleWeek || 1) - 1));
 
     let rExpectedSets = 0;
     let rCompletedSets = 0;
     const sealedWeeks = [];
 
-    for (let w = 0; w < weeksLen; w++) {
+    for (let w = 0; w <= maxAllowedWeekIdx; w++) {
       const isSealed = Boolean(finalizedSessions?.[`${r.id}-${w + 1}`]?.finalizada);
       if (isSealed) {
         sealedSessionsCount++;
         sealedWeeks.push(w + 1);
       }
 
-      const countsInExpected = w < elapsedWeeks;
-      if (countsInExpected && ejs.length > 0) expectedSessions++;
-
       let sessionHasCompleted = false;
+      const sessionExpectedEntries = [];
+
       for (const ej of ejs) {
         const nSeries = parseInt(ej?.num_series, 10) || 4;
         const effIdx = getEffectiveSeriesIndices(ej, nSeries);
-        if (countsInExpected) rExpectedSets += effIdx.length;
+        const variantsList = [
+          "original",
+          ...(Array.isArray(ej?.alternativas) ? ej.alternativas.map((_, altI) => `alt_${altI}`) : []),
+        ];
+        const principalGrp = normalizeMuscleGroup(ej?.grupo_muscular) || "general";
+        sessionExpectedEntries.push({ grp: principalGrp, count: effIdx.length });
 
         for (const s of effIdx) {
           let setCompleted = false;
           let setMaxVol = 0;
+          let completedVid = "original";
           for (const vid of variantsList) {
             const rRaw = progreso[`${ej.id}-${w}-${s}-reps-${vid}`];
             const pRaw = progreso[`${ej.id}-${w}-${s}-peso-${vid}`];
@@ -1192,6 +1223,7 @@ export function computeCycleTrainingKpis({
             const rNum = parseFloat(rStr);
             const pKg = parseRawWeightToKg(pRaw);
             if (!isNaN(rNum) && rNum > 0 && pKg !== null && pKg >= 0) {
+              if (!setCompleted) completedVid = vid;
               setCompleted = true;
               if (pKg > 0) setMaxVol = Math.max(setMaxVol, pKg * rNum);
             }
@@ -1200,23 +1232,51 @@ export function computeCycleTrainingKpis({
             sessionHasCompleted = true;
             rCompletedSets++;
             totalVolumeKg += setMaxVol;
+            let completedGrp = principalGrp;
+            if (completedVid !== "original") {
+              const altIdxNum = parseInt(completedVid.replace("alt_", ""), 10);
+              const altObj = !isNaN(altIdxNum) ? (ej?.alternativas || [])[altIdxNum] : null;
+              if (altObj?.grupo_muscular) {
+                completedGrp = normalizeMuscleGroup(altObj.grupo_muscular) || principalGrp;
+              }
+            }
+            completedByMuscle[completedGrp] = (completedByMuscle[completedGrp] || 0) + 1;
           }
+        }
+      }
+
+      const hasArrived = hasRoutineSessionArrived({
+        routine: r,
+        routineIdx: rIdx,
+        totalRoutines: safeRutinas.length,
+        weekIdx: w,
+        startStr: rStartRaw,
+        todayNoon,
+      });
+      const countsInExpected = hasArrived || sessionHasCompleted || isSealed;
+      if (countsInExpected) {
+        if (ejs.length > 0) expectedSessions++;
+        for (const entry of sessionExpectedEntries) {
+          rExpectedSets += entry.count;
+          expectedByMuscle[entry.grp] = (expectedByMuscle[entry.grp] || 0) + entry.count;
         }
       }
       if (sessionHasCompleted) activeSessionsCount++;
     }
 
-    // Contar mejoras de 1RM dentro del ciclo para ejercicios con >=2 semanas con datos
-    for (const ej of ejs) {
-      const series = buildExerciseChartSeries({
-        ex: ej,
-        progreso,
-        totalSemanas: weeksLen,
-        weightUnit: "kg",
-      });
-      const valid1RMs = series.points.filter((pt) => pt.max1RMKg > 0).map((pt) => pt.max1RMKg);
-      if (valid1RMs.length >= 2 && Math.max(...valid1RMs.slice(1)) > valid1RMs[0] + 0.1) {
-        prsCount++;
+    // Contar mejoras de 1RM dentro del ciclo solo hasta la semana actual (sin semanas futuras)
+    if (maxAllowedWeekIdx >= 1) {
+      for (const ej of ejs) {
+        const series = buildExerciseChartSeries({
+          ex: ej,
+          progreso,
+          totalSemanas: maxAllowedWeekIdx + 1,
+          weightUnit: "kg",
+        });
+        const valid1RMs = series.points.filter((pt) => pt.max1RMKg > 0).map((pt) => pt.max1RMKg);
+        if (valid1RMs.length >= 2 && Math.max(...valid1RMs.slice(1)) > valid1RMs[0] + 0.1) {
+          prsCount++;
+        }
       }
     }
 
@@ -1235,8 +1295,21 @@ export function computeCycleTrainingKpis({
       ? Math.min(100, Math.round((completedSetsToDate / expectedSetsToDate) * 100))
       : 0;
 
+  const muscleIds = new Set([...Object.keys(completedByMuscle), ...Object.keys(expectedByMuscle)]);
+  const completedMuscleList = Array.from(muscleIds)
+    .map((id) => ({
+      id,
+      label: GRUPO_LABELS[id] || id.replace(/_/g, " "),
+      sets: completedByMuscle[id] || 0,
+      expectedSets: expectedByMuscle[id] || 0,
+    }))
+    .filter((m) => m.sets > 0 || m.expectedSets > 0)
+    .sort((a, b) => b.sets - a.sets || b.expectedSets - a.expectedSets);
+
   return {
     weeklyVol,
+    completedByMuscle,
+    completedMuscleList,
     expectedSetsToDate,
     completedSetsToDate,
     adherenceSetsPct,
