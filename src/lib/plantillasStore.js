@@ -130,10 +130,11 @@ export function serializeDiaForTemplate(d, dIdx = 0) {
 }
 
 /** Normaliza una rutina semanal para plantilla. */
-export function serializeRutinaForTemplate(r, rIdx = 0, fallbackWeeks = 4) {
+export function serializeRutinaForTemplate(r, rIdx = 0, fallbackWeeks = null) {
+  const resolvedWeeks = Number(r?.semanas) || Number(fallbackWeeks) || null;
   return {
     nombre: r.nombre,
-    semanas: Number(r.semanas) || Number(fallbackWeeks) || 4,
+    ...(resolvedWeeks ? { semanas: resolvedWeeks } : {}),
     orden: r.orden != null ? r.orden : rIdx,
     ejercicios: (r.ejercicios || []).map((e, eIdx) =>
       mapExerciseForTemplate(e, eIdx)
@@ -147,7 +148,7 @@ export function createEmptyTemplateDraft({
   creatorId = null,
   nombre = "",
   tags = "",
-  semanas = 4,
+  semanas = null,
 } = {}) {
   const now = new Date().toISOString();
   return {
@@ -166,7 +167,7 @@ export function createEmptyTemplateDraft({
           dias: [],
         }
       : {
-          semanas: Number(semanas) || 4,
+          ...(semanas ? { semanas: Number(semanas) } : {}),
           rutinas: [],
         }),
   };

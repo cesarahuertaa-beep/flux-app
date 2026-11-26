@@ -165,7 +165,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     id: templateWorkspace?.template?.id || "",
     nombre: templateWorkspace?.template?.nombre || "",
     tags: templateWorkspace?.template?.tags || "",
-    semanas: Number(templateWorkspace?.template?.semanas) || 4,
     smaeDistribution:
       templateWorkspace?.template?.smaeDistribution ||
       templateWorkspace?.template?.macros?.smaeDistribution ||
@@ -239,12 +238,10 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   const [rutinas, setRutinas] = useState(() => {
     if (isTemplateMode) {
       const seed = Date.now();
-      const tplWeeks = Number(templateWorkspace?.template?.semanas) || 4;
       return (templateWorkspace?.template?.rutinas || []).map((r, rIdx) => ({
         ...r,
         id: r.id || `tpl_rut_${seed}_${rIdx}`,
         nombre: r.nombre || `Rutina ${rIdx + 1}`,
-        semanas: Number(r.semanas) || tplWeeks,
         orden: r.orden ?? rIdx,
         ejercicios: (r.ejercicios || []).map((e, eIdx) => ({
           ...e,
@@ -808,7 +805,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       type: templateType,
       nombre: mergedMeta?.nombre ?? baseTpl.nombre ?? "",
       tags: mergedMeta?.tags ?? baseTpl.tags ?? "",
-      semanas: Number(mergedMeta?.semanas) || 4,
       smaeDistribution: smaeMapClean,
       ...(templateType === "nutri"
         ? {
@@ -823,7 +819,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           }
         : {
             rutinas: (mergedRutinas || []).map((r, rIdx) =>
-              serializeRutinaForTemplate(r, rIdx, Number(mergedMeta?.semanas) || 4)
+              serializeRutinaForTemplate(r, rIdx, null)
             ),
           }),
     };
@@ -1310,13 +1306,13 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           nutricion: templateType === "nutri",
           entrenamiento: templateType === "rutina",
         },
-        semanas: Number(tplMeta.semanas) || 4,
-        dias: (Number(tplMeta.semanas) || 4) * 7,
+        semanas: null,
+        dias: null,
         enfoque: tplMeta.nombre || "",
       };
     }
     return parseCycleData(cicloSel, clinicalRec?.servicios_activos);
-  }, [isTemplateMode, templateType, tplMeta.semanas, tplMeta.nombre, cicloSel, clinicalRec?.servicios_activos]);
+  }, [isTemplateMode, templateType, tplMeta.nombre, cicloSel, clinicalRec?.servicios_activos]);
 
   const serviciosActivos = parsedActiveCycle.servicios;
 
@@ -2878,7 +2874,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
     const prevRutinas = rutinas;
     const nowTs = Date.now();
-    const initialWeeks = cicloSel ? getCycleWeeks(cicloSel) : (Number(tpl.semanas) || 4);
+    const initialWeeks = cicloSel ? getCycleWeeks(cicloSel) : (parsedActiveCycle?.semanas || 4);
 
     // 1. Actualización Optimista Instantánea en 0ms
     const optimisticNewRutinas = sourceRutinas.map((r, i) => {
@@ -4417,7 +4413,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       }
     } else {
       const diasToCreate = dSeleccionados.length > 0 ? dSeleccionados : ["S/D"];
-      const tplWeeks = Number(tplMeta.semanas) || (+formSnap.semanas || 4);
+      const resolvedWeeks = activeCiclo ? getCycleWeeks(activeCiclo) : (isTemplateMode ? null : (+formSnap.semanas || 4));
       const optimisticNewRutinas = diasToCreate.map((d, idx) => {
         const finalName = d === "S/D" ? formSnap.tituloPersonalizado : `${d}|${formSnap.tituloPersonalizado}`;
         const tempRutId = `temp_rut_${Date.now()}_${idx}`;
@@ -4426,7 +4422,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           cliente_id: selected?.id || null,
           ciclo_id: activeCiclo?.id || null,
           nombre: finalName,
-          semanas: activeCiclo ? getCycleWeeks(activeCiclo) : tplWeeks,
+          ...(resolvedWeeks ? { semanas: resolvedWeeks } : {}),
           fecha_inicio: formSnap.fecha_inicio || null,
           orden: prevRutinas.length + idx,
           ejercicios: formSnap.ejercicios.map((e, i) => ({
@@ -5259,8 +5255,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
             </div>
           </div>
 
-          <div className={`grid grid-cols-1 gap-3 ${templateType === "rutina" ? "md:grid-cols-12" : "md:grid-cols-12"}`}>
-            <div className={templateType === "rutina" ? "md:col-span-5" : "md:col-span-6"}>
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+            <div className="md:col-span-6">
               <label className="block text-[10px] font-bold text-[#6B7A8D] uppercase tracking-wider mb-1">
                 Nombre de la plantilla
               </label>
@@ -5279,7 +5275,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
               />
             </div>
 
-            <div className={templateType === "rutina" ? "md:col-span-4" : "md:col-span-6"}>
+            <div className="md:col-span-6">
               <label className="block text-[10px] font-bold text-[#6B7A8D] uppercase tracking-wider mb-1">
                 Etiquetas / Enfoque
               </label>
@@ -5297,42 +5293,10 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                 className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-xs sm:text-sm font-medium text-[#0B1929] outline-none focus:border-[var(--brand-primary)]"
               />
             </div>
-
-            {templateType === "rutina" && (
-              <div className="md:col-span-3">
-                <label className="block text-[10px] font-bold text-[#6B7A8D] uppercase tracking-wider mb-1">
-                  Semanas sugeridas
-                </label>
-                <div className="flex items-center gap-1 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-1">
-                  {[2, 4, 6, 8, 12].map((w) => (
-                    <button
-                      key={w}
-                      type="button"
-                      onClick={() => {
-                        const nextMeta = { ...tplMeta, semanas: w };
-                        const nextRutinas = rutinas.map((r) => ({ ...r, semanas: w }));
-                        setTplMeta(nextMeta);
-                        setRutinas(nextRutinas);
-                        syncTemplateSnapshot({ meta: nextMeta, rutinas: nextRutinas });
-                      }}
-                      className={`flex-1 py-1.5 rounded-lg text-[11px] font-bold transition-colors cursor-pointer ${
-                        Number(tplMeta.semanas || 4) === w
-                          ? "bg-[var(--brand-primary)] text-white shadow-xs"
-                          : "text-[#6B7A8D] hover:bg-white hover:text-[#0B1929]"
-                      }`}
-                    >
-                      {w}s
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
-          {templateType === "rutina" && (
-            <div className="mt-2 text-[11px] text-[#6B7A8D]">
-              Al aplicar esta plantilla a un paciente, sus sesiones se adaptarán automáticamente a las semanas del ciclo activo del paciente.
-            </div>
-          )}
+          <div className="mt-2.5 text-[11px] text-[#6B7A8D]">
+            Sin duración independiente: al aplicar esta plantilla a un paciente, adoptará automáticamente la duración de su plan activo.
+          </div>
         </div>
       ) : (
       <>
@@ -6656,7 +6620,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                     <span className="text-[#6B7A8D] font-normal ml-1.5">({rutinas.length})</span>
                   </span>
                 </span>
-                {Boolean(parsedActiveCycle.dias && parsedActiveCycle.semanas) && (
+                {Boolean(!isTemplateMode && parsedActiveCycle.dias && parsedActiveCycle.semanas) && (
                   <span className="text-[10px] sm:text-[11px] font-bold px-1.5 sm:px-2.5 py-0.5 rounded-md sm:rounded-lg bg-blue-50 text-[var(--brand-primary)] border border-blue-200/60 shrink-0 whitespace-nowrap">
                     {parsedActiveCycle.dias}d • {parsedActiveCycle.semanas}sem
                   </span>
@@ -10111,7 +10075,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                             }),
                     dias
                   }
-                : { rutinas, semanas: cicloSel ? getCycleWeeks(cicloSel) : (planForm?.semanas || 4) }
+                : { rutinas }
             }
             hasExistingPlan={
               templateModal === "nutri"
@@ -10120,7 +10084,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
             }
             hasPatientMacros={Number(macros?.calorias || nutri?.calorias || 0) > 0}
             patientMacros={macros}
-            cycleWeeks={cicloSel ? getCycleWeeks(cicloSel) : (planForm?.semanas || 4)}
+            cycleWeeks={parsedActiveCycle?.semanas || (cicloSel ? getCycleWeeks(cicloSel) : (planForm?.semanas || 4))}
             profileId={profileId || (typeof window !== "undefined" && localStorage.getItem("flux_profileId")) || selected?.nutriologo_id || selected?.auth_id}
             onApplyTemplate={
               templateModal === "nutri"

@@ -308,7 +308,7 @@ export function MisPlantillas({ biblioteca, profileId, setMsg }) {
           <p className="text-xs text-[#6B7A8D] max-w-md mx-auto">
             {activeType === "nutri"
               ? "Crea dietas base por calorías (ej. 1800 kcal, 2200 kcal) con distribución SMAE y platillos listos para asignar en segundos."
-              : "Arma tus splits favoritos (Torso/Pierna, PPL, Full Body) y aplícalos a cualquier ciclo adaptándose a su duración."}
+              : "Arma tus splits favoritos (Torso/Pierna, PPL, Full Body) y aplícalos a cualquier plan activo adaptándose automáticamente a su duración."}
           </p>
           {!search.trim() && (
             <button

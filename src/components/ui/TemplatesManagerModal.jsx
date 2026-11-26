@@ -65,7 +65,6 @@ export default function TemplatesManagerModal({
   // Estado para "+ Crear Plantilla"
   const [newTplTitle, setNewTplTitle] = useState("");
   const [newTplTags, setNewTplTags] = useState("");
-  const [newTplWeeks, setNewTplWeeks] = useState(4);
 
   // Estado para "Guardar Actual"
   const [saveMode, setSaveMode] = useState("new"); // 'new' | 'overwrite'
@@ -188,7 +187,6 @@ export default function TemplatesManagerModal({
       creatorId,
       nombre: newTplTitle.trim() || (isNutri ? "Nueva plantilla de nutrición" : "Nueva plantilla de entrenamiento"),
       tags: newTplTags.trim() || "Personalizada",
-      semanas: Number(newTplWeeks) || 4,
     });
     const nextList = await upsertUserTemplate({ type, creatorId, profileId, template: draft });
     setTemplates(nextList);
@@ -234,7 +232,7 @@ export default function TemplatesManagerModal({
       const parsedRutinas = (currentData?.rutinas || [])
         .filter((r) => (r.ejercicios || []).length > 0)
         .map((r, rIdx) => {
-          const serialized = serializeRutinaForTemplate(r, rIdx, Number(currentData?.semanas) || 4);
+          const serialized = serializeRutinaForTemplate(r, rIdx, null);
           if (!stripWeightsOnSave) return serialized;
           return {
             ...serialized,
@@ -251,7 +249,6 @@ export default function TemplatesManagerModal({
         updated_at: new Date().toISOString(),
         isDefault: false,
         isCustom: true,
-        semanas: Number(currentData?.semanas) || 4,
         rutinas: parsedRutinas,
       };
     }
@@ -312,43 +309,43 @@ export default function TemplatesManagerModal({
 
         {/* Navigation Tabs (hidden when inside apply preview) */}
         {!selectedTplForApply && (
-          <div className="flex border-b border-[#E2E8F0] px-4 sm:px-5 gap-3 sm:gap-5 bg-[#F8FAFC]/50 overflow-x-auto scroll-hide">
+          <div className="flex border-b border-[#E2E8F0] px-4 sm:px-5 gap-4 sm:gap-6 bg-[#F8FAFC]/50 overflow-x-auto scroll-hide">
             <button
               type="button"
               onClick={() => setActiveTab("list")}
-              className={`py-3 text-xs sm:text-[13px] font-bold border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+              className={`py-3 px-0.5 text-xs sm:text-[13px] font-bold border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]/30 rounded-t-md cursor-pointer ${
                 activeTab === "list"
                   ? "border-[var(--brand-primary)] text-[var(--brand-primary)]"
                   : "border-transparent text-[#6B7A8D] hover:text-[#0B1929]"
               }`}
             >
-              <Bookmark className="w-3.5 h-3.5" />
+              <Bookmark className="w-3.5 h-3.5 shrink-0" />
               <span>Plantillas ({templates.length})</span>
             </button>
             {onOpenTemplateBuilder && (
               <button
                 type="button"
                 onClick={() => setActiveTab("crear")}
-                className={`py-3 text-xs sm:text-[13px] font-bold border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                className={`py-3 px-0.5 text-xs sm:text-[13px] font-bold border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]/30 rounded-t-md cursor-pointer ${
                   activeTab === "crear"
                     ? "border-[var(--brand-primary)] text-[var(--brand-primary)]"
                     : "border-transparent text-[#6B7A8D] hover:text-[#0B1929]"
                 }`}
               >
-                <Plus className="w-3.5 h-3.5" />
+                <Plus className="w-3.5 h-3.5 shrink-0" />
                 <span>Crear Plantilla</span>
               </button>
             )}
             <button
               type="button"
               onClick={() => setActiveTab("guardar")}
-              className={`py-3 text-xs sm:text-[13px] font-bold border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+              className={`py-3 px-0.5 text-xs sm:text-[13px] font-bold border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]/30 rounded-t-md cursor-pointer ${
                 activeTab === "guardar"
                   ? "border-[var(--brand-primary)] text-[var(--brand-primary)]"
                   : "border-transparent text-[#6B7A8D] hover:text-[#0B1929]"
               }`}
             >
-              <Copy className="w-3.5 h-3.5" />
+              <Copy className="w-3.5 h-3.5 shrink-0" />
               <span>Guardar Actual</span>
             </button>
           </div>
@@ -540,8 +537,8 @@ export default function TemplatesManagerModal({
                 {!isNutri && (
                   <div className="space-y-2.5">
                     <div className="p-2.5 rounded-xl bg-blue-50/60 border border-blue-200/70 text-[11px] text-[#0B1929]">
-                      Duración automática: las sesiones importadas adoptarán las{" "}
-                      <strong>{cycleWeeks} semanas</strong> del ciclo activo del paciente.
+                      Duración automática: las sesiones importadas adoptarán automáticamente las{" "}
+                      <strong>{cycleWeeks} semanas</strong> del plan activo del paciente.
                     </div>
                     <label className="flex items-center gap-2.5 p-3 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] cursor-pointer">
                       <input
@@ -732,7 +729,15 @@ export default function TemplatesManagerModal({
           ) : activeTab === "crear" ? (
             <form onSubmit={handleCreateEmptyTemplate} className="space-y-4">
               <div className="p-3.5 rounded-xl bg-blue-50/70 border border-blue-200/70 text-xs text-[#0B1929]">
-                Arma una plantilla independiente <strong>sin asociarla a ningún paciente</strong>, con metas manuales de calorías/SMAE o días completos de entrenamiento.
+                {isNutri ? (
+                  <>
+                    Arma una plantilla independiente <strong>sin asociarla a ningún paciente</strong>, con metas manuales de calorías/SMAE y días de menú. Al aplicarla se adaptará automáticamente a la duración del plan activo.
+                  </>
+                ) : (
+                  <>
+                    Arma una plantilla independiente <strong>sin asociarla a ningún paciente</strong>, con tus sesiones y ejercicios listos para reusar. No requiere duración fija: al aplicarla adoptará automáticamente la duración del plan activo del paciente.
+                  </>
+                )}
               </div>
 
               <div>
@@ -761,30 +766,6 @@ export default function TemplatesManagerModal({
                   className="w-full px-3.5 py-2.5 rounded-xl border border-[#E2E8F0] focus:border-[var(--brand-primary)] outline-none text-sm text-[#0B1929]"
                 />
               </div>
-
-              {!isNutri && (
-                <div>
-                  <label className="block text-xs font-bold text-[#0B1929] uppercase tracking-wider mb-1.5">
-                    Duración sugerida
-                  </label>
-                  <div className="flex gap-1.5">
-                    {[2, 4, 6, 8, 12].map((w) => (
-                      <button
-                        key={w}
-                        type="button"
-                        onClick={() => setNewTplWeeks(w)}
-                        className={`px-3 py-1.5 rounded-xl border text-xs font-bold cursor-pointer transition-colors ${
-                          Number(newTplWeeks) === w
-                            ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)]"
-                            : "bg-white text-[#6B7A8D] border-[#E2E8F0] hover:bg-gray-50"
-                        }`}
-                      >
-                        {w} sem
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
 
               <button
                 type="submit"
