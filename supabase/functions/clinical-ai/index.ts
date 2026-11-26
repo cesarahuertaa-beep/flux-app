@@ -1557,6 +1557,108 @@ Responde ÚNICAMENTE con JSON válido:
     }
 
     // =========================================================================
+    // ACCIÓN: AUDITAR SESIÓN DE ENTRENAMIENTO DEL DÍA CON IA CLÍNICA
+    // =========================================================================
+    if (action === "audit-training-day") {
+      if (!geminiKey || geminiKey.trim().length < 20) {
+        return new Response(
+          JSON.stringify({ error: "NO_GEMINI_KEY", message: "API Key de Gemini no configurada en secrets." }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const anamnesis = body.anamnesis || {};
+      const resumenClinico = body.resumenClinico || {};
+      const smartTraining = body.smartTraining || {};
+      const sessionTitle = String(body.sessionTitle || "Sesión actual").trim();
+      const sessionStats = body.sessionStats || {};
+      const sessionSummaryText = String(body.sessionSummaryText || "").trim();
+      const ejerciciosCount = Math.max(0, Number(body.ejerciciosCount || 0));
+
+      const diagnostico = resumenClinico?.diagnostico || resumenClinico?.texto || "Paciente en programa de entrenamiento";
+      const patologias = resumenClinico?.alertas?.patologias_normalizadas || anamnesis?.patologias || "Ninguna reportada";
+      const lesionesRaw = smartTraining?.lesionesRaw || anamnesis?.cirugias_lesiones || "Ninguna reportada";
+      const medicacion = resumenClinico?.medicacion_normalizada || anamnesis?.medicacion_suplementos || "Ninguna";
+      const contexto = typeof resumenClinico?.contexto_normalizado === "object"
+        ? Object.values(resumenClinico.contexto_normalizado).filter(Boolean).join(". ")
+        : (resumenClinico?.contexto_normalizado || "Sin contexto particular");
+
+      const promptAuditDay = `Eres el Director de Biomecánica Clínica y Metodología del Entrenamiento en FLUX.
+Tu función es auditar exhaustivamente ÚNICAMENTE esta sesión/rutina del día ("${sessionTitle}") para un paciente, contrastándola contra su expediente clínico, lesiones y objetivo (NO evalúes días faltantes de la semana).
+
+PILAR 1: RESUMEN CLÍNICO DEL PACIENTE
+- Diagnóstico: ${diagnostico}
+- Patologías: ${Array.isArray(patologias) ? patologias.join(", ") : patologias}
+- Lesiones / Cirugías / Precauciones articulares: ${lesionesRaw}${smartTraining?.precaucionesLesion ? ` (${smartTraining.precaucionesLesion})` : ""}
+- Medicación y suplementación: ${medicacion}
+- Contexto laboral, descanso y estrés: ${contexto}
+
+PILAR 2: PRESCRIPCIÓN Y OBJETIVO DE ENTRENAMIENTO
+- Objetivo fisiológico: ${smartTraining?.enfoqueFisiologico || smartTraining?.goalTitle || "Hipertrofia / Recomposición"}
+- Nivel / Frecuencia / Split: ${smartTraining?.nivel || "Intermedio"} | ${smartTraining?.diasSugeridos || "-"} días/sem | ${smartTraining?.splitSugerido || "Personalizado"}
+- Estrategia: ${smartTraining?.rationale || "Sesión adaptada al paciente"}
+
+PILAR 3: SESIÓN PROGRAMADA DEL DÍA (${ejerciciosCount} EJERCICIOS)
+- Volumen de esta sesión: ${sessionStats.seriesEfectivasTotal || 0} series efectivas (+${sessionStats.seriesCalentamientoTotal || 0} calentamiento) | Grupos: ${sessionStats.patronResumen || "Varios"}
+${sessionSummaryText}
+
+INSTRUCCIONES DE AUDITORÍA:
+1. Evalúa únicamente esta sesión: orden de ejercicios (compuestos multiarticulares antes de aislados), densidad de volumen efectivo del día por grupo muscular, descansos, RIR, técnica (drop sets, al fallo, calentamiento), biseries y coherencia con el objetivo/nivel.
+2. VERIFICACIÓN POR EJERCICIO (index 0..${Math.max(0, ejerciciosCount - 1)}):
+   - "peligro": si choca con una lesión, cirugía o patología declarada (en "alertaClinica" nombra explícitamente el ejercicio, el riesgo y una variante/alternativa segura).
+   - "advertencia": si tiene una observación metodológica clara en esta sesión (ej. orden compuesto después de aislamiento, descanso demasiado corto para compuesto pesado, exceso de series al fallo o redundancia). En "alertaClinica" explica brevemente qué ajustar.
+   - "seguro": si es biomecánicamente seguro y aporta estímulo coherente; pon "alertaClinica": null y una frase corta positiva en "evaluacion".
+3. Emite un dictamen global honesto, directo y accionable de esta sesión (2-3 frases) y recomendaciones puntuales.
+
+Responde ÚNICAMENTE con JSON válido:
+{
+  "ejerciciosAuditados": [
+    {
+      "index": 0,
+      "estado": "seguro",
+      "titulo": "string corto",
+      "alertaClinica": "string explícito o null",
+      "evaluacion": "string corto"
+    }
+  ],
+  "resumenGlobal": {
+    "estado": "aprobado",
+    "dictamenGeneral": "string claro de 2-3 frases sobre esta sesión",
+    "recomendaciones": ["string accionable 1", "string accionable 2"]
+  }
+}`;
+
+      for (const model of CANDIDATE_MODELS) {
+        try {
+          const genCfg = getGenerationConfig(model, true, 0.2);
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`;
+          const res = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: promptAuditDay }] }],
+              generationConfig: genCfg,
+            }),
+          });
+          if (!res.ok) continue;
+          const resData = await res.json();
+          const rawTxt = extractGeminiText(resData).replace(/```json\s*|```/gi, "").trim();
+          const parsed = JSON.parse(rawTxt);
+          if (parsed?.resumenGlobal?.dictamenGeneral && Array.isArray(parsed?.ejerciciosAuditados)) {
+            return new Response(
+              JSON.stringify({ ...parsed, success: true, origen: "edge_function", model }),
+              { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+        } catch {}
+      }
+      return new Response(
+        JSON.stringify({ error: "TRAIN_DAY_AUDIT_FAILED", message: "No se pudo auditar la sesión con IA." }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // =========================================================================
     // ACCIÓN: AUDITAR SEMANA DE ENTRENAMIENTO CON IA CLÍNICA
     // =========================================================================
     if (action === "audit-training-week") {

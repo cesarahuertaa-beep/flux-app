@@ -52,7 +52,7 @@ import { calcEdadFromBirthdate, normalizeSexo, enrichMetrica, linkMetricasToCicl
 import { peekClinicalRecord, fetchClinicalRecord, saveClinicalRecord, hasAnamnesisData, EMPTY_ANAMNESIS } from "../../lib/clinicalRecord";
 import { parseMealOptions, parseMealOptionsStructured, formatMealOptions, formatMealOptionsKeepSmae, parseDiaMetadata, formatDiaMetadata } from "../../lib/mealOptions";
 import { SMAE_GROUPS, SMAE_GROUPS_MAP, SMAE_FOODS_BY_GROUP, calculateSmaeTotals, autoDistributeSmaeFromMacros, serializeSmaeMap, parseSmaeString, formatScaledSmaePortion, estimateMealSmaeMap, estimateDaySmaeUsage, suggestMealSmaeSplit, extractSmaeMapFromMealText, embedSmaeMapInMealText, embedMealIngredientsInText, extractMealIngredientsFromText } from "../../lib/smaeData";
-import { optimizeMealWithAi, generateMealFromPantryWithAi, generateDishFromIngredientsWithAi, generateBatchDishesFromIngredientsWithAi, auditFullDayWithAi, auditTrainingWeekWithAi, computeDualSummarySourceHash, buildFallbackDualSummaries, syncDualDomainSummariesInBackground } from "../../lib/clinicalAi";
+import { optimizeMealWithAi, generateMealFromPantryWithAi, generateDishFromIngredientsWithAi, generateBatchDishesFromIngredientsWithAi, auditFullDayWithAi, auditTrainingDayWithAi, computeDualSummarySourceHash, buildFallbackDualSummaries, syncDualDomainSummariesInBackground } from "../../lib/clinicalAi";
 import { buscarIngredientes, CATEGORIAS_INGREDIENTES, INGREDIENTES_CATALOGO, getIngredientesCatalog, formatIngredientSmaePortion, evaluateIngredientForPatient, resolveDishStructuredIngredients, computeSmaeFromIngredientItems } from "../../lib/ingredientsCatalog";
 import { searchDishPhotoInCatalog, registerDishPhotoInCatalog, CATALOGO_PLATILLOS_BASE, getPlatillosCatalog, CATEGORIAS_PLATILLOS, buscarPlatillosCatalogo } from "../../lib/foodPhotoCatalog";
 
@@ -242,13 +242,13 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     if (entrenoView === "tracking") setVisitedEntrenoTracking(true);
   }, [entrenoView]);
 
-  const [isAuditingTrainingWeek, setIsAuditingTrainingWeek] = useState(false);
-  const [trainingWeekAuditResult, setTrainingWeekAuditResult] = useState(null);
+  const [isAuditingTrainingDay, setIsAuditingTrainingDay] = useState(false);
+  const [trainingDayAuditResult, setTrainingDayAuditResult] = useState(null);
 
   useEffect(() => {
     setVisitedNutriTracking(false);
     setVisitedEntrenoTracking(false);
-    setTrainingWeekAuditResult(null);
+    setTrainingDayAuditResult(null);
   }, [selected?.id, cicloSel?.id]);
   const [showDiaModal, setShowDiaModal] = useState(false);
   const [editDia, setEditDia] = useState(null);
@@ -3714,7 +3714,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     if (selected?.id) loadPatientExerciseHistory(selected.id, { force: true });
     setEditRutina(null); 
     setActiveAltSlot(null);
-    setTrainingWeekAuditResult(null);
+    setTrainingDayAuditResult(null);
     setRutinaForm({ diasSeleccionados:[], tituloPersonalizado:"", ejercicios:[] }); 
     setShowRutinaModal(true); 
   };
@@ -3732,7 +3732,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     }
     setEditRutina(r); 
     setActiveAltSlot(null);
-    setTrainingWeekAuditResult(null);
+    setTrainingDayAuditResult(null);
     setRutinaForm({ 
       diasSeleccionados: dSel,
       tituloPersonalizado: tPers,
@@ -3790,6 +3790,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         delete cleanAlt.seriesForm;
         delete cleanAlt._showOptions;
         delete cleanAlt._historyApplied;
+        delete cleanAlt._evaluacionClinica;
         delete cleanAlt._dndId;
         return {
           ...cleanAlt,
@@ -3809,6 +3810,101 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     };
   };
 
+  const clearTrainingAudit = () => {
+    setTrainingDayAuditResult(null);
+    setRutinaForm((p) => ({
+      ...p,
+      ejercicios: (p.ejercicios || []).map((ej) => ({ ...ej, _evaluacionClinica: null })),
+    }));
+  };
+
+  const dismissExerciseAuditNote = (exIdx) => {
+    setRutinaForm((p) => ({
+      ...p,
+      ejercicios: (p.ejercicios || []).map((ej, idx) =>
+        idx === exIdx ? { ...ej, _evaluacionClinica: null } : ej
+      ),
+    }));
+  };
+
+  const renderClinicalEvalCard = (evalData, { onDismiss = null, className = "mt-2.5" } = {}) => {
+    if (!evalData) return null;
+    const tipo = evalData.tipo;
+    const badgeLabel =
+      evalData.badge ||
+      (tipo === "exito"
+        ? "Alimento Favorito"
+        : tipo === "advertencia"
+        ? "Aversión"
+        : tipo === "peligro"
+        ? "Alérgeno Crítico"
+        : "");
+    return (
+      <div className={`${className} p-2.5 rounded-xl border text-xs flex items-start gap-2.5 animate-in fade-in transition-all ${
+        tipo === "peligro"
+          ? "bg-rose-50/90 border-rose-200 text-rose-950"
+          : tipo === "advertencia"
+          ? "bg-amber-50/90 border-amber-200 text-amber-950"
+          : tipo === "exito"
+          ? "bg-emerald-50/90 border-emerald-200 text-emerald-950"
+          : "bg-blue-50/90 border-blue-200 text-blue-950"
+      }`}>
+        {tipo === "peligro" ? (
+          <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+        ) : tipo === "advertencia" ? (
+          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+        ) : tipo === "exito" ? (
+          <Sparkles className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+        ) : (
+          <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-bold text-xs">{evalData.titulo}</span>
+              {badgeLabel && (
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                  tipo === "exito"
+                    ? "bg-emerald-100 text-emerald-800"
+                    : tipo === "advertencia"
+                    ? "bg-amber-100 text-amber-800"
+                    : tipo === "peligro"
+                    ? "bg-rose-100 text-rose-800"
+                    : "bg-blue-100 text-blue-800"
+                }`}>
+                  {badgeLabel}
+                </span>
+              )}
+            </div>
+            {onDismiss && (
+              <button
+                type="button"
+                onClick={onDismiss}
+                className="p-0.5 rounded text-current/60 hover:text-current cursor-pointer focus:outline-none shrink-0"
+                title="Ocultar evaluación"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+          <div className="text-[11.5px] leading-relaxed mt-1">
+            {evalData.mensaje}
+          </div>
+          <div className="mt-1 flex items-center justify-between gap-2 text-[10px] opacity-75">
+            <span>Análisis asistido por IA orientativo</span>
+            <button
+              type="button"
+              onClick={() => setMsg && setMsg("✓ Respuesta de IA reportada para revisión.")}
+              className="underline hover:opacity-100 cursor-pointer font-semibold"
+            >
+              Reportar IA
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const handleAuditTrainingRoutine = async () => {
     if (isEstandar) {
       openPaywall("ia");
@@ -3816,32 +3912,104 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     }
     const ejList = rutinaForm?.ejercicios || [];
     if (ejList.length === 0) {
-      alert("Agrega al menos un ejercicio a esta rutina para poder auditarla.");
+      alert("Agrega al menos un ejercicio a esta sesión para poder auditarla.");
       return;
     }
-    setIsAuditingTrainingWeek(true);
+    setIsAuditingTrainingDay(true);
+    setMsg?.(
+      <div className="flex items-center gap-2 text-purple-700">
+        <Sparkles className="w-4 h-4 animate-spin text-purple-600" />
+        <span>Auditando sesión de entrenamiento con IA Clínica FLUX...</span>
+      </div>
+    );
     try {
       const dayTag = (rutinaForm.diasSeleccionados || [])[0] || "";
       const titleTag = (rutinaForm.tituloPersonalizado || "").trim();
-      const liveNombre = dayTag ? `${dayTag}|${titleTag || "Sesión"}` : (titleTag || "Sesión actual");
-      const liveFocusRoutine = {
-        id: editRutina?.id || "live_routine",
-        nombre: liveNombre,
-        ejercicios: ejList.map((e, idx) => serializeExerciseForDb(e, editRutina?.id || "live_routine", idx)),
-      };
-      const otherRutinas = (rutinas || []).filter((r) => !editRutina?.id || r.id !== editRutina.id);
-      const res = await auditTrainingWeekWithAi({
-        rutinas: [liveFocusRoutine, ...otherRutinas],
-        focusRoutine: liveFocusRoutine,
+      const sessionTitle = dayTag ? `${dayTag} · ${titleTag || "Sesión"}` : (titleTag || "Sesión actual");
+      const resolvedList = ejList.map((e) => {
+        const canon = resolveCanonicalExercise(e);
+        return {
+          ...e,
+          nombre: canon.nombre || e.nombre,
+          grupo_muscular: canon.grupo_muscular || e.grupo_muscular || "",
+        };
+      });
+
+      const res = await auditTrainingDayWithAi({
+        sessionTitle,
+        ejercicios: resolvedList,
         smartTraining: smartTrainingPrescription,
         clinicalRec,
         cliente: selected,
       });
-      setTrainingWeekAuditResult(res);
+
+      let totalAlerts = 0;
+      if (Array.isArray(res?.ejerciciosAuditados)) {
+        setRutinaForm((p) => ({
+          ...p,
+          ejercicios: (p.ejercicios || []).map((ejItem, idx) => {
+            const audited =
+              res.ejerciciosAuditados.find((a) => Number(a?.index) === idx) ||
+              res.ejerciciosAuditados[idx];
+            if (!audited) return { ...ejItem, _evaluacionClinica: null };
+            const evalTipo =
+              audited.estado === "peligro"
+                ? "peligro"
+                : audited.estado === "advertencia"
+                ? "advertencia"
+                : "exito";
+            if (evalTipo !== "exito") totalAlerts++;
+            return {
+              ...ejItem,
+              _evaluacionClinica: {
+                tipo: evalTipo,
+                titulo:
+                  audited.titulo ||
+                  (evalTipo === "peligro"
+                    ? "Alerta Biomecánica"
+                    : evalTipo === "advertencia"
+                    ? "Observación Técnica"
+                    : "Compatibilidad Clínica"),
+                badge:
+                  evalTipo === "peligro"
+                    ? "Riesgo Lesión"
+                    : evalTipo === "advertencia"
+                    ? "Ajuste Sugerido"
+                    : "Alineado",
+                mensaje:
+                  audited.alertaClinica ||
+                  audited.evaluacion ||
+                  "Ejercicio compatible con el perfil clínico del paciente.",
+              },
+            };
+          }),
+        }));
+      }
+
+      if (res?.resumenGlobal) {
+        setTrainingDayAuditResult(res.resumenGlobal);
+      }
+
+      setMsg?.(
+        <div className="flex items-center gap-2 text-emerald-800">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+          <span>
+            Auditoría de sesión completada
+            {totalAlerts > 0
+              ? ` • ${totalAlerts} observación(es) detectada(s)`
+              : " • 100% alineada con el perfil clínico"}
+          </span>
+        </div>
+      );
     } catch (err) {
-      alert(err?.message || "No se pudo auditar la rutina con IA.");
+      setMsg?.(
+        <div className="flex items-center gap-1.5 text-amber-700 text-xs font-medium">
+          <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+          <span>{err?.message || "No se pudo auditar la sesión con IA."}</span>
+        </div>
+      );
     } finally {
-      setIsAuditingTrainingWeek(false);
+      setIsAuditingTrainingDay(false);
     }
   };
 
@@ -4508,6 +4676,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       nota_tecnica: targetAlt.nota_tecnica || "",
       _showOptions: false,
       _historyApplied: false,
+      _evaluacionClinica: null,
       alternativas: newAlts,
     };
 
@@ -7491,59 +7660,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
                                     {/* Alerta clínica de alergias o aversiones */}
                                     {c.evaluacionClinica ? (
-                                       <div className={`mt-2.5 p-2.5 rounded-xl border text-xs flex items-start gap-2.5 animate-in fade-in transition-all ${
-                                         c.evaluacionClinica.tipo === "peligro"
-                                           ? "bg-rose-50/90 border-rose-200 text-rose-950"
-                                           : c.evaluacionClinica.tipo === "advertencia"
-                                           ? "bg-amber-50/90 border-amber-200 text-amber-950"
-                                           : c.evaluacionClinica.tipo === "exito"
-                                           ? "bg-emerald-50/90 border-emerald-200 text-emerald-950"
-                                           : "bg-blue-50/90 border-blue-200 text-blue-950"
-                                       }`}>
-                                         {c.evaluacionClinica.tipo === "peligro" ? (
-                                           <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-                                         ) : c.evaluacionClinica.tipo === "advertencia" ? (
-                                           <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                                         ) : c.evaluacionClinica.tipo === "exito" ? (
-                                           <Sparkles className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                                         ) : (
-                                           <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                                         )}
-                                         <div className="min-w-0 flex-1">
-                                           <div className="flex items-center gap-2 flex-wrap">
-                                             <span className="font-bold text-xs">{c.evaluacionClinica.titulo}</span>
-                                             {c.evaluacionClinica.tipo === "exito" && (
-                                               <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold uppercase tracking-wider">
-                                                 Alimento Favorito
-                                               </span>
-                                             )}
-                                             {c.evaluacionClinica.tipo === "advertencia" && (
-                                               <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold uppercase tracking-wider">
-                                                 Aversión
-                                               </span>
-                                             )}
-                                             {c.evaluacionClinica.tipo === "peligro" && (
-                                               <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 font-bold uppercase tracking-wider">
-                                                 Alérgeno Crítico
-                                               </span>
-                                             )}
-                                           </div>
-                                           <div className="text-[11.5px] leading-relaxed mt-1">
-                                             {c.evaluacionClinica.mensaje}
-                                           </div>
-                                           <div className="mt-1 flex items-center justify-between gap-2 text-[10px] opacity-75">
-                                             <span>Análisis asistido por IA orientativo</span>
-                                             <button
-                                               type="button"
-                                               onClick={() => setMsg && setMsg("✓ Respuesta de IA reportada para revisión.")}
-                                               className="underline hover:opacity-100 cursor-pointer font-semibold"
-                                             >
-                                               Reportar IA
-                                             </button>
-                                           </div>
-                                         </div>
-                                       </div>
-                                     ) : c.alertaClinica ? (
+                                      renderClinicalEvalCard(c.evaluacionClinica)
+                                    ) : c.alertaClinica ? (
                                        <div className="mt-2.5 p-2.5 rounded-xl bg-amber-50/90 border border-amber-200 text-xs text-amber-900 flex items-start gap-2 animate-in fade-in">
                                          <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                                          <div className="min-w-0">
@@ -8511,18 +8629,18 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                         <button
                           type="button"
                           onClick={handleAuditTrainingRoutine}
-                          disabled={isAuditingTrainingWeek || rutinaForm.ejercicios.length === 0}
+                          disabled={isAuditingTrainingDay || rutinaForm.ejercicios.length === 0}
                           className={`text-xs font-bold flex items-center gap-2 px-3.5 py-1.5 rounded-xl transition-all shadow-xs cursor-pointer shrink-0 ${
                             isEstandar
                               ? "bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-200 hover:text-slate-900"
                               : "bg-purple-50 text-purple-700 border border-purple-200/80 hover:bg-purple-100 hover:text-purple-800 disabled:opacity-50"
                           }`}
-                          title={isEstandar ? "Función exclusiva de FLUX Pro" : "Auditar rutina, lesiones y balance semanal con IA Clínica"}
+                          title={isEstandar ? "Función exclusiva de FLUX Pro" : "Auditar únicamente esta sesión del día con IA Clínica"}
                         >
-                          {isAuditingTrainingWeek ? (
+                          {isAuditingTrainingDay ? (
                             <>
                               <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-600" />
-                              <span>Auditando rutina...</span>
+                              <span>Auditando sesión...</span>
                             </>
                           ) : (
                             <>
@@ -8555,66 +8673,71 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                         ))}
                       </div>
                     )}
-                    {trainingWeekAuditResult && (
+                    {trainingDayAuditResult && (
                       <div className={`p-3.5 sm:p-4 rounded-2xl border transition-all animate-in fade-in ${
-                        trainingWeekAuditResult.estado === "critico"
+                        trainingDayAuditResult.estado === "critico"
                           ? "bg-rose-50/80 border-rose-200/90 text-rose-950"
-                          : trainingWeekAuditResult.estado === "advertencia"
+                          : trainingDayAuditResult.estado === "advertencia"
                           ? "bg-amber-50/80 border-amber-200/90 text-amber-950"
                           : "bg-indigo-50/70 border-indigo-200/80 text-indigo-950"
                       }`}>
-                        <div className="flex items-start justify-between gap-2.5">
-                          <div className="space-y-1.5 min-w-0 flex-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-xs font-black uppercase tracking-wider">
-                                Auditoría IA Clínica · Rutina &amp; Semana
-                              </span>
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase ${
-                                trainingWeekAuditResult.estado === "aprobado"
-                                  ? "bg-emerald-100 text-emerald-800"
-                                  : trainingWeekAuditResult.estado === "critico"
-                                  ? "bg-rose-100 text-rose-800"
-                                  : "bg-amber-100 text-amber-800"
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-2.5 min-w-0">
+                            {trainingDayAuditResult.estado === "aprobado" ? (
+                              <div className="p-1.5 rounded-xl bg-indigo-100/80 text-indigo-700 shrink-0 mt-0.5">
+                                <Sparkles className="w-4 h-4" />
+                              </div>
+                            ) : (
+                              <div className={`p-1.5 rounded-xl shrink-0 mt-0.5 ${
+                                trainingDayAuditResult.estado === "critico"
+                                  ? "bg-rose-100/80 text-rose-700"
+                                  : "bg-amber-100/80 text-amber-700"
                               }`}>
-                                {trainingWeekAuditResult.estado === "aprobado"
-                                  ? "Alineado"
-                                  : trainingWeekAuditResult.estado === "critico"
-                                  ? "Alerta Biomecánica"
-                                  : "Con Observaciones"}
-                              </span>
-                              {trainingWeekAuditResult.balanceResumen?.ratioTexto && (
-                                <span className="text-[11px] font-semibold text-[#475569]">
-                                  {trainingWeekAuditResult.balanceResumen.ratioTexto}
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-xs leading-relaxed text-[#1E293B]">
-                              {trainingWeekAuditResult.dictamenGeneral}
-                            </p>
-                            {Array.isArray(trainingWeekAuditResult.alertasBiomecanicas) && trainingWeekAuditResult.alertasBiomecanicas.length > 0 && (
-                              <div className="space-y-1 mt-1.5">
-                                {trainingWeekAuditResult.alertasBiomecanicas.map((al, aIdx) => (
-                                  <div key={aIdx} className="bg-white/85 rounded-lg border border-rose-200 px-2.5 py-1.5 text-[11px]">
-                                    <strong className="text-rose-900">{al.ejercicio}</strong>
-                                    {al.rutinaNombre ? <span className="text-[#64748B]"> ({al.rutinaNombre})</span> : null}:{" "}
-                                    <span>{al.riesgo}</span>
-                                    {al.sugerencia ? <span className="block text-emerald-800 font-semibold mt-0.5">↳ Sugerencia: {al.sugerencia}</span> : null}
-                                  </div>
-                                ))}
+                                <AlertCircle className="w-4 h-4" />
                               </div>
                             )}
-                            {Array.isArray(trainingWeekAuditResult.recomendaciones) && trainingWeekAuditResult.recomendaciones.length > 0 && (
-                              <ul className="text-[11px] text-[#334155] list-disc list-inside space-y-0.5 mt-1">
-                                {trainingWeekAuditResult.recomendaciones.map((rec, rIdx) => (
-                                  <li key={rIdx}>{rec}</li>
-                                ))}
-                              </ul>
-                            )}
+                            <div className="min-w-0 space-y-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs font-black uppercase tracking-wider text-indigo-950">
+                                  Dictamen de Auditoría de la Sesión (IA FLUX)
+                                </span>
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${
+                                  trainingDayAuditResult.estado === "aprobado"
+                                    ? "bg-emerald-100 text-emerald-800 border border-emerald-200/60"
+                                    : trainingDayAuditResult.estado === "critico"
+                                    ? "bg-rose-100 text-rose-800 border border-rose-200/60"
+                                    : "bg-amber-100 text-amber-800 border border-amber-200/60"
+                                }`}>
+                                  {trainingDayAuditResult.estado === "aprobado"
+                                    ? "Alineado"
+                                    : trainingDayAuditResult.estado === "critico"
+                                    ? "Alerta Biomecánica"
+                                    : "Con Observaciones"}
+                                </span>
+                                {trainingDayAuditResult.seriesEfectivasTotal != null && (
+                                  <span className="text-xs font-semibold text-[#475569]">
+                                    Total: <strong className="text-[#0B1929]">{trainingDayAuditResult.seriesEfectivasTotal} ser. ef.</strong>
+                                    {trainingDayAuditResult.seriesCalentamientoTotal > 0 ? ` (+${trainingDayAuditResult.seriesCalentamientoTotal} cal.)` : ""}
+                                    {trainingDayAuditResult.patronResumen ? ` · ${trainingDayAuditResult.patronResumen}` : ""}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-[#334155] leading-relaxed">
+                                {trainingDayAuditResult.dictamenGeneral}
+                              </p>
+                              {Array.isArray(trainingDayAuditResult.recomendaciones) && trainingDayAuditResult.recomendaciones.length > 0 && (
+                                <ul className="text-[11px] text-[#475569] list-disc list-inside mt-1 space-y-0.5">
+                                  {trainingDayAuditResult.recomendaciones.map((rec, rIdx) => (
+                                    <li key={rIdx}>{rec}</li>
+                                  ))}
+                                </ul>
+                              )}
+                            </div>
                           </div>
                           <button
                             type="button"
-                            onClick={() => setTrainingWeekAuditResult(null)}
-                            className="p-1 rounded-lg text-[#64748B] hover:text-[#0B1929] hover:bg-white/70 shrink-0 cursor-pointer"
+                            onClick={clearTrainingAudit}
+                            className="text-[#94A3B8] hover:text-[#0B1929] p-1 rounded-lg hover:bg-white/60 transition-colors cursor-pointer shrink-0 focus:outline-none"
                             title="Cerrar dictamen"
                           >
                             <X className="w-4 h-4" />
@@ -8928,6 +9051,12 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                     </div>
                                   </div>
                                 )}
+
+                                {/* EVALUACIÓN CLÍNICA / BIOMECÁNICA IA DEL EJERCICIO (ESPEJO DE NUTRICIÓN) */}
+                                {!isAlt && item._evaluacionClinica && renderClinicalEvalCard(item._evaluacionClinica, {
+                                  onDismiss: () => dismissExerciseAuditNote(exIdx),
+                                  className: `mt-2 ${indentPanelCls}`,
+                                })}
                               </>
                             );
                           };
