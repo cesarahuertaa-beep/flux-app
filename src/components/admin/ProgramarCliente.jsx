@@ -44,8 +44,6 @@ import {
   normalizeSupersetBlocks,
   computeSupersetMetadata,
   formatRestLabel,
-  calculateWeightFrom1RM,
-  computeDoubleProgressionSuggestion,
 } from "../../utils/routineHelpers";
 import { useBrand } from "../BrandContext";
 import { useBackButton } from "../../lib/backButtonHandler";
@@ -1377,7 +1375,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       rir_objetivo: alt.rir_objetivo || "",
       nota_tecnica: alt.nota_tecnica || "",
       _showOptions: false,
-      _showRmPicker: false,
       _historyApplied: false,
     };
   };
@@ -1440,7 +1437,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       nota_tecnica: x.nota_tecnica || "",
       bloque_grupo: x.bloque_grupo || null,
       _showOptions: false,
-      _showRmPicker: false,
       alternativas: (x.alternativas || []).map((alt) =>
         hydrateAltFormItem(alt, unit, numSeries, resolved.reps_sugeridas || x.reps_sugeridas || 10)
       ),
@@ -3793,7 +3789,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         const cleanAlt = { ...alt };
         delete cleanAlt.seriesForm;
         delete cleanAlt._showOptions;
-        delete cleanAlt._showRmPicker;
         delete cleanAlt._historyApplied;
         delete cleanAlt._dndId;
         return {
@@ -4107,7 +4102,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         biblioteca_id:ej.id, nombre:ej.nombre, grupo_muscular:ej.grupo_muscular, 
         tipo_movimiento: ej.tipo_movimiento || "",
         gif_url:ej.gif_url||"", num_series:4, reps_sugeridas:10, peso_sugerido:"", unidad:"kg", series_detalle:[], seriesForm:[], alternativas:[],
-        descanso_seg: "", rir_objetivo: "", nota_tecnica: "", bloque_grupo: null, _showOptions: false, _showRmPicker: false, _historyApplied: false
+        descanso_seg: "", rir_objetivo: "", nota_tecnica: "", bloque_grupo: null, _showOptions: false, _historyApplied: false
       }] }));
     } else {
       setRutinaForm(p => {
@@ -4130,7 +4125,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           rir_objetivo: "",
           nota_tecnica: "",
           _showOptions: false,
-          _showRmPicker: false,
           _historyApplied: false,
         };
         es[activeAltSlot] = { ...main, alternativas: [...(main.alternativas || []), newAlt] };
@@ -4277,10 +4271,10 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
   const toggleExerciseOptions = (i, altIdx = null) => setRutinaForm(p => {
     const es = [...p.ejercicios];
-    updateTargetItem(es, i, altIdx, (cur) => {
-      const nextOpen = !cur._showOptions;
-      return { ...cur, _showOptions: nextOpen, ...(nextOpen ? { _showRmPicker: false } : {}) };
-    });
+    updateTargetItem(es, i, altIdx, (cur) => ({
+      ...cur,
+      _showOptions: !cur._showOptions,
+    }));
     return { ...p, ejercicios: es };
   });
 
@@ -4327,62 +4321,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     );
     return { ...p, ejercicios: normalizeSupersetBlocks(es) };
   });
-
-  const toggleRmPicker = (i, altIdx = null) => setRutinaForm(p => {
-    const es = [...p.ejercicios];
-    updateTargetItem(es, i, altIdx, (cur) => {
-      const nextOpen = !cur._showRmPicker;
-      return { ...cur, _showRmPicker: nextOpen, ...(nextOpen ? { _showOptions: false } : {}) };
-    });
-    return { ...p, ejercicios: es };
-  });
-
-  const applyCalculatedLoadToExercise = (i, computeFn, altIdx = null) => setRutinaForm(p => {
-    const es = [...p.ejercicios];
-    updateTargetItem(es, i, altIdx, (cur) => {
-      const hMark = lookupExerciseHistory(patientHistoryMarks, cur);
-      const res = computeFn(cur, hMark);
-      if (!res) return cur;
-
-      const nextSeriesForm = Array.isArray(cur.seriesForm) && cur.seriesForm.length > 0
-        ? cur.seriesForm.map((sf) =>
-            normalizeSeriesType(sf.tipo) === "warmup"
-              ? sf
-              : { ...sf, peso: res.peso, reps: res.reps }
-          )
-        : cur.seriesForm;
-
-      return {
-        ...cur,
-        peso_sugerido: res.peso,
-        reps_sugeridas: res.reps,
-        seriesForm: nextSeriesForm,
-        _showRmPicker: false,
-      };
-    });
-    return { ...p, ejercicios: es };
-  });
-
-  const applyPercent1RMToExercise = (i, pct, altIdx = null) =>
-    applyCalculatedLoadToExercise(i, (cur, hMark) => {
-      if (!hMark?.best1RM) return null;
-      const calc = calculateWeightFrom1RM({
-        best1RMKg: hMark.best1RM,
-        targetPct: pct,
-        unit: cur.unidad || "kg",
-      });
-      return calc ? { peso: calc.pesoInput, reps: String(calc.estReps) } : null;
-    }, altIdx);
-
-  const applyDoubleProgressionToExercise = (i, altIdx = null) =>
-    applyCalculatedLoadToExercise(i, (cur, hMark) => {
-      const prog = computeDoubleProgressionSuggestion({
-        hMark,
-        targetReps: +cur.reps_sugeridas || 10,
-        unit: cur.unidad || "kg",
-      });
-      return prog ? { peso: prog.nextPesoInput, reps: prog.nextReps } : null;
-    }, altIdx);
 
   const getItemFirstWorkingTargets = (item) => {
     if (!item) return { reps: "", peso: "" };
@@ -4540,7 +4478,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       rir_objetivo: main.rir_objetivo || "",
       nota_tecnica: main.nota_tecnica || "",
       _showOptions: false,
-      _showRmPicker: false,
       _historyApplied: false,
     };
 
@@ -4570,7 +4507,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       rir_objetivo: targetAlt.rir_objetivo || "",
       nota_tecnica: targetAlt.nota_tecnica || "",
       _showOptions: false,
-      _showRmPicker: false,
       _historyApplied: false,
       alternativas: newAlts,
     };
@@ -8877,37 +8813,21 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                 <div className={`${indentSubbarCls} flex items-center justify-between flex-wrap gap-1.5`}>
                                   <div className="flex items-center flex-wrap gap-1.5">
                                     {hMark ? (
-                                      <>
-                                        {!item._historyApplied && !hasItemCompleteTargets(item) && (
-                                          <button
-                                            type="button"
-                                            onClick={() => applyHistoryMarksToExercise(exIdx, altIdx)}
-                                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold border transition-colors cursor-pointer bg-[var(--brand-secondary)] text-[var(--brand-primary)] border-[var(--brand-primary)]/35 hover:bg-[var(--brand-primary)] hover:text-white focus:outline-none"
-                                            title="Importar la mejor marca histórica registrada por este paciente en este ejercicio"
-                                          >
-                                            <Trophy className="w-3 h-3 shrink-0" />
-                                            <span>
-                                              {markSummaryLabel
-                                                ? `Marca: ${markSummaryLabel}`
-                                                : "Importar mejor marca"}
-                                            </span>
-                                          </button>
-                                        )}
-                                        {hMark.best1RM > 0 && (
-                                          <button
-                                            type="button"
-                                            onClick={() => toggleRmPicker(exIdx, altIdx)}
-                                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold border transition-colors cursor-pointer focus:outline-none ${
-                                              item._showRmPicker
-                                                ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)]"
-                                                : "bg-white text-[#475569] border-[#E2E8F0] hover:text-[var(--brand-primary)] hover:border-[var(--brand-primary)]/40"
-                                            }`}
-                                            title="Calcular carga por % de 1RM estimado o doble progresión"
-                                          >
-                                            <span>% 1RM · ~{convertWeightToInput(hMark.best1RM, u)} {u}</span>
-                                          </button>
-                                        )}
-                                      </>
+                                      !item._historyApplied && !hasItemCompleteTargets(item) && (
+                                        <button
+                                          type="button"
+                                          onClick={() => applyHistoryMarksToExercise(exIdx, altIdx)}
+                                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold border transition-colors cursor-pointer bg-[var(--brand-secondary)] text-[var(--brand-primary)] border-[var(--brand-primary)]/35 hover:bg-[var(--brand-primary)] hover:text-white focus:outline-none"
+                                          title="Importar la mejor marca histórica registrada por este paciente en este ejercicio"
+                                        >
+                                          <Trophy className="w-3 h-3 shrink-0" />
+                                          <span>
+                                            {markSummaryLabel
+                                              ? `Marca: ${markSummaryLabel}`
+                                              : "Importar mejor marca"}
+                                          </span>
+                                        </button>
+                                      )
                                     ) : !isAlt && !loadingPatientHistory && !hasItemCompleteTargets(item) ? (
                                       <span className="text-[10px] text-[#94A3B8] font-normal">Sin marcas previas</span>
                                     ) : null}
@@ -8966,51 +8886,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                     )}
                                   </div>
                                 </div>
-
-                                {/* PANEL %1RM & DOBLE PROGRESIÓN (GRID SIMÉTRICO, SIN SALTOS HUÉRFANOS) */}
-                                {item._showRmPicker && hMark?.best1RM > 0 && (() => {
-                                  const progSug = computeDoubleProgressionSuggestion({
-                                    hMark,
-                                    targetReps: +item.reps_sugeridas || +parentFallback?.reps_sugeridas || 10,
-                                    unit: u,
-                                  });
-                                  return (
-                                    <div className={`mt-2 ${indentPanelCls} p-2.5 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] space-y-2`}>
-                                      <div className="flex items-center justify-between gap-2 flex-wrap">
-                                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#6B7A8D]">
-                                          Carga por % de 1RM (~{convertWeightToInput(hMark.best1RM, u)} {u})
-                                        </span>
-                                        {progSug && (
-                                          <button
-                                            type="button"
-                                            onClick={() => applyDoubleProgressionToExercise(exIdx, altIdx)}
-                                            className="px-2.5 py-0.5 rounded-lg bg-[var(--brand-secondary)] text-[var(--brand-primary)] border border-[var(--brand-primary)]/30 hover:bg-[var(--brand-primary)] hover:text-white text-[10px] font-bold cursor-pointer transition-colors"
-                                            title="Aplicar sugerencia de doble progresión"
-                                          >
-                                            Progresión: {progSug.label}
-                                          </button>
-                                        )}
-                                      </div>
-                                      <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
-                                        {[65, 70, 75, 80, 85, 90].map((pctVal) => {
-                                          const calc = calculateWeightFrom1RM({ best1RMKg: hMark.best1RM, targetPct: pctVal, unit: u });
-                                          return (
-                                            <button
-                                              key={pctVal}
-                                              type="button"
-                                              onClick={() => applyPercent1RMToExercise(exIdx, pctVal, altIdx)}
-                                              className="px-2 py-1.5 rounded-lg bg-white border border-[#E2E8F0] hover:border-[var(--brand-primary)] hover:bg-[var(--brand-secondary)]/35 text-center cursor-pointer transition-colors"
-                                              title={calc ? `${pctVal}% ≈ ${calc.pesoInput} ${u} × ~${calc.estReps} reps` : ""}
-                                            >
-                                              <div className="text-[11px] font-extrabold text-[var(--brand-primary)] leading-tight">{pctVal}%</div>
-                                              <div className="text-[10px] font-mono font-semibold text-[#475569] leading-tight mt-0.5">{calc?.pesoInput} {u}</div>
-                                            </button>
-                                          );
-                                        })}
-                                      </div>
-                                    </div>
-                                  );
-                                })()}
 
                                 {/* OPCIONALES: DESCANSO, RIR Y NOTA TÉCNICA */}
                                 {item._showOptions && (
