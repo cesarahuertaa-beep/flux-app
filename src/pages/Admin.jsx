@@ -5,7 +5,7 @@ import {
   Search, Plus, Activity, Edit2, MessageCircle, AlertCircle, X, ShoppingBag, CreditCard, Banknote 
 , UserCheck, Dumbbell, BarChart2, User, CheckCircle2, UtensilsCrossed, Camera, Trash2, Check,
   Clock, Sparkles, ChevronDown,
-  Mail, Phone, Target, ClipboardList, Footprints
+  Mail, Phone, Target, ClipboardList, Footprints, Bookmark
 } from "lucide-react";
 import { AppLayout } from "../components/ui/AppLayout";
 import BloqueadoNutriologo from "../components/BloqueadoNutriologo";
@@ -24,6 +24,7 @@ import { lazyWithRetry as lazyRetry } from "../lib/chunkRecovery";
 
 const Biblioteca = lazyRetry(() => import("../components/admin/Biblioteca").then((m) => ({ default: m.Biblioteca })));
 const ProgramarCliente = lazyRetry(() => import("../components/admin/ProgramarCliente").then((m) => ({ default: m.ProgramarCliente })));
+const MisPlantillas = lazyRetry(() => import("../components/admin/MisPlantillas").then((m) => ({ default: m.MisPlantillas })));
 const MiMembresiaCivil = lazyRetry(() => import("../components/admin/MiMembresiaCivil"));
 const GestionEquipo = lazyRetry(() => import("../components/admin/GestionEquipo").then((m) => ({ default: m.GestionEquipo })));
 const AgendaAdmin = lazyRetry(() => import("../components/admin/AgendaAdmin").then((m) => ({ default: m.AgendaAdmin })));
@@ -1244,6 +1245,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
   const STAFF_ALL_CATALOG_ITEMS = [
     { id:"clientes",         label:"Directorio",          icon: <Users size={18} strokeWidth={1.5} /> },
     { id:"agenda",           label:"Agenda",              icon: <CalendarDays size={18} strokeWidth={1.5} /> },
+    { id:"plantillas",       label:"Mis Plantillas",      icon: <Bookmark size={18} strokeWidth={1.5} /> },
     { id:"equipo",           label:"Mi Equipo",           icon: <UsersRound size={18} strokeWidth={1.5} /> },
     { id:"aprobaciones",     label:"Aprobaciones",        icon: <UserCheck size={18} strokeWidth={1.5} /> },
     { id:"biblioteca",       label:"Biblioteca",          icon: <Folder size={18} strokeWidth={1.5} /> },
@@ -1267,6 +1269,9 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
   : role ==="staff"
     ? [
         ...STAFF_ALL_CATALOG_ITEMS.filter(item => {
+          if (item.id === "plantillas") {
+            return staffModules.includes("plantillas") || staffModules.includes("clientes");
+          }
           if (!staffModules.includes(item.id)) return false;
           if (item.id === "nutricion") return personalServices.nutricion;
           if (item.id === "entrenamiento") return personalServices.entrenamiento;
@@ -1283,6 +1288,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       : [
           { id:"clientes",   label: isSuperadmin ?"Directorio" :"Clientes",   icon: <Users size={18} strokeWidth={1.5} /> },
           { id:"agenda",     label:"Agenda",     icon: <CalendarDays size={18} strokeWidth={1.5} /> },
+          { id:"plantillas", label:"Mis Plantillas", icon: <Bookmark size={18} strokeWidth={1.5} /> },
           { id:"equipo",     label:"Mi Equipo",  icon: <UsersRound size={18} strokeWidth={1.5} /> },
           ...(!isSuperadmin ? [
             { id:"membresia",  label:"Membresía",  icon: <CreditCard size={18} strokeWidth={1.5} /> }
@@ -1753,6 +1759,20 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
           <Suspense fallback={<div className="p-6 md:p-8 max-w-5xl w-full mx-auto"><ListSkeleton rows={4} /></div>}>
             <Biblioteca biblioteca={biblioteca} onUpdate={loadBiblioteca} setMsg={setMsg} isSuperadmin={true}/>
           </Suspense>
+        </div>
+      )}
+
+      {!isCivil && role !== "administrativo" && (role !== "staff" || staffModules.includes("plantillas") || staffModules.includes("clientes")) && (tab === "plantillas" || visitedTabs.has("plantillas")) && (
+        <div className={tab === "plantillas" ? "flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
+          <div className="w-full max-w-7xl mx-auto md:p-6 flex-1 flex flex-col">
+            <Suspense fallback={<div className="p-6 md:p-8 max-w-5xl w-full mx-auto"><ListSkeleton rows={4} /></div>}>
+              <MisPlantillas
+                biblioteca={biblioteca}
+                profileId={myId}
+                setMsg={setMsg}
+              />
+            </Suspense>
+          </div>
         </div>
       )}
       

@@ -64,6 +64,13 @@ import NuevoExpedienteForms from "../clinical/NuevoExpedienteForms";
 import ClinicalAiSummaryCard from "../clinical/ClinicalAiSummaryCard";
 import ProgresoHistoricoModal from "./ProgresoHistoricoModal";
 import UpgradeModal from "../ui/UpgradeModal";
+import {
+  resolvePlantillasCreatorId,
+  serializeDiaForTemplate,
+  serializeRutinaForTemplate,
+  stripWeightsFromTemplateExercise,
+  upsertUserTemplate,
+} from "../../lib/plantillasStore";
 
 const sanitizeWhatsAppPhone = (phone) => {
   if (!phone) return "";
@@ -149,61 +156,126 @@ const parseCycleData = (cycle, fallbackServicios = { nutricion: true, entrenamie
   return { nombreBase, semanas, dias, servicios, enfoque };
 };
 
-export function ProgramarCliente({ clientes, selected, setSelected, onBackToList, setMsg, biblioteca, isMiPlan, profileId }) {
+export function ProgramarCliente({ clientes, selected, setSelected, onBackToList, setMsg, biblioteca, isMiPlan, profileId, templateWorkspace = null }) {
   const brand = useBrand();
+  const isTemplateMode = Boolean(templateWorkspace);
+  const templateType = templateWorkspace?.type || "nutri";
   const catalogRef = useRef(null);
+  const [tplMeta, setTplMeta] = useState(() => ({
+    id: templateWorkspace?.template?.id || "",
+    nombre: templateWorkspace?.template?.nombre || "",
+    tags: templateWorkspace?.template?.tags || "",
+    semanas: Number(templateWorkspace?.template?.semanas) || 4,
+    smaeDistribution:
+      templateWorkspace?.template?.smaeDistribution ||
+      templateWorkspace?.template?.macros?.smaeDistribution ||
+      {},
+  }));
   const [subtab, setSubtab] = useState(() => {
+    if (templateWorkspace) {
+      return templateWorkspace.type === "rutina" ? "deporte" : "nutri";
+    }
     const s = sessionStorage.getItem("flux_programar_subtab");
     return s ? s : "progreso";
   });
 
   useEffect(() => {
+    if (isTemplateMode) return;
     if (subtab) sessionStorage.setItem("flux_programar_subtab", subtab);
-  }, [subtab]);
+  }, [subtab, isTemplateMode]);
 
   const [searchProg, setSearchProg] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(null);
 
-  const _peekCiclos = selected?.id ? dbPeek(`ciclos?cliente_id=eq.${selected.id}&order=created_at.desc`) : null;
+  const _peekCiclos = !isTemplateMode && selected?.id ? dbPeek(`ciclos?cliente_id=eq.${selected.id}&order=created_at.desc`) : null;
   const _peekActiveCiclo = Array.isArray(_peekCiclos) ? (_peekCiclos.find(c => c.activo) || _peekCiclos[0] || null) : null;
   const _peekFilter = _peekActiveCiclo ? `ciclo_id=eq.${_peekActiveCiclo.id}` : `ciclo_id=is.null`;
-  const _peekNs = selected?.id ? dbPeek(`nutricion?cliente_id=eq.${selected.id}&${_peekFilter}`) : null;
+  const _peekNs = !isTemplateMode && selected?.id ? dbPeek(`nutricion?cliente_id=eq.${selected.id}&${_peekFilter}`) : null;
   const _peekNutri = Array.isArray(_peekNs) && _peekNs.length ? _peekNs[0] : null;
-  const _peekDs = _peekNutri ? dbPeek(`nutricion_dias?nutricion_id=eq.${_peekNutri.id}&select=*,comidas(*)&order=orden.asc`) : null;
-  const _peekRs = selected?.id ? dbPeek(`rutinas?cliente_id=eq.${selected.id}&${_peekFilter}&select=*,ejercicios(*)&order=orden.asc`) : null;
+  const _peekDs = !isTemplateMode && _peekNutri ? dbPeek(`nutricion_dias?nutricion_id=eq.${_peekNutri.id}&select=*,comidas(*)&order=orden.asc`) : null;
+  const _peekRs = !isTemplateMode && selected?.id ? dbPeek(`rutinas?cliente_id=eq.${selected.id}&${_peekFilter}&select=*,ejercicios(*)&order=orden.asc`) : null;
 
   // ── Ciclos ──
-  const [ciclos, setCiclos] = useState(() => Array.isArray(_peekCiclos) ? _peekCiclos : []);
-  const [cicloSel, setCicloSel] = useState(() => _peekActiveCiclo);
-  const isReadOnly = Boolean(cicloSel && !cicloSel.activo);
+  const [ciclos, setCiclos] = useState(() => (!isTemplateMode && Array.isArray(_peekCiclos)) ? _peekCiclos : []);
+  const [cicloSel, setCicloSel] = useState(() => (!isTemplateMode ? _peekActiveCiclo : null));
+  const isReadOnly = isTemplateMode ? false : Boolean(cicloSel && !cicloSel.activo);
   const [showPastCycles, setShowPastCycles] = useState(false);
   useEffect(() => { 
+    if (isTemplateMode) return;
     if (cicloSel && !cicloSel.activo) setShowPastCycles(true); 
     if (cicloSel && selected?.id) sessionStorage.setItem(`flux_programar_ciclo_${selected.id}`, cicloSel.id);
-  }, [cicloSel, selected?.id]); // ciclo seleccionado para ver/editar
+  }, [cicloSel, selected?.id, isTemplateMode]); // ciclo seleccionado para ver/editar
 
   // ── Datos del ciclo seleccionado ──
-  const [nutri, setNutri] = useState(() => _peekNutri);
-  const [dias, setDias] = useState(() =>
-    Array.isArray(_peekDs)
+  const [nutri, setNutri] = useState(() => (!isTemplateMode ? _peekNutri : null));
+  const [dias, setDias] = useState(() => {
+    if (isTemplateMode) {
+      const seed = Date.now();
+      return (templateWorkspace?.template?.dias || []).map((d, dIdx) => ({
+        ...d,
+        id: d.id || `tpl_dia_${seed}_${dIdx}`,
+        dia: d.dia || `Día ${dIdx + 1}`,
+        orden: d.orden ?? dIdx,
+        comidas: (d.comidas || []).map((c, cIdx) => {
+          const opts = Array.isArray(c.opciones) && c.opciones.length > 0 ? c.opciones : parseMealOptions(c);
+          const { opcion1, opcion2 } = formatMealOptionsKeepSmae(opts, c);
+          return {
+            ...c,
+            id: c.id || `tpl_com_${seed}_${dIdx}_${cIdx}`,
+            hora: c.hora || "",
+            nombre: c.nombre || `Comida ${cIdx + 1}`,
+            opcion1: opcion1 || c.opcion1 || "",
+            opcion2: opcion2 || c.opcion2 || "",
+            opciones: opts,
+            orden: c.orden ?? cIdx,
+          };
+        }),
+      }));
+    }
+    return Array.isArray(_peekDs)
       ? _peekDs.map(d => ({ ...d, comidas: (d.comidas || []).sort((a,b) => a.orden - b.orden) }))
-      : []
-  );
-  const [rutinas, setRutinas] = useState(() =>
-    Array.isArray(_peekRs)
+      : [];
+  });
+  const [rutinas, setRutinas] = useState(() => {
+    if (isTemplateMode) {
+      const seed = Date.now();
+      const tplWeeks = Number(templateWorkspace?.template?.semanas) || 4;
+      return (templateWorkspace?.template?.rutinas || []).map((r, rIdx) => ({
+        ...r,
+        id: r.id || `tpl_rut_${seed}_${rIdx}`,
+        nombre: r.nombre || `Rutina ${rIdx + 1}`,
+        semanas: Number(r.semanas) || tplWeeks,
+        orden: r.orden ?? rIdx,
+        ejercicios: (r.ejercicios || []).map((e, eIdx) => ({
+          ...e,
+          id: e.id || `tpl_ej_${seed}_${rIdx}_${eIdx}`,
+          orden: e.orden ?? eIdx,
+        })),
+      }));
+    }
+    return Array.isArray(_peekRs)
       ? _peekRs.map(r => ({ ...r, ejercicios: (r.ejercicios || []).sort((a,b) => a.orden - b.orden) }))
-      : []
-  );
+      : [];
+  });
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const savingRutinaRef = useRef(false);
   const savingDiaRef = useRef(false);
-  const [macros, setMacros] = useState(() => ({
-    calorias: _peekNutri?.calorias || "",
-    proteina: _peekNutri?.proteina || "",
-    carbohidratos: _peekNutri?.carbohidratos || "",
-    grasas: _peekNutri?.grasas || ""
-  }));
+  const [macros, setMacros] = useState(() => (
+    isTemplateMode
+      ? {
+          calorias: templateWorkspace?.template?.macros?.calorias ?? "",
+          proteina: templateWorkspace?.template?.macros?.proteina ?? "",
+          carbohidratos: templateWorkspace?.template?.macros?.carbohidratos ?? "",
+          grasas: templateWorkspace?.template?.macros?.grasas ?? "",
+        }
+      : {
+          calorias: _peekNutri?.calorias || "",
+          proteina: _peekNutri?.proteina || "",
+          carbohidratos: _peekNutri?.carbohidratos || "",
+          grasas: _peekNutri?.grasas || ""
+        }
+  ));
   const [showPlanModal, setShowPlanModal] = useState(false);
   const [planModalMode, setPlanModalMode] = useState("create"); // "create" | "edit"
   const [editingCycle, setEditingCycle] = useState(null);
@@ -710,22 +782,197 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   const [rutinaForm, setRutinaForm] = useState({ nombre:"", ejercicios:[] });
   const [activeAltSlot, setActiveAltSlot] = useState(null);
   const [templateModal, setTemplateModal] = useState(null); // 'nutri' | 'rutina' | null
+  const [activeTemplateEditor, setActiveTemplateEditor] = useState(null); // { type: 'nutri' | 'rutina', template }
+  const [tplSmaeExpanded, setTplSmaeExpanded] = useState(() => {
+    const dist = templateWorkspace?.template?.smaeDistribution || templateWorkspace?.template?.macros?.smaeDistribution || {};
+    return Object.values(dist).some((v) => Number(v) > 0);
+  });
+  const tplSyncTimerRef = useRef(null);
+  const pendingTemplateSnapshotRef = useRef(null);
+
+  const buildTemplateSnapshot = useCallback((overrides = {}) => {
+    if (!isTemplateMode) return null;
+    const mergedMeta = overrides.meta ?? tplMeta;
+    const mergedMacros = overrides.macros ?? macros;
+    const mergedDias = overrides.dias ?? dias;
+    const mergedRutinas = overrides.rutinas ?? rutinas;
+    const baseTpl = templateWorkspace?.template || {};
+    const smaeMapClean = {};
+    Object.entries(mergedMeta?.smaeDistribution || {}).forEach(([k, v]) => {
+      const n = Number(v) || 0;
+      if (n > 0) smaeMapClean[k] = n;
+    });
+    return {
+      ...baseTpl,
+      id: mergedMeta?.id || baseTpl.id,
+      type: templateType,
+      nombre: mergedMeta?.nombre ?? baseTpl.nombre ?? "",
+      tags: mergedMeta?.tags ?? baseTpl.tags ?? "",
+      semanas: Number(mergedMeta?.semanas) || 4,
+      smaeDistribution: smaeMapClean,
+      ...(templateType === "nutri"
+        ? {
+            macros: {
+              calorias: Number(mergedMacros?.calorias) || 0,
+              proteina: Number(mergedMacros?.proteina) || 0,
+              carbohidratos: Number(mergedMacros?.carbohidratos) || 0,
+              grasas: Number(mergedMacros?.grasas) || 0,
+              ...(Object.keys(smaeMapClean).length > 0 ? { smaeDistribution: smaeMapClean } : {}),
+            },
+            dias: (mergedDias || []).map((d, dIdx) => serializeDiaForTemplate(d, dIdx)),
+          }
+        : {
+            rutinas: (mergedRutinas || []).map((r, rIdx) =>
+              serializeRutinaForTemplate(r, rIdx, Number(mergedMeta?.semanas) || 4)
+            ),
+          }),
+    };
+  }, [isTemplateMode, templateType, templateWorkspace?.template, tplMeta, macros, dias, rutinas]);
+
+  const syncTemplateSnapshot = useCallback((overrides = {}, { debounce = false } = {}) => {
+    if (!isTemplateMode || !templateWorkspace?.onChangeTemplate) return;
+    const snapshot = buildTemplateSnapshot(overrides);
+    if (!snapshot) return;
+    if (debounce) {
+      pendingTemplateSnapshotRef.current = snapshot;
+      if (tplSyncTimerRef.current) clearTimeout(tplSyncTimerRef.current);
+      tplSyncTimerRef.current = setTimeout(() => {
+        const pending = pendingTemplateSnapshotRef.current;
+        pendingTemplateSnapshotRef.current = null;
+        if (pending) templateWorkspace.onChangeTemplate(pending);
+      }, 450);
+    } else {
+      if (tplSyncTimerRef.current) clearTimeout(tplSyncTimerRef.current);
+      pendingTemplateSnapshotRef.current = null;
+      templateWorkspace.onChangeTemplate(snapshot);
+    }
+  }, [isTemplateMode, templateWorkspace, buildTemplateSnapshot]);
+
+  const flushTemplateSync = useCallback(() => {
+    if (!isTemplateMode || !templateWorkspace?.onChangeTemplate) return;
+    if (tplSyncTimerRef.current) {
+      clearTimeout(tplSyncTimerRef.current);
+      tplSyncTimerRef.current = null;
+    }
+    const pending = pendingTemplateSnapshotRef.current;
+    pendingTemplateSnapshotRef.current = null;
+    if (pending) {
+      templateWorkspace.onChangeTemplate(pending);
+    }
+  }, [isTemplateMode, templateWorkspace]);
+
+  useEffect(() => {
+    return () => {
+      if (tplSyncTimerRef.current) {
+        clearTimeout(tplSyncTimerRef.current);
+        tplSyncTimerRef.current = null;
+      }
+      if (pendingTemplateSnapshotRef.current && templateWorkspace?.onChangeTemplate) {
+        const pending = pendingTemplateSnapshotRef.current;
+        pendingTemplateSnapshotRef.current = null;
+        templateWorkspace.onChangeTemplate(pending);
+      }
+    };
+  }, [templateWorkspace]);
+
+  const tplCurKcal = Number(macros.calorias) || 0;
+  const tplCurP = Number(macros.proteina) || 0;
+  const tplCurC = Number(macros.carbohidratos) || 0;
+  const tplCurG = Number(macros.grasas) || 0;
+  const tplCalcKcalFromMacros = Math.round(tplCurP * 4 + tplCurC * 4 + tplCurG * 9);
+  const tplPPct = tplCalcKcalFromMacros > 0 ? Math.round(((tplCurP * 4) / tplCalcKcalFromMacros) * 100) : 0;
+  const tplCPct = tplCalcKcalFromMacros > 0 ? Math.round(((tplCurC * 4) / tplCalcKcalFromMacros) * 100) : 0;
+  const tplGPct = tplCalcKcalFromMacros > 0 ? Math.round(((tplCurG * 9) / tplCalcKcalFromMacros) * 100) : 0;
+  const tplSmaeMap = tplMeta.smaeDistribution || {};
+  const tplSmaeTotals = isTemplateMode && templateType === "nutri" ? calculateSmaeTotals(tplSmaeMap) : { totalEquivalentes: 0, kcal: 0, proteina: 0, carbohidratos: 0, grasas: 0 };
+
+  const applyManualTplPreset = (pShare, cShare, gShare) => {
+    const baseKcal = tplCurKcal > 0 ? tplCurKcal : 2000;
+    const nextMacros = {
+      calorias: baseKcal,
+      proteina: Math.round((baseKcal * pShare) / 4),
+      carbohidratos: Math.round((baseKcal * cShare) / 4),
+      grasas: Math.round((baseKcal * gShare) / 9),
+    };
+    setMacros(nextMacros);
+    syncTemplateSnapshot({ macros: nextMacros });
+  };
+
+  const updateTplMacroField = (field, rawVal) => {
+    const cleanVal = rawVal === "" ? "" : Math.max(0, Math.round(Number(rawVal) || 0));
+    const nextMacros = { ...macros, [field]: cleanVal };
+    if (field !== "calorias") {
+      const p = Number(field === "proteina" ? cleanVal : nextMacros.proteina) || 0;
+      const c = Number(field === "carbohidratos" ? cleanVal : nextMacros.carbohidratos) || 0;
+      const g = Number(field === "grasas" ? cleanVal : nextMacros.grasas) || 0;
+      const sum = Math.round(p * 4 + c * 4 + g * 9);
+      if (sum > 0 && (!tplCurKcal || tplCurKcal === tplCalcKcalFromMacros)) {
+        nextMacros.calorias = sum;
+      }
+    }
+    setMacros(nextMacros);
+    syncTemplateSnapshot({ macros: nextMacros }, { debounce: true });
+  };
+
+  const updateTplSmaeQty = (groupId, delta) => {
+    const prevQty = Number(tplSmaeMap[groupId]) || 0;
+    const nextQty = Math.max(0, Math.round((prevQty + delta) * 2) / 2);
+    const nextDist = { ...tplSmaeMap, [groupId]: nextQty };
+    if (nextQty <= 0) delete nextDist[groupId];
+    const nextMeta = { ...tplMeta, smaeDistribution: nextDist };
+    setTplMeta(nextMeta);
+    syncTemplateSnapshot({ meta: nextMeta });
+  };
+
+  const handleAutoDistributeTplSmae = () => {
+    const targetK = tplCurKcal > 0 ? tplCurKcal : (tplCalcKcalFromMacros > 0 ? tplCalcKcalFromMacros : 2000);
+    const targetP = tplCurP > 0 ? tplCurP : Math.round((targetK * 0.3) / 4);
+    const targetC = tplCurC > 0 ? tplCurC : Math.round((targetK * 0.4) / 4);
+    const targetG = tplCurG > 0 ? tplCurG : Math.round((targetK * 0.3) / 9);
+    const nextMacros = tplCurKcal > 0 ? macros : { calorias: targetK, proteina: targetP, carbohidratos: targetC, grasas: targetG };
+    const dist = autoDistributeSmaeFromMacros({
+      calorias: targetK,
+      proteina: targetP,
+      carbohidratos: targetC,
+      grasas: targetG,
+    });
+    const nextMeta = { ...tplMeta, smaeDistribution: dist };
+    if (tplCurKcal <= 0) setMacros(nextMacros);
+    setTplMeta(nextMeta);
+    setTplSmaeExpanded(true);
+    syncTemplateSnapshot({ meta: nextMeta, macros: nextMacros });
+  };
+
+  const handleSyncMacrosFromSmae = () => {
+    if (tplSmaeTotals.kcal <= 0) return;
+    const nextMacros = {
+      calorias: Math.round(tplSmaeTotals.kcal),
+      proteina: Math.round(tplSmaeTotals.proteina),
+      carbohidratos: Math.round(tplSmaeTotals.carbohidratos),
+      grasas: Math.round(tplSmaeTotals.grasas),
+    };
+    setMacros(nextMacros);
+    syncTemplateSnapshot({ macros: nextMacros });
+  };
+
   const [showMacroCalc, setShowMacroCalc] = useState(false);
   const [showExpediente, setShowExpediente] = useState(false);
   const [metaPrescritaCollapsed, setMetaPrescritaCollapsed] = useState(true);
   const [metaEntrenoCollapsed, setMetaEntrenoCollapsed] = useState(true);
   const [allMetricas, setAllMetricas] = useState(() => {
+    if (isTemplateMode) return [];
     const ms = selected?.id ? dbPeek(`metricas_progreso?cliente_id=eq.${selected.id}&order=fecha.desc`) : null;
     return Array.isArray(ms) ? ms.map(enrichMetrica) : [];
   });
   const [latestMetrica, setLatestMetrica] = useState(() => {
+    if (isTemplateMode) return null;
     const ms = selected?.id ? dbPeek(`metricas_progreso?cliente_id=eq.${selected.id}&order=fecha.desc`) : null;
     return Array.isArray(ms) && ms.length > 0 ? enrichMetrica(ms[0]) : null;
   });
-  const [clinicalLoaded, setClinicalLoaded] = useState(false);
+  const [clinicalLoaded, setClinicalLoaded] = useState(() => isTemplateMode);
   const [skipExpedienteForNow, setSkipExpedienteForNow] = useState(false);
   const [clinicalRec, setClinicalRec] = useState(() => {
-    return selected?.id ? peekClinicalRecord(selected.id) : null;
+    return !isTemplateMode && selected?.id ? peekClinicalRecord(selected.id) : null;
   });
 
   const biblioMap = useMemo(() => {
@@ -784,6 +1031,9 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   }, [allMetricas, ciclos, cicloSel?.id]);
 
   const smartPrescription = useMemo(() => {
+    if (isTemplateMode || !selected) {
+      return { hasEvaluation: false, targetKcal: 0, proteinG: 0, carbsG: 0, fatsG: 0 };
+    }
     return generateSmartMacroPrescription({
       cliente: selected,
       metrica: cycleMetrica || latestMetrica,
@@ -791,9 +1041,12 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       ciclo: cicloSel,
       cicloNombre: cicloSel?.nombre || "",
     });
-  }, [selected, cycleMetrica, latestMetrica, clinicalRec, cicloSel]);
+  }, [isTemplateMode, selected, cycleMetrica, latestMetrica, clinicalRec, cicloSel]);
 
   const smartTrainingPrescription = useMemo(() => {
+    if (isTemplateMode || !selected) {
+      return { hasEvaluation: false };
+    }
     return generateSmartTrainingPrescription({
       cliente: selected,
       metrica: cycleMetrica,
@@ -803,7 +1056,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       smartPrescription,
       isMiPlan,
     });
-  }, [selected, cycleMetrica, clinicalRec, cicloSel, smartPrescription, isMiPlan]);
+  }, [isTemplateMode, selected, cycleMetrica, clinicalRec, cicloSel, smartPrescription, isMiPlan]);
 
   // ── Síntesis secundaria automática y 100% silenciosa en segundo plano (Dieta y Rutina exclusivas por dominio) ──
   const triedDualHashesRef = useRef(new Set());
@@ -1014,7 +1267,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   // Sincronización automática inicial de macros cuando el plan aún no tiene calorías prescritas
   // (respeta los ajustes personalizados hechos desde el Simulador de Macros o Plantillas)
   useEffect(() => {
-    if (!selected?.id || isReadOnly || !smartPrescription?.targetKcal || !cycleMetrica) return;
+    if (isTemplateMode || !selected?.id || isReadOnly || !smartPrescription?.targetKcal || !cycleMetrica) return;
     const sKcal = Number(smartPrescription.targetKcal) || 0;
     const sP = Number(smartPrescription.proteinG) || 0;
     const sC = Number(smartPrescription.carbsG) || 0;
@@ -1048,26 +1301,42 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         }
       }).catch(() => {});
     }
-  }, [selected?.id, cicloSel?.id, smartPrescription?.targetKcal, smartPrescription?.proteinG, smartPrescription?.carbsG, smartPrescription?.fatsG, isReadOnly, cycleMetrica, macros.calorias]);
+  }, [isTemplateMode, selected?.id, cicloSel?.id, smartPrescription?.targetKcal, smartPrescription?.proteinG, smartPrescription?.carbsG, smartPrescription?.fatsG, isReadOnly, cycleMetrica, macros.calorias]);
 
   const parsedActiveCycle = useMemo(() => {
+    if (isTemplateMode) {
+      return {
+        servicios: {
+          nutricion: templateType === "nutri",
+          entrenamiento: templateType === "rutina",
+        },
+        semanas: Number(tplMeta.semanas) || 4,
+        dias: (Number(tplMeta.semanas) || 4) * 7,
+        enfoque: tplMeta.nombre || "",
+      };
+    }
     return parseCycleData(cicloSel, clinicalRec?.servicios_activos);
-  }, [cicloSel, clinicalRec?.servicios_activos]);
+  }, [isTemplateMode, templateType, tplMeta.semanas, tplMeta.nombre, cicloSel, clinicalRec?.servicios_activos]);
 
   const serviciosActivos = parsedActiveCycle.servicios;
 
   // Reorientar subtab si el servicio seleccionado fue desactivado
   useEffect(() => {
+    if (isTemplateMode) {
+      const desired = templateType === "rutina" ? "deporte" : "nutri";
+      if (subtab !== desired) setSubtab(desired);
+      return;
+    }
     if (!serviciosActivos.nutricion && subtab === "nutri") {
       setSubtab(serviciosActivos.entrenamiento ? "deporte" : "progreso");
     } else if (!serviciosActivos.entrenamiento && subtab === "deporte") {
       setSubtab(serviciosActivos.nutricion ? "nutri" : "progreso");
     }
-  }, [serviciosActivos.nutricion, serviciosActivos.entrenamiento, subtab]);
+  }, [isTemplateMode, templateType, serviciosActivos.nutricion, serviciosActivos.entrenamiento, subtab]);
 
   const ORDINALES = ["Primer","Segundo","Tercer","Cuarto","Quinto","Sexto","Séptimo","Octavo","Noveno","Décimo"];
 
-  const isEstandar = localStorage.getItem("flux_role") === "civil" && selected && !selected.nutriologo_id && selected.plan_tipo !== 'premium' && selected.objetivo !== 'Mi entrenamiento personal';
+  const isEstandar = !isTemplateMode && localStorage.getItem("flux_role") === "civil" && selected && !selected.nutriologo_id && selected.plan_tipo !== 'premium' && selected.objetivo !== 'Mi entrenamiento personal';
 
   // ── Historial para Plantillas ──
   const [historialRutinas, setHistorialRutinas] = useState([]);
@@ -1091,6 +1360,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   }, 50);
   useBackButton(showHistorico, () => setShowHistorico(false), 30);
   useBackButton(showExpediente, () => setShowExpediente(false), 25);
+  useBackButton(Boolean(activeTemplateEditor), () => setActiveTemplateEditor(null), 45);
   useBackButton(!!templateModal, () => setTemplateModal(null), 40);
   useBackButton(!!showDiaModal, () => {
     if (photoCatalogModal) setPhotoCatalogModal(null);
@@ -1450,7 +1720,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   };
 
   const loadHistorial = useCallback(async ({ force = false } = {}) => {
-    if (!clientes || clientes.length === 0) return;
+    if (isTemplateMode || !clientes || clientes.length === 0) return;
     if (historialLoadedRef.current && !force) return;
     const ownClientes = activeSpecialistId
       ? clientes.filter((c) => String(c.nutriologo_id) === String(activeSpecialistId))
@@ -1614,7 +1884,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
   // ── Cargar ciclos del cliente ──
   const loadCiclos = useCallback(async (preferCycleId = null, opts = {}) => {
-    if (!selected) return null;
+    if (isTemplateMode || !selected) return null;
     const { forceFresh = false } = opts;
     try {
       const fetchFn = forceFresh ? dbGetFresh : dbGet;
@@ -1678,7 +1948,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
   // ── Cargar datos del ciclo seleccionado ──
   const loadData = useCallback(async (targetCiclo = cicloSel, opts = {}) => {
-    if (!selected?.id) return;
+    if (isTemplateMode || !selected?.id) return;
     const { silent = false, forceFresh = false } = opts;
     const currentCiclo = targetCiclo !== undefined ? targetCiclo : cicloSel;
     const cycleKey = `${selected.id}_${currentCiclo?.id || "null"}`;
@@ -1794,22 +2064,28 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
   const pendingCacheReloadRef = useRef(false);
 
-  useEffect(() => { loadCiclos(); }, [loadCiclos]);
   useEffect(() => {
+    if (isTemplateMode) return;
+    loadCiclos();
+  }, [loadCiclos, isTemplateMode]);
+  useEffect(() => {
+    if (isTemplateMode) return;
     if (cicloSel !== undefined && !savingDiaRef.current && !savingRutinaRef.current) {
       loadData();
     }
-  }, [loadData]);
+  }, [loadData, isTemplateMode]);
 
   useEffect(() => {
+    if (isTemplateMode) return;
     if (!saving && !showDiaModal && !showRutinaModal && !showPlanModal && !savingRutinaRef.current && !savingDiaRef.current && pendingCacheReloadRef.current) {
       pendingCacheReloadRef.current = false;
       loadCiclos(cicloSel?.id || null, { forceFresh: true });
       if (cicloSel !== undefined) loadData(cicloSel, { silent: true, forceFresh: true });
     }
-  }, [saving, showDiaModal, showRutinaModal, showPlanModal, loadCiclos, loadData, cicloSel]);
+  }, [saving, showDiaModal, showRutinaModal, showPlanModal, loadCiclos, loadData, cicloSel, isTemplateMode]);
 
   useEffect(() => {
+    if (isTemplateMode) return;
     let timer = null;
     const onCacheUpdated = (ev) => {
       const table = ev?.detail?.table;
@@ -1834,7 +2110,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       window.removeEventListener("flux:cache-updated", onCacheUpdated);
       window.removeEventListener("flux:synced", onCacheUpdated);
     };
-  }, [saving, showDiaModal, showRutinaModal, showPlanModal, loadCiclos, loadData, cicloSel]);
+  }, [saving, showDiaModal, showRutinaModal, showPlanModal, loadCiclos, loadData, cicloSel, isTemplateMode]);
 
   // ── (Ciclos se crean ahora desde los modales de Día/Rutina) ──
 
@@ -2371,9 +2647,16 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     setSaving(false);
   };
 
-  const handleApplyNutriTemplate = async (tpl) => {
+  const handleApplyNutriTemplate = async (tpl, applyOpts = {}) => {
     if (!selected) return;
-    if (isEstandar && (dias.length + (tpl.dias || []).length > 3)) {
+    const { mode = "append", selectedIndices = null, applyMacros = false } = applyOpts || {};
+    const allTplDias = Array.isArray(tpl.dias) ? tpl.dias : [];
+    const sourceDias = Array.isArray(selectedIndices)
+      ? allTplDias.filter((_, i) => selectedIndices.includes(i))
+      : allTplDias;
+
+    const baseDias = mode === "replace" ? [] : dias;
+    if (isEstandar && (baseDias.length + sourceDias.length > 3)) {
       openPaywall("dias");
       return;
     }
@@ -2388,16 +2671,21 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           grasas: Number(tpl.macros.grasas) || 0,
         }
       : null;
+    const hasValidTplMacros = Boolean(
+      tplMacros && (tplMacros.calorias > 0 || tplMacros.proteina > 0 || tplMacros.carbohidratos > 0 || tplMacros.grasas > 0)
+    );
+    const hasPatientMacros = Number(macros?.calorias || nutri?.calorias || 0) > 0;
+    const shouldApplyMacros = hasValidTplMacros && (applyMacros === true || (!hasPatientMacros && applyMacros !== false));
 
     // 1. Actualización Optimista Instantánea en 0ms
     const nowTs = Date.now();
-    const optimisticNewDias = (tpl.dias || []).map((d, i) => {
+    const optimisticNewDias = sourceDias.map((d, i) => {
       const tempDiaId = `temp_tpl_dia_${nowTs}_${i}`;
       return {
         id: tempDiaId,
         nutricion_id: nutri?.id || "temp_nutri",
-        dia: d.dia || `Día ${prevDias.length + i + 1}`,
-        orden: prevDias.length + i,
+        dia: d.dia || `Día ${baseDias.length + i + 1}`,
+        orden: baseDias.length + i,
         comidas: (d.comidas || []).map((c, cIdx) => {
           const optsList = Array.isArray(c.opciones) && c.opciones.length > 0
             ? c.opciones
@@ -2423,13 +2711,17 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       };
     });
 
-    if (tplMacros && (tplMacros.calorias > 0 || tplMacros.proteina > 0 || tplMacros.carbohidratos > 0 || tplMacros.grasas > 0)) {
+    if (shouldApplyMacros) {
       setMacros(tplMacros);
     }
-    setDias((prev) => [...prev, ...optimisticNewDias]);
-    updateQueryCache("nutricion_dias", (list) =>
-      Array.isArray(list) ? [...list, ...optimisticNewDias] : list
-    );
+    setDias([...baseDias, ...optimisticNewDias]);
+    updateQueryCache("nutricion_dias", (list) => {
+      if (!Array.isArray(list)) return list;
+      const filtered = mode === "replace"
+        ? list.filter((d) => String(d.nutricion_id) !== String(nutri?.id))
+        : list;
+      return [...filtered, ...optimisticNewDias];
+    });
 
     savingDiaRef.current = true;
     setSaving(true);
@@ -2469,26 +2761,35 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       if (!currentNutri) {
         const payload = {
           cliente_id: selected.id,
-          calorias: tplMacros?.calorias || 0,
-          proteina: tplMacros?.proteina || 0,
-          carbohidratos: tplMacros?.carbohidratos || 0,
-          grasas: tplMacros?.grasas || 0,
+          calorias: shouldApplyMacros ? tplMacros.calorias : 0,
+          proteina: shouldApplyMacros ? tplMacros.proteina : 0,
+          carbohidratos: shouldApplyMacros ? tplMacros.carbohidratos : 0,
+          grasas: shouldApplyMacros ? tplMacros.grasas : 0,
           ciclo_id: activeCiclo.id
         };
         const res = await dbPost("nutricion", payload);
         currentNutri = res[0];
         setNutri(currentNutri);
-        if (tplMacros) setMacros(tplMacros);
-      } else if (tplMacros && (tplMacros.calorias > 0 || tplMacros.proteina > 0 || tplMacros.carbohidratos > 0 || tplMacros.grasas > 0)) {
+        if (shouldApplyMacros) setMacros(tplMacros);
+      } else if (shouldApplyMacros) {
         setNutri((prev) => ({ ...prev, ...tplMacros }));
         setMacros(tplMacros);
         await dbPatch(`nutricion?id=eq.${currentNutri.id}`, tplMacros);
       }
 
-      const diasPayload = (tpl.dias || []).map((d, i) => ({
+      if (mode === "replace" && currentNutri?.id) {
+        const existingIds = prevDias
+          .map((d) => d.id)
+          .filter((id) => id && !String(id).startsWith("temp_"));
+        if (existingIds.length > 0) {
+          await dbDel(`nutricion_dias?id=in.(${existingIds.join(",")})`);
+        }
+      }
+
+      const diasPayload = sourceDias.map((d, i) => ({
         nutricion_id: currentNutri.id,
-        dia: d.dia || `Día ${prevDias.length + i + 1}`,
-        orden: prevDias.length + i,
+        dia: d.dia || `Día ${baseDias.length + i + 1}`,
+        orden: baseDias.length + i,
       }));
 
       if (diasPayload.length > 0) {
@@ -2507,7 +2808,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
         const allComidasPayload = [];
         (creados || []).forEach((nuevoDia, dIdx) => {
-          const sourceDia = (tpl.dias || [])[dIdx];
+          const sourceDia = sourceDias[dIdx];
           if (!nuevoDia || !sourceDia?.comidas?.length) return;
           sourceDia.comidas.forEach((c, cIdx) => {
             const optsList = Array.isArray(c.opciones) && c.opciones.length > 0
@@ -2561,10 +2862,16 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     setSaving(false);
   };
 
-  const handleApplyRutinaTemplate = async (tpl) => {
+  const handleApplyRutinaTemplate = async (tpl, applyOpts = {}) => {
     if (!selected) return;
-    const validExisting = rutinas.filter((r) => (r.ejercicios || []).length > 0);
-    if (isEstandar && (validExisting.length + (tpl.rutinas || []).length > 3)) {
+    const { mode = "append", selectedIndices = null, clearWeights = false } = applyOpts || {};
+    const allTplRutinas = Array.isArray(tpl.rutinas) ? tpl.rutinas : [];
+    const sourceRutinas = Array.isArray(selectedIndices)
+      ? allTplRutinas.filter((_, i) => selectedIndices.includes(i))
+      : allTplRutinas;
+
+    const validExisting = mode === "replace" ? [] : rutinas.filter((r) => (r.ejercicios || []).length > 0);
+    if (isEstandar && (validExisting.length + sourceRutinas.length > 3)) {
       openPaywall("rutinas");
       return;
     }
@@ -2574,41 +2881,48 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     const initialWeeks = cicloSel ? getCycleWeeks(cicloSel) : (Number(tpl.semanas) || 4);
 
     // 1. Actualización Optimista Instantánea en 0ms
-    const optimisticNewRutinas = (tpl.rutinas || []).map((r, i) => {
+    const optimisticNewRutinas = sourceRutinas.map((r, i) => {
       const tempRutId = `temp_tpl_rut_${nowTs}_${i}`;
       return {
         id: tempRutId,
         cliente_id: selected.id,
         ciclo_id: cicloSel?.id || null,
         nombre: r.nombre || `Rutina ${validExisting.length + i + 1}`,
-        semanas: Number(r.semanas) || initialWeeks,
+        semanas: initialWeeks,
         orden: validExisting.length + i,
-        ejercicios: (r.ejercicios || []).map((e, eIdx) => ({
-          ...e,
-          id: `temp_tpl_ej_${nowTs}_${i}_${eIdx}`,
-          rutina_id: tempRutId,
-          biblioteca_id: e.biblioteca_id || null,
-          nombre: e.nombre || "",
-          gif_url: e.gif_url || "",
-          grupo_muscular: e.grupo_muscular || "",
-          tipo_movimiento: e.tipo_movimiento || "",
-          num_series: +e.num_series || 4,
-          reps_sugeridas: +e.reps_sugeridas || 10,
-          peso_sugerido: (e.peso_sugerido !== "" && e.peso_sugerido !== null && e.peso_sugerido !== undefined && !isNaN(e.peso_sugerido)) ? Number(e.peso_sugerido) : null,
-          unidad: e.unidad || "kg",
-          alternativas: (e.alternativas || []).map((alt) => ({
-            ...alt,
-            peso_sugerido: (alt.peso_sugerido !== "" && alt.peso_sugerido !== null && alt.peso_sugerido !== undefined && !isNaN(alt.peso_sugerido)) ? Number(alt.peso_sugerido) : null,
-          })),
-          orden: eIdx,
-        })),
+        ejercicios: (r.ejercicios || []).map((rawEx, eIdx) => {
+          const e = clearWeights ? stripWeightsFromTemplateExercise(rawEx) : rawEx;
+          return {
+            ...e,
+            id: `temp_tpl_ej_${nowTs}_${i}_${eIdx}`,
+            rutina_id: tempRutId,
+            biblioteca_id: e.biblioteca_id || null,
+            nombre: e.nombre || "",
+            gif_url: e.gif_url || "",
+            grupo_muscular: e.grupo_muscular || "",
+            tipo_movimiento: e.tipo_movimiento || "",
+            num_series: +e.num_series || 4,
+            reps_sugeridas: +e.reps_sugeridas || 10,
+            peso_sugerido: (e.peso_sugerido !== "" && e.peso_sugerido !== null && e.peso_sugerido !== undefined && !isNaN(e.peso_sugerido)) ? Number(e.peso_sugerido) : null,
+            unidad: e.unidad || "kg",
+            alternativas: (e.alternativas || []).map((alt) => ({
+              ...alt,
+              peso_sugerido: (alt.peso_sugerido !== "" && alt.peso_sugerido !== null && alt.peso_sugerido !== undefined && !isNaN(alt.peso_sugerido)) ? Number(alt.peso_sugerido) : null,
+            })),
+            orden: eIdx,
+          };
+        }),
       };
     });
 
     setRutinas([...validExisting, ...optimisticNewRutinas]);
-    updateQueryCache("rutinas", (list) =>
-      Array.isArray(list) ? [...list.filter((r) => (r.ejercicios || []).length > 0), ...optimisticNewRutinas] : list
-    );
+    updateQueryCache("rutinas", (list) => {
+      if (!Array.isArray(list)) return list;
+      const base = mode === "replace"
+        ? list.filter((r) => String(r.ciclo_id) !== String(cicloSel?.id))
+        : list.filter((r) => (r.ejercicios || []).length > 0);
+      return [...base, ...optimisticNewRutinas];
+    });
 
     savingRutinaRef.current = true;
     setSaving(true);
@@ -2641,22 +2955,31 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         invalidateCache("ciclos");
       }
 
-      // Limpiar rutinas fantasma vacías (0 ejercicios) en este ciclo si existían
-      const existingEmpty = prevRutinas.filter(
-        (r) => !String(r.id).startsWith("temp_") && (r.ejercicios || []).length === 0 && r.ciclo_id === activeCiclo.id
-      );
-      for (const er of existingEmpty) {
-        try { await dbDel(`rutinas?id=eq.${er.id}`); } catch(_) {}
+      if (mode === "replace") {
+        const toDeleteIds = prevRutinas
+          .filter((r) => !String(r.id).startsWith("temp_") && (!activeCiclo?.id || String(r.ciclo_id) === String(activeCiclo.id)))
+          .map((r) => r.id);
+        if (toDeleteIds.length > 0) {
+          await dbDel(`rutinas?id=in.(${toDeleteIds.join(",")})`);
+        }
+      } else {
+        // Limpiar rutinas fantasma vacías (0 ejercicios) en este ciclo si existían
+        const existingEmpty = prevRutinas.filter(
+          (r) => !String(r.id).startsWith("temp_") && (r.ejercicios || []).length === 0 && r.ciclo_id === activeCiclo.id
+        );
+        for (const er of existingEmpty) {
+          try { await dbDel(`rutinas?id=eq.${er.id}`); } catch(_) {}
+        }
       }
 
       const currentValidCount = validExisting.filter((r) => r.ciclo_id === activeCiclo.id).length;
       const cycleWeeks = getCycleWeeks(activeCiclo) || 4;
 
-      const rutinasPayload = (tpl.rutinas || []).map((r, i) => ({
+      const rutinasPayload = sourceRutinas.map((r, i) => ({
         cliente_id: selected.id,
         ciclo_id: activeCiclo.id,
         nombre: r.nombre || `Rutina ${currentValidCount + i + 1}`,
-        semanas: Number(r.semanas) || cycleWeeks,
+        semanas: cycleWeeks,
         orden: currentValidCount + i,
       }));
 
@@ -2676,9 +2999,10 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
         const allEjerciciosPayload = [];
         (creadas || []).forEach((nuevaRutina, rIdx) => {
-          const sourceRut = (tpl.rutinas || [])[rIdx];
+          const sourceRut = sourceRutinas[rIdx];
           if (!nuevaRutina || !sourceRut?.ejercicios?.length) return;
-          sourceRut.ejercicios.forEach((e, eIdx) => {
+          sourceRut.ejercicios.forEach((rawEx, eIdx) => {
+            const e = clearWeights ? stripWeightsFromTemplateExercise(rawEx) : rawEx;
             allEjerciciosPayload.push({
               rutina_id: nuevaRutina.id,
               biblioteca_id: e.biblioteca_id || null,
@@ -2745,6 +3069,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   };
 
   const interceptNoPlan = () => {
+    if (isTemplateMode) return false;
     if (!cicloSel) {
       setShowPlanModal(true);
       return true;
@@ -3033,6 +3358,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     });
 
     // 1. Actualización Optimista Instantánea en 0ms y cierre de modal inmediato
+    let nextDiasList;
     if (editDiaSnap) {
       const optimisticComidas = formSnap.comidas.map((c, i) => ({
         ...c,
@@ -3056,10 +3382,13 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         orden: formSnap.orden,
         comidas: optimisticComidas,
       };
-      setDias(prev => prev.map(d => d.id === editDiaSnap.id ? optimisticDia : d));
-      updateQueryCache("nutricion_dias", (list) =>
-        Array.isArray(list) ? list.map(d => d.id === editDiaSnap.id ? optimisticDia : d) : list
-      );
+      nextDiasList = prevDias.map(d => d.id === editDiaSnap.id ? optimisticDia : d);
+      setDias(nextDiasList);
+      if (!isTemplateMode) {
+        updateQueryCache("nutricion_dias", (list) =>
+          Array.isArray(list) ? list.map(d => d.id === editDiaSnap.id ? optimisticDia : d) : list
+        );
+      }
     } else {
       const dSeleccionados = formSnap.diasSeleccionados || [];
       const creationDays = dSeleccionados.length > 0 ? dSeleccionados : ["S/D"];
@@ -3097,14 +3426,22 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         };
         return dObj;
       });
-      setDias(prev => [...prev, ...optimisticNewDias]);
-      updateQueryCache("nutricion_dias", (list) =>
-        Array.isArray(list) ? [...list, ...optimisticNewDias] : list
-      );
+      nextDiasList = [...prevDias, ...optimisticNewDias];
+      setDias(nextDiasList);
+      if (!isTemplateMode) {
+        updateQueryCache("nutricion_dias", (list) =>
+          Array.isArray(list) ? [...list, ...optimisticNewDias] : list
+        );
+      }
     }
 
     setShowDiaModal(false);
-    setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Día guardado</div>);
+    setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> {isTemplateMode ? "Día guardado en plantilla" : "Día guardado"}</div>);
+
+    if (isTemplateMode) {
+      syncTemplateSnapshot({ dias: nextDiasList });
+      return;
+    }
 
     // 2. Persistencia asíncrona en segundo plano (sin bloquear la interfaz)
     savingDiaRef.current = true;
@@ -3287,9 +3624,15 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       icon: "trash",
       onConfirm: async () => {
         const prevDias = dias;
+        const nextDias = prevDias.filter(x => x.id !== d.id);
         // Eliminación optimista en 0ms
         setConfirmDelete(null);
-        setDias(prev => prev.filter(x => x.id !== d.id));
+        setDias(nextDias);
+        if (isTemplateMode) {
+          syncTemplateSnapshot({ dias: nextDias });
+          setMsg(<div className="flex items-center gap-1.5"><Trash2 className="w-4 h-4 text-red-500" /> Día eliminado de la plantilla</div>);
+          return;
+        }
         updateQueryCache("nutricion_dias", (list) =>
           Array.isArray(list) ? list.filter(x => x.id !== d.id) : list
         );
@@ -3451,7 +3794,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           carbohidratos: macros.carbohidratos || smartPrescription?.carbsG,
           grasas: macros.grasas || smartPrescription?.fatsG,
         },
-        cliente: selected,
+        cliente: selected || { nombre: tplMeta.nombre || "Plantilla de nutrición" },
       });
 
       if (res?.comidasAuditadas && Array.isArray(res.comidasAuditadas)) {
@@ -3940,7 +4283,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         ejercicios: resolvedList,
         smartTraining: smartTrainingPrescription,
         clinicalRec,
-        cliente: selected,
+        cliente: selected || { nombre: tplMeta.nombre || "Plantilla de entrenamiento" },
       });
 
       let totalAlerts = 0;
@@ -4052,6 +4395,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     }
 
     // 1. Actualización Optimista Instantánea en 0ms y cierre de modal inmediato
+    let nextRutinasList;
     if (editRutinaSnap) {
       const finalName = dSeleccionados.length > 0 ? `${dSeleccionados[0]}|${formSnap.tituloPersonalizado}` : formSnap.tituloPersonalizado;
       const optimisticEjercicios = formSnap.ejercicios.map((e, i) => ({
@@ -4064,21 +4408,25 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         nombre: finalName,
         ejercicios: optimisticEjercicios,
       };
-      setRutinas(prev => prev.map(r => r.id === editRutinaSnap.id ? optimisticRutina : r));
-      updateQueryCache("rutinas", (list) =>
-        Array.isArray(list) ? list.map(r => r.id === editRutinaSnap.id ? optimisticRutina : r) : list
-      );
+      nextRutinasList = prevRutinas.map(r => r.id === editRutinaSnap.id ? optimisticRutina : r);
+      setRutinas(nextRutinasList);
+      if (!isTemplateMode) {
+        updateQueryCache("rutinas", (list) =>
+          Array.isArray(list) ? list.map(r => r.id === editRutinaSnap.id ? optimisticRutina : r) : list
+        );
+      }
     } else {
       const diasToCreate = dSeleccionados.length > 0 ? dSeleccionados : ["S/D"];
+      const tplWeeks = Number(tplMeta.semanas) || (+formSnap.semanas || 4);
       const optimisticNewRutinas = diasToCreate.map((d, idx) => {
         const finalName = d === "S/D" ? formSnap.tituloPersonalizado : `${d}|${formSnap.tituloPersonalizado}`;
         const tempRutId = `temp_rut_${Date.now()}_${idx}`;
         return {
           id: tempRutId,
-          cliente_id: selected.id,
+          cliente_id: selected?.id || null,
           ciclo_id: activeCiclo?.id || null,
           nombre: finalName,
-          semanas: activeCiclo ? getCycleWeeks(activeCiclo) : (+formSnap.semanas || 4),
+          semanas: activeCiclo ? getCycleWeeks(activeCiclo) : tplWeeks,
           fecha_inicio: formSnap.fecha_inicio || null,
           orden: prevRutinas.length + idx,
           ejercicios: formSnap.ejercicios.map((e, i) => ({
@@ -4088,15 +4436,23 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           })),
         };
       });
-      setRutinas(prev => [...prev, ...optimisticNewRutinas]);
-      updateQueryCache("rutinas", (cachedList) => {
-        if (!Array.isArray(cachedList)) return cachedList;
-        return [...cachedList, ...optimisticNewRutinas];
-      });
+      nextRutinasList = [...prevRutinas, ...optimisticNewRutinas];
+      setRutinas(nextRutinasList);
+      if (!isTemplateMode) {
+        updateQueryCache("rutinas", (cachedList) => {
+          if (!Array.isArray(cachedList)) return cachedList;
+          return [...cachedList, ...optimisticNewRutinas];
+        });
+      }
     }
 
     setShowRutinaModal(false);
-    setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Rutina guardada</div>);
+    setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> {isTemplateMode ? "Rutina guardada en plantilla" : "Rutina guardada"}</div>);
+
+    if (isTemplateMode) {
+      syncTemplateSnapshot({ rutinas: nextRutinasList });
+      return;
+    }
 
     // 2. Persistencia en segundo plano (con peticiones en paralelo)
     savingRutinaRef.current = true;
@@ -4216,9 +4572,15 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       icon: "trash",
       onConfirm: async () => {
         const prevRutinas = rutinas;
+        const nextRutinas = prevRutinas.filter(x => x.id !== r.id);
         // Eliminación optimista en 0ms
         setConfirmDelete(null);
-        setRutinas(prev => prev.filter(x => x.id !== r.id));
+        setRutinas(nextRutinas);
+        if (isTemplateMode) {
+          syncTemplateSnapshot({ rutinas: nextRutinas });
+          setMsg(<div className="flex items-center gap-1.5"><Trash2 className="w-4 h-4 text-red-500" /> Rutina eliminada de la plantilla</div>);
+          return;
+        }
         updateQueryCache("rutinas", (list) =>
           Array.isArray(list) ? list.filter(x => x.id !== r.id) : list
         );
@@ -4695,12 +5057,15 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       setDias((items) => {
         const oldIndex = items.findIndex(d => String(d.id) === active.id);
         const newIndex = items.findIndex(d => String(d.id) === over.id);
-        const newItems = arrayMove(items, oldIndex, newIndex);
+        const newItems = arrayMove(items, oldIndex, newIndex).map((d, idx) => ({ ...d, orden: idx }));
+        if (isTemplateMode) {
+          syncTemplateSnapshot({ dias: newItems });
+          return newItems;
+        }
         // Patch in background
         newItems.forEach((d, idx) => {
-          if (d.orden !== idx) {
+          if (items[idx]?.orden !== idx || String(d.id).startsWith("temp_") === false) {
             dbPatch(`nutricion_dias?id=eq.${d.id}`, { orden: idx }).catch(e=>console.error(e));
-            d.orden = idx;
           }
         });
         notifyPlanUpdate("nutricion_dias");
@@ -4726,12 +5091,15 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       setRutinas((items) => {
         const oldIndex = items.findIndex(r => String(r.id) === active.id);
         const newIndex = items.findIndex(r => String(r.id) === over.id);
-        const newItems = arrayMove(items, oldIndex, newIndex);
+        const newItems = arrayMove(items, oldIndex, newIndex).map((r, idx) => ({ ...r, orden: idx }));
+        if (isTemplateMode) {
+          syncTemplateSnapshot({ rutinas: newItems });
+          return newItems;
+        }
         // Patch in background
         newItems.forEach((r, idx) => {
-          if (r.orden !== idx) {
+          if (!String(r.id).startsWith("temp_")) {
             dbPatch(`rutinas?id=eq.${r.id}`, { orden: idx }).catch(e=>console.error(e));
-            r.orden = idx;
           }
         });
         notifyPlanUpdate("rutinas");
@@ -4754,7 +5122,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   const fmtFecha = (f) => f ? new Date(f+"T12:00:00").toLocaleDateString("es-MX",{month:"short",year:"numeric"}) :"";
 
   // ── Sin cliente seleccionado ──
-  if (!selected) {
+  if (!isTemplateMode && !selected) {
     const filteredClientes = (clientes || []).filter(c =>
       c.objetivo !== 'Mi entrenamiento personal' &&
       ((c.nombre || "").toLowerCase().includes(searchProg.toLowerCase()) ||
@@ -4801,7 +5169,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
   // ── Verificación de Expediente Inicial para Pacientes Nuevos y Mi Plan ──
   // Si aún no termina de cargar el expediente remoto desde Supabase Storage, mostrar loader sutil para evitar parpadeos
-  if (!clinicalLoaded) {
+  if (!isTemplateMode && !clinicalLoaded) {
     return (
       <div className="w-full flex-1 flex flex-col items-center justify-center py-24 gap-3 bg-[#F8FAFC]">
         <div className="w-8 h-8 rounded-full border-2 border-[var(--brand-primary)] border-t-transparent animate-spin" />
@@ -4820,7 +5188,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     skipExpedienteForNow
   );
 
-  if (!isExpedienteCompletado) {
+  if (!isTemplateMode && !isExpedienteCompletado) {
     return (
       <div className="w-full flex-1 flex flex-col min-h-full bg-white md:bg-transparent">
         <NuevoExpedienteForms
@@ -4856,7 +5224,118 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
   return (
     <div className="w-full flex-1 flex flex-col pb-28 md:pb-8">
-      {/* ── Cabecera cliente / Mi Plan ── */}
+      {/* ── Cabecera Taller de Plantilla Personal vs Cabecera cliente / Mi Plan ── */}
+      {isTemplateMode ? (
+        <div className="mb-3 md:mb-4 bg-white rounded-none md:rounded-2xl border-b md:border border-[#E2E8F0] p-3.5 sm:p-5 shadow-none md:shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2.5 mb-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              {templateWorkspace?.onBack && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    flushTemplateSync();
+                    templateWorkspace.onBack();
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#F0F4FA] hover:bg-[#E2E8F0] text-[#0B1929] text-xs font-bold transition-colors cursor-pointer shrink-0"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>Volver a plantillas</span>
+                </button>
+              )}
+              <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-lg border ${
+                templateType === "nutri"
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                  : "bg-blue-50 text-[var(--brand-primary)] border-blue-200"
+              }`}>
+                {templateType === "nutri" ? <Utensils className="w-3.5 h-3.5" /> : <Dumbbell className="w-3.5 h-3.5" />}
+                <span>{templateType === "nutri" ? "Plantilla de Nutrición" : "Plantilla de Entrenamiento"}</span>
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#6B7A8D] bg-[#F8FAFC] border border-[#E2E8F0] px-2.5 py-1 rounded-lg">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                <span>Recetario personal · Sin paciente</span>
+              </span>
+            </div>
+          </div>
+
+          <div className={`grid grid-cols-1 gap-3 ${templateType === "rutina" ? "md:grid-cols-12" : "md:grid-cols-12"}`}>
+            <div className={templateType === "rutina" ? "md:col-span-5" : "md:col-span-6"}>
+              <label className="block text-[10px] font-bold text-[#6B7A8D] uppercase tracking-wider mb-1">
+                Nombre de la plantilla
+              </label>
+              <input
+                type="text"
+                value={tplMeta.nombre}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const nextMeta = { ...tplMeta, nombre: val };
+                  setTplMeta(nextMeta);
+                  syncTemplateSnapshot({ meta: nextMeta }, { debounce: true });
+                }}
+                onBlur={() => flushTemplateSync()}
+                placeholder={templateType === "nutri" ? "Ej. Definición 2000 kcal · 4 comidas" : "Ej. Hipertrofia Upper/Lower 4 días"}
+                className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm font-bold text-[#0B1929] outline-none focus:border-[var(--brand-primary)]"
+              />
+            </div>
+
+            <div className={templateType === "rutina" ? "md:col-span-4" : "md:col-span-6"}>
+              <label className="block text-[10px] font-bold text-[#6B7A8D] uppercase tracking-wider mb-1">
+                Etiquetas / Enfoque
+              </label>
+              <input
+                type="text"
+                value={tplMeta.tags}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const nextMeta = { ...tplMeta, tags: val };
+                  setTplMeta(nextMeta);
+                  syncTemplateSnapshot({ meta: nextMeta }, { debounce: true });
+                }}
+                onBlur={() => flushTemplateSync()}
+                placeholder={templateType === "nutri" ? "Ej. Déficit, Alta Proteína, Vegetariana" : "Ej. Hipertrofia, Fuerza, Gimnasio"}
+                className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-xs sm:text-sm font-medium text-[#0B1929] outline-none focus:border-[var(--brand-primary)]"
+              />
+            </div>
+
+            {templateType === "rutina" && (
+              <div className="md:col-span-3">
+                <label className="block text-[10px] font-bold text-[#6B7A8D] uppercase tracking-wider mb-1">
+                  Semanas sugeridas
+                </label>
+                <div className="flex items-center gap-1 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-1">
+                  {[2, 4, 6, 8, 12].map((w) => (
+                    <button
+                      key={w}
+                      type="button"
+                      onClick={() => {
+                        const nextMeta = { ...tplMeta, semanas: w };
+                        const nextRutinas = rutinas.map((r) => ({ ...r, semanas: w }));
+                        setTplMeta(nextMeta);
+                        setRutinas(nextRutinas);
+                        syncTemplateSnapshot({ meta: nextMeta, rutinas: nextRutinas });
+                      }}
+                      className={`flex-1 py-1.5 rounded-lg text-[11px] font-bold transition-colors cursor-pointer ${
+                        Number(tplMeta.semanas || 4) === w
+                          ? "bg-[var(--brand-primary)] text-white shadow-xs"
+                          : "text-[#6B7A8D] hover:bg-white hover:text-[#0B1929]"
+                      }`}
+                    >
+                      {w}s
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          {templateType === "rutina" && (
+            <div className="mt-2 text-[11px] text-[#6B7A8D]">
+              Al aplicar esta plantilla a un paciente, sus sesiones se adaptarán automáticamente a las semanas del ciclo activo del paciente.
+            </div>
+          )}
+        </div>
+      ) : (
+      <>
       <div className="mb-0 md:mb-4 bg-white rounded-none md:rounded-2xl border-b md:border border-[#E2E8F0] p-3.5 sm:p-5 shadow-none md:shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           
@@ -5117,11 +5596,14 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           </>
         )}
       </div>
+      </>
+      )}
 
-      {/* ── Solo mostrar herramientas inferiores si existe al menos un plan creado ── */}
-      {ciclos.length > 0 && (
+      {/* ── Solo mostrar herramientas inferiores si existe al menos un plan creado (o estamos en Taller de Plantillas) ── */}
+      {(ciclos.length > 0 || isTemplateMode) && (
         <>
       {/* ── Sub-tabs ── */}
+      {!isTemplateMode && (
       <div className="flex gap-1 mb-3.5 md:mb-4 mx-3 md:mx-0 bg-[#F0F4FA] rounded-xl p-1 w-[calc(100%-1.5rem)] sm:w-max overflow-x-auto scroll-hide">
         {[
           { k:"progreso", ic: <BarChart2 className="w-4 h-4 shrink-0"/>, lb:"Evaluación" },
@@ -5141,6 +5623,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           </button>
         ))}
       </div>
+      )}
 
       {loading ? <ListSkeleton rows={4} /> : <>
 
@@ -5148,6 +5631,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         {subtab ==="nutri" && (
           <div>
             {/* Sub-pestañas: Programar vs Tracking */}
+            {!isTemplateMode && (
             <div className="flex gap-1 mb-3.5 md:mb-4 mx-3 md:mx-0 bg-[#F0F4FA] rounded-xl p-1 w-[calc(100%-1.5rem)] sm:w-max">
               <button
                 type="button"
@@ -5174,8 +5658,217 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                 <span>Tracking</span>
               </button>
             </div>
+            )}
 
-            <div className={nutriView === "programar" ? "" : "hidden"}>
+            <div className={isTemplateMode || nutriView === "programar" ? "" : "hidden"}>
+              {/* ── Taller Manual de Kcal, Macros y SMAE (Solo en Modo Plantilla) ── */}
+              {isTemplateMode && (
+                <div className="mb-3.5 md:mb-4 bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] p-3.5 sm:p-5 shadow-none md:shadow-sm space-y-3.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-xl bg-blue-50 text-[var(--brand-primary)] flex items-center justify-center shrink-0">
+                        <Calculator className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h3 className="text-xs sm:text-sm font-bold text-[#0B1929]">
+                          Metas Manuales (Kcal, Macros &amp; SMAE)
+                        </h3>
+                        <p className="text-[11px] text-[#6B7A8D]">
+                          Referencia base de la plantilla; al aplicarla a un paciente podrás elegir si conservar sus macros o usar los de esta plantilla.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => applyManualTplPreset(0.3, 0.4, 0.3)}
+                        className="px-2.5 py-1 rounded-lg bg-[#F0F4FA] hover:bg-[#E2E8F0] text-[11px] font-bold text-[#0B1929] cursor-pointer transition-colors"
+                        title="Reparto 30% Proteína / 40% Carbohidratos / 30% Grasas"
+                      >
+                        Balanceado 30/40/30
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => applyManualTplPreset(0.35, 0.4, 0.25)}
+                        className="px-2.5 py-1 rounded-lg bg-[#F0F4FA] hover:bg-[#E2E8F0] text-[11px] font-bold text-[#0B1929] cursor-pointer transition-colors"
+                        title="Reparto 35% Proteína / 40% Carbohidratos / 25% Grasas"
+                      >
+                        Alto Prot 35/40/25
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => applyManualTplPreset(0.4, 0.25, 0.35)}
+                        className="px-2.5 py-1 rounded-lg bg-[#F0F4FA] hover:bg-[#E2E8F0] text-[11px] font-bold text-[#0B1929] cursor-pointer transition-colors"
+                        title="Reparto 40% Proteína / 25% Carbohidratos / 35% Grasas"
+                      >
+                        Definición 40/25/35
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                    <div className="p-2.5 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0]">
+                      <label className="block text-[10px] font-bold text-[#6B7A8D] uppercase tracking-wider mb-1">
+                        Calorías (kcal)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={macros.calorias}
+                        onChange={(e) => updateTplMacroField("calorias", e.target.value)}
+                        onBlur={() => flushTemplateSync()}
+                        placeholder="2000"
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-[#E2E8F0] bg-white text-sm font-extrabold text-[#0B1929] outline-none focus:border-[var(--brand-primary)]"
+                      />
+                      {tplCalcKcalFromMacros > 0 && Math.abs(tplCalcKcalFromMacros - tplCurKcal) > 25 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const nextMacros = { ...macros, calorias: tplCalcKcalFromMacros };
+                            setMacros(nextMacros);
+                            syncTemplateSnapshot({ macros: nextMacros });
+                          }}
+                          className="mt-1 text-[10px] font-bold text-[var(--brand-primary)] hover:underline cursor-pointer"
+                        >
+                          Ajustar a {tplCalcKcalFromMacros} kcal
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0]">
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">Proteína (g)</label>
+                        {tplPPct > 0 && <span className="text-[10px] font-bold text-[#6B7A8D]">{tplPPct}%</span>}
+                      </div>
+                      <input
+                        type="number"
+                        min="0"
+                        value={macros.proteina}
+                        onChange={(e) => updateTplMacroField("proteina", e.target.value)}
+                        onBlur={() => flushTemplateSync()}
+                        placeholder="150"
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-[#E2E8F0] bg-white text-sm font-extrabold text-[#0B1929] outline-none focus:border-[var(--brand-primary)]"
+                      />
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0]">
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[10px] font-bold text-amber-700 uppercase tracking-wider">Carbs (g)</label>
+                        {tplCPct > 0 && <span className="text-[10px] font-bold text-[#6B7A8D]">{tplCPct}%</span>}
+                      </div>
+                      <input
+                        type="number"
+                        min="0"
+                        value={macros.carbohidratos}
+                        onChange={(e) => updateTplMacroField("carbohidratos", e.target.value)}
+                        onBlur={() => flushTemplateSync()}
+                        placeholder="200"
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-[#E2E8F0] bg-white text-sm font-extrabold text-[#0B1929] outline-none focus:border-[var(--brand-primary)]"
+                      />
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0]">
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[10px] font-bold text-rose-700 uppercase tracking-wider">Grasas (g)</label>
+                        {tplGPct > 0 && <span className="text-[10px] font-bold text-[#6B7A8D]">{tplGPct}%</span>}
+                      </div>
+                      <input
+                        type="number"
+                        min="0"
+                        value={macros.grasas}
+                        onChange={(e) => updateTplMacroField("grasas", e.target.value)}
+                        onBlur={() => flushTemplateSync()}
+                        placeholder="65"
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-[#E2E8F0] bg-white text-sm font-extrabold text-[#0B1929] outline-none focus:border-[var(--brand-primary)]"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Distribución Manual / Automática SMAE */}
+                  <div className="pt-2 border-t border-[#F0F4FA] space-y-2.5">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-bold text-[#0B1929]">
+                          Equivalentes SMAE Base
+                        </span>
+                        {tplSmaeTotals.totalEquivalentes > 0 && (
+                          <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                            {tplSmaeTotals.totalEquivalentes} eq · {tplSmaeTotals.kcal} kcal · {tplSmaeTotals.proteina}g P · {tplSmaeTotals.carbohidratos}g C · {tplSmaeTotals.grasas}g G
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={handleAutoDistributeTplSmae}
+                          className="px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[11px] font-bold cursor-pointer transition-colors"
+                        >
+                          Auto-distribuir SMAE
+                        </button>
+                        {tplSmaeTotals.kcal > 0 && (
+                          <button
+                            type="button"
+                            onClick={handleSyncMacrosFromSmae}
+                            className="px-2.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-[var(--brand-primary)] border border-blue-200 text-[11px] font-bold cursor-pointer transition-colors"
+                          >
+                            Usar suma SMAE como meta
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setTplSmaeExpanded((p) => !p)}
+                          className="px-2.5 py-1.5 rounded-xl bg-[#F8FAFC] hover:bg-gray-100 text-[#0B1929] border border-[#E2E8F0] text-[11px] font-bold cursor-pointer transition-colors"
+                        >
+                          {tplSmaeExpanded ? "Ocultar tabla SMAE" : "Editar porciones SMAE"}
+                        </button>
+                      </div>
+                    </div>
+
+                    {tplSmaeExpanded && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 pt-1">
+                        {SMAE_GROUPS.map((g) => {
+                          const val = Number(tplSmaeMap[g.id]) || 0;
+                          return (
+                            <div
+                              key={g.id}
+                              className={`flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl border ${
+                                val > 0 ? "bg-emerald-50/50 border-emerald-200" : "bg-[#F8FAFC] border-[#E2E8F0]"
+                              }`}
+                            >
+                              <div className="min-w-0">
+                                <div className="text-[11px] font-bold text-[#0B1929] truncate">{g.nombre}</div>
+                                <div className="text-[10px] text-[#6B7A8D]">{g.kcal} kcal/eq</div>
+                              </div>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => updateTplSmaeQty(g.id, -0.5)}
+                                  disabled={val <= 0}
+                                  className="w-6 h-6 rounded-lg bg-white border border-[#E2E8F0] text-[#0B1929] font-bold text-xs flex items-center justify-center disabled:opacity-40 cursor-pointer"
+                                >
+                                  -
+                                </button>
+                                <span className="w-8 text-center text-xs font-extrabold text-[#0B1929] tabular-nums">
+                                  {val}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => updateTplSmaeQty(g.id, 0.5)}
+                                  className="w-6 h-6 rounded-lg bg-white border border-[#E2E8F0] text-[#0B1929] font-bold text-xs flex items-center justify-center cursor-pointer"
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* ── Tarjeta Inteligente de Prescripción Energética & Macros (IA) ── */}
                 {(() => {
                   const hasExpediente = Boolean(
@@ -5452,7 +6145,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                     <span className="text-[#6B7A8D] font-normal ml-1.5">({dias.length})</span>
                   </span>
                 </span>
-                {Boolean(parsedActiveCycle.dias && parsedActiveCycle.semanas) && (
+                {Boolean(!isTemplateMode && parsedActiveCycle.dias && parsedActiveCycle.semanas) && (
                   <span className="text-[10px] sm:text-[11px] font-bold px-1.5 sm:px-2.5 py-0.5 rounded-md sm:rounded-lg bg-blue-50 text-[var(--brand-primary)] border border-blue-200/60 shrink-0 whitespace-nowrap">
                     {parsedActiveCycle.dias}d • {parsedActiveCycle.semanas}sem
                   </span>
@@ -5461,7 +6154,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
               <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                 {dias.length > 0 && (
                   <button
-                    onClick={() => generateNutriPDF(selected, nutri, dias, brand)}
+                    onClick={() => generateNutriPDF(selected || { nombre: tplMeta.nombre || "Plantilla de Nutrición" }, isTemplateMode ? macros : nutri, dias, brand)}
                     className="w-8 h-8 sm:w-auto sm:px-3 sm:py-1.5 rounded-xl border border-[#E2E8F0] bg-white text-[#0B1929] hover:bg-gray-50 text-xs sm:text-sm font-bold shadow-2xs transition-colors flex items-center justify-center sm:gap-1.5 cursor-pointer"
                     title="Descargar PDF"
                   >
@@ -5469,7 +6162,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                     <span className="hidden sm:inline">Descargar PDF</span>
                   </button>
                 )}
-                {!isReadOnly && (
+                {!isReadOnly && !isTemplateMode && (
                   <button
                     onClick={() => setTemplateModal("nutri")}
                     className="w-8 h-8 sm:w-auto sm:px-3 sm:py-1.5 rounded-xl border border-[#E2E8F0] bg-white text-[#0B1929] hover:bg-gray-50 text-xs sm:text-sm font-bold shadow-2xs transition-colors flex items-center justify-center sm:gap-1.5 cursor-pointer"
@@ -5534,22 +6227,24 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
               const avgKcal = Math.round(totalKcalPlan / dias.length);
 
               const evalMetricaForSmae = cycleMetrica || latestMetrica || null;
-              const savedEvalSmae =
-                evalMetricaForSmae?.prescribed_macros?.smaeDistribution ||
-                smartPrescription?.smaeDistribution ||
-                null;
+              const savedEvalSmae = isTemplateMode
+                ? (tplMeta.smaeDistribution || null)
+                : (evalMetricaForSmae?.prescribed_macros?.smaeDistribution ||
+                  smartPrescription?.smaeDistribution ||
+                  null);
               const hasSavedSmae =
                 savedEvalSmae &&
                 typeof savedEvalSmae === "object" &&
                 Object.values(savedEvalSmae).some((v) => Number(v) > 0);
+              const fallbackKcalTarget = smartPrescription?.targetKcal || Number(macros?.calorias) || 0;
               const targetSmaeMap = hasSavedSmae
                 ? savedEvalSmae
-                : (smartPrescription?.targetKcal > 0
+                : (fallbackKcalTarget > 0
                     ? autoDistributeSmaeFromMacros({
-                        calorias: smartPrescription.targetKcal,
-                        proteina: smartPrescription.proteinG,
-                        carbohidratos: smartPrescription.carbsG,
-                        grasas: smartPrescription.fatsG,
+                        calorias: fallbackKcalTarget,
+                        proteina: smartPrescription?.proteinG || Number(macros?.proteina) || 0,
+                        carbohidratos: smartPrescription?.carbsG || Number(macros?.carbohidratos) || 0,
+                        grasas: smartPrescription?.fatsG || Number(macros?.grasas) || 0,
                       })
                     : null);
               const targetSmaeTotals = targetSmaeMap ? calculateSmaeTotals(targetSmaeMap) : null;
@@ -5692,6 +6387,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     {subtab === "deporte" && (
       <div>
         {/* Sub-pestañas: Programar vs Tracking */}
+        {!isTemplateMode && (
         <div className="flex gap-1 mb-4 bg-[#F0F4FA] rounded-xl p-1 w-full sm:w-max">
           <button
             type="button"
@@ -5718,8 +6414,9 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
             <span>Tracking</span>
           </button>
         </div>
+        )}
 
-        <div className={entrenoView === "programar" ? "" : "hidden"}>
+        <div className={isTemplateMode || entrenoView === "programar" ? "" : "hidden"}>
           {/* ── Tarjeta Inteligente de Prescripción de Entrenamiento (IA & Biomecánica) ── */}
             {(() => {
               const hasExpediente = Boolean(
@@ -5968,7 +6665,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
               <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                 {rutinas.length > 0 && (
                   <button
-                    onClick={() => generateRutinaPDF(selected, rutinas, parsedActiveCycle, brand, smartTrainingPrescription)}
+                    onClick={() => generateRutinaPDF(selected || { nombre: tplMeta.nombre || "Plantilla de Entrenamiento" }, rutinas, parsedActiveCycle, brand, smartTrainingPrescription)}
                     className="w-8 h-8 sm:w-auto sm:px-3 sm:py-1.5 rounded-xl border border-[#E2E8F0] bg-white text-[#0B1929] hover:bg-gray-50 text-xs sm:text-sm font-bold shadow-2xs transition-colors flex items-center justify-center sm:gap-1.5 cursor-pointer"
                     title="Descargar PDF de Rutinas"
                   >
@@ -5976,7 +6673,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                     <span className="hidden sm:inline">Descargar PDF</span>
                   </button>
                 )}
-                {!isReadOnly && (
+                {!isReadOnly && !isTemplateMode && (
                   <button
                     onClick={() => setTemplateModal("rutina")}
                     className="w-8 h-8 sm:w-auto sm:px-3 sm:py-1.5 rounded-xl border border-[#E2E8F0] bg-white text-[#0B1929] hover:bg-gray-50 text-xs sm:text-sm font-bold shadow-2xs transition-colors flex items-center justify-center sm:gap-1.5 cursor-pointer"
@@ -6478,10 +7175,11 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           expediente: selected?.expediente_clinico || null,
           smaeGustos: evalMetricaForFood?.smae_gustos || smartPrescription?.smaeGustos || null,
         };
-        const savedEvalSmaeDay =
-          evalMetricaForFood?.prescribed_macros?.smaeDistribution ||
-          smartPrescription?.smaeDistribution ||
-          null;
+        const savedEvalSmaeDay = isTemplateMode
+          ? (tplMeta.smaeDistribution || null)
+          : (evalMetricaForFood?.prescribed_macros?.smaeDistribution ||
+            smartPrescription?.smaeDistribution ||
+            null);
         const hasSavedEvalSmaeDay =
           savedEvalSmaeDay &&
           typeof savedEvalSmaeDay === "object" &&
@@ -6517,7 +7215,9 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                     {editDia ? `Editar Día: ${diaForm.diasSeleccionados?.join(', ') || diaForm.dia?.split('|')?.[0] || 'Día'}` : "Nuevo Día de Nutrición"}
                   </h2>
                   <div className="text-[11px] text-[#6B7A8D] hidden sm:block truncate">
-                    {selected?.nombre} • {cicloSel?.nombre?.split('|')?.[0] || 'Plan'}
+                    {isTemplateMode
+                      ? `Taller de Plantilla · ${tplMeta.nombre || "Sin nombre"}`
+                      : `${selected?.nombre} • ${cicloSel?.nombre?.split('|')?.[0] || 'Plan'}`}
                   </div>
                 </div>
               </div>
@@ -6592,7 +7292,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                     Programación del Día
                   </h3>
 
-                  {!editDia && historialDias.length > 0 && !isEstandar && (
+                  {!editDia && !isTemplateMode && historialDias.length > 0 && !isEstandar && (
                     <div className="mb-5 pb-5 border-b border-[#F0F4FA]">
                       <div className="text-xs font-semibold text-[#6B7A8D] mb-1.5 uppercase tracking-wider">Importar desde Historial</div>
                       <CustomSelect
@@ -8431,7 +9131,9 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                   {editRutina ? `Editar: ${editRutina.nombre?.split('|')?.slice(1)?.join('|') || editRutina.nombre}` : "Nueva Rutina de Entrenamiento"}
                 </h2>
                 <div className="text-[11px] text-[#6B7A8D] hidden sm:block truncate">
-                  {selected?.nombre} • {cicloSel?.nombre?.split('|')?.[0] || 'Plan'}
+                  {isTemplateMode
+                    ? `Taller de Plantilla · ${tplMeta.nombre || "Sin nombre"}`
+                    : `${selected?.nombre} • ${cicloSel?.nombre?.split('|')?.[0] || 'Plan'}`}
                 </div>
               </div>
             </div>
@@ -8481,7 +9183,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                   Programación de la Rutina
                 </h3>
 
-                {!editRutina && historialRutinas.length > 0 && !isEstandar && (
+                {!editRutina && !isTemplateMode && historialRutinas.length > 0 && !isEstandar && (
                   <div className="mb-5 pb-5 border-b border-[#F0F4FA]">
                     <div className="text-xs font-semibold text-[#6B7A8D] mb-1.5 uppercase tracking-wider">Importar desde Historial</div>
                     <CustomSelect
@@ -9390,7 +10092,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       )}
 
       {/* ── Modal de Plantillas Maestro (Nutrición y Rutinas) ── */}
-      {templateModal && (
+      {templateModal && !isTemplateMode && (
         <Suspense fallback={null}>
           <TemplatesManagerModal
             type={templateModal}
@@ -9409,20 +10111,65 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                             }),
                     dias
                   }
-                : { rutinas, semanas: planForm?.semanas || 4 }
+                : { rutinas, semanas: cicloSel ? getCycleWeeks(cicloSel) : (planForm?.semanas || 4) }
             }
-            clientes={clientes}
-            currentClienteId={selected?.id}
+            hasExistingPlan={
+              templateModal === "nutri"
+                ? dias.length > 0
+                : rutinas.filter((r) => (r.ejercicios || []).length > 0).length > 0
+            }
+            hasPatientMacros={Number(macros?.calorias || nutri?.calorias || 0) > 0}
+            patientMacros={macros}
+            cycleWeeks={cicloSel ? getCycleWeeks(cicloSel) : (planForm?.semanas || 4)}
             profileId={profileId || (typeof window !== "undefined" && localStorage.getItem("flux_profileId")) || selected?.nutriologo_id || selected?.auth_id}
             onApplyTemplate={
               templateModal === "nutri"
                 ? handleApplyNutriTemplate
                 : handleApplyRutinaTemplate
             }
+            onOpenTemplateBuilder={(tplObj) => {
+              if (!tplObj) return;
+              setActiveTemplateEditor({ type: templateModal, template: tplObj });
+            }}
             onClose={() => setTemplateModal(null)}
             setMsg={setMsg}
           />
         </Suspense>
+      )}
+
+      {/* ── Constructor Independiente de Plantilla (sin paciente asignado) ── */}
+      {activeTemplateEditor && !isTemplateMode && (
+        <div className="fixed inset-0 z-[120] bg-[#F8FAFC] overflow-y-auto animate-in fade-in duration-150">
+          <div className="max-w-7xl mx-auto md:px-4 md:py-4">
+            <ProgramarCliente
+              key={activeTemplateEditor.template?.id || activeTemplateEditor.type}
+              templateWorkspace={{
+                type: activeTemplateEditor.type,
+                template: activeTemplateEditor.template,
+                onChangeTemplate: (updatedTpl) => {
+                  const cid = resolvePlantillasCreatorId(
+                    profileId || (typeof window !== "undefined" && localStorage.getItem("flux_profileId")) || selected?.nutriologo_id || selected?.auth_id
+                  );
+                  upsertUserTemplate({
+                    type: activeTemplateEditor.type,
+                    creatorId: cid,
+                    profileId: cid,
+                    template: updatedTpl,
+                  });
+                  setActiveTemplateEditor((prev) =>
+                    prev && prev.template?.id === updatedTpl.id
+                      ? { ...prev, template: updatedTpl }
+                      : prev
+                  );
+                },
+                onBack: () => setActiveTemplateEditor(null),
+              }}
+              biblioteca={biblioteca}
+              setMsg={setMsg}
+              profileId={profileId || (typeof window !== "undefined" && localStorage.getItem("flux_profileId")) || selected?.nutriologo_id || selected?.auth_id}
+            />
+          </div>
+        </div>
       )}
 
       {/* ── Calculadora Metabólica y de Macronutrientes ── */}

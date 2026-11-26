@@ -5,7 +5,7 @@ import {
   Loader2, Circle, CircleDashed, Trash2, Crown, ChevronRight, ArrowLeft, 
   Check, Shield, Plus, Briefcase, Lock, UserCheck, Sliders, Edit2,
   CalendarDays, ShoppingBag, Banknote, Activity, UtensilsCrossed, Dumbbell, Camera, UsersRound,
-  Copy, DollarSign, Wallet, CreditCard, ChevronDown, Calendar, Send, Clock, Search, X
+  Copy, DollarSign, Wallet, CreditCard, ChevronDown, Calendar, Send, Clock, Search, X, Bookmark
 } from "lucide-react";
 import { 
   authInvite, authResetPassword, dbPeek, dbGet, dbGetFresh, dbPost, 
@@ -20,6 +20,7 @@ import { checkAndCleanOrphanedEmail, deleteCollaboratorAccount } from "../../lib
 export const SUPERADMIN_TABS = [
   { id: "clientes",         nombre: "Directorio",          desc: "Especialistas, atletas y pacientes", icon: "Users" },
   { id: "agenda",           nombre: "Agenda",              desc: "Citas y disponibilidad médica", icon: "CalendarDays" },
+  { id: "plantillas",       nombre: "Mis Plantillas",      desc: "Recetario personal de dietas y rutinas", icon: "Bookmark" },
   { id: "equipo",           nombre: "Mi Equipo",           desc: "Gestión de colaboradores y roles", icon: "UsersRound" },
   { id: "aprobaciones",     nombre: "Aprobaciones",        desc: "Solicitudes de registro profesional", icon: "UserCheck" },
   { id: "biblioteca",       nombre: "Biblioteca",          desc: "Catálogo de ejercicios y movimientos", icon: "Folder" },
@@ -145,6 +146,7 @@ function TabIcon({ id, size = 15, className = "" }) {
   switch (id) {
     case "clientes": return <Users size={size} className={className} />;
     case "agenda": return <CalendarDays size={size} className={className} />;
+    case "plantillas": return <Bookmark size={size} className={className} />;
     case "equipo": return <UsersRound size={size} className={className} />;
     case "aprobaciones": return <UserCheck size={size} className={className} />;
     case "biblioteca": return <Folder size={size} className={className} />;
