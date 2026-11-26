@@ -69,7 +69,7 @@ import {
   autoDistributeSmaeFromMacros,
   calculateSmaeTotals,
 } from "../../lib/smaeData";
-import { parseDiaMetadata } from "../../lib/mealOptions";
+import { parseDiaMetadata, countCompletedMealsForDay, computeCycleNutritionKpis } from "../../lib/mealOptions";
 import UpgradeModal from "../ui/UpgradeModal";
 
 const FIELDS_BASICAS = [
@@ -4133,8 +4133,77 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
             const validWeeks = visibleNutriWeeks.length > 0
               ? visibleNutriWeeks
               : [{ weekNum: 1, label: "Semana 1", isCurrent: true }];
+            const nutriKpis = computeCycleNutritionKpis({
+              nutriDias,
+              nutriProgreso,
+              ciclo: cicloSel,
+              refItem: rutinas[0] || null,
+              clientePeso: selected?.peso || displayedMetricas?.[0]?.peso || activeMetricas?.[0]?.peso || null,
+            });
 
             return (
+              <>
+              {/* Cabecera de KPIs de Nutrición del Ciclo (sin días/semanas futuras) */}
+              <div className="mb-4 grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <div className="bg-white rounded-xl border border-[#E2E8F0] p-3 shadow-2xs">
+                  <span className="text-[10px] font-bold text-[#6B7A8D] uppercase tracking-wider block">
+                    Adherencia Menú
+                  </span>
+                  <div className="flex items-baseline gap-1.5 mt-1">
+                    <span className={`text-xl font-extrabold font-mono ${
+                      nutriKpis.adherenceMealsPct >= 80 ? "text-emerald-600" : nutriKpis.adherenceMealsPct >= 50 ? "text-[var(--brand-primary)]" : "text-amber-600"
+                    }`}>
+                      {nutriKpis.adherenceMealsPct}%
+                    </span>
+                    <span className="text-[11px] text-[#6B7A8D] font-medium">
+                      ({nutriKpis.completedMealsToDate}/{nutriKpis.expectedMealsToDate} com.)
+                    </span>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-xl border border-[#E2E8F0] p-3 shadow-2xs">
+                  <span className="text-[10px] font-bold text-[#6B7A8D] uppercase tracking-wider block">
+                    Días (Hasta Hoy)
+                  </span>
+                  <div className="flex items-baseline gap-1.5 mt-1 flex-wrap">
+                    <span className="text-xl font-extrabold font-mono text-[#0B1929]">
+                      {nutriKpis.activeDaysCount}/{nutriKpis.expectedDays}
+                    </span>
+                    <span className="text-[11px] font-semibold text-emerald-700">
+                      · {nutriKpis.completeDaysCount} completo{nutriKpis.completeDaysCount === 1 ? "" : "s"}
+                    </span>
+                  </div>
+                  {nutriKpis.hasActiveCurrentWeek && nutriKpis.currentWeekExpectedDays > 0 && (
+                    <div className="text-[10px] text-[#6B7A8D] mt-0.5 font-medium">
+                      Sem. actual: {nutriKpis.currentWeekActiveCount}/{nutriKpis.currentWeekExpectedDays} reg. · {nutriKpis.currentWeekCompleteCount} completo{nutriKpis.currentWeekCompleteCount === 1 ? "" : "s"}
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-white rounded-xl border border-[#E2E8F0] p-3 shadow-2xs">
+                  <span className="text-[10px] font-bold text-[#6B7A8D] uppercase tracking-wider block">
+                    Hidratación Promedio
+                  </span>
+                  <div className="flex items-baseline gap-1.5 mt-1 flex-wrap">
+                    <span className="text-lg font-extrabold font-mono text-[#0B1929]">
+                      {nutriKpis.avgWaterL} L/día
+                    </span>
+                    <span className={`inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                      nutriKpis.waterPct >= 85
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                        : nutriKpis.waterPct >= 50
+                        ? "bg-sky-50 text-sky-700 border-sky-200"
+                        : "bg-slate-50 text-[#6B7A8D] border-[#E2E8F0]"
+                    }`}>
+                      {nutriKpis.waterPct}% meta
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-[#6B7A8D] mt-0.5 font-medium">
+                    Meta diaria prom.: {nutriKpis.avgWaterGoalL} L
+                  </div>
+                </div>
+              </div>
+
               <div className="bg-white rounded-none md:rounded-2xl border-b md:border border-[#E2E8F0] shadow-none md:shadow-sm overflow-hidden">
                 <div className="px-4 py-3 border-b border-[#E2E8F0] bg-gray-50/60 flex items-center justify-between flex-wrap gap-2">
                   <div>
@@ -4191,16 +4260,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                             {validWeeks.map(s => {
                               const r = nutriProgreso[`${d.id}-${s.weekNum}`];
                               const agua = Number(r?.agua_ml) || 0;
-                              const doneMap = (r && typeof r.comidas_done === "object" && r.comidas_done !== null) ? r.comidas_done : {};
-                              let doneCount = (d.comidas || []).filter((c, ci) => Boolean(
-                                (c.id && doneMap[c.id]) ||
-                                doneMap[ci] ||
-                                doneMap[String(ci)] ||
-                                (c.orden != null && doneMap[c.orden])
-                              )).length;
-                              if (doneCount === 0 && Number(r?.comidas_realizadas) > 0) {
-                                doneCount = Math.min(Number(r.comidas_realizadas), totalC);
-                              }
+                              const doneCount = countCompletedMealsForDay(d, r);
                               const hasAny = agua > 0 || doneCount > 0;
                               return (
                                 <td
@@ -4242,17 +4302,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                             const r = nutriProgreso[`${d.id}-${s.weekNum}`];
                             const totalC = (d.comidas || []).length;
                             semTotalComidas += totalC;
-                            const doneMap = (r && typeof r.comidas_done === "object" && r.comidas_done !== null) ? r.comidas_done : {};
-                            let doneCount = (d.comidas || []).filter((c, ci) => Boolean(
-                              (c.id && doneMap[c.id]) ||
-                              doneMap[ci] ||
-                              doneMap[String(ci)] ||
-                              (c.orden != null && doneMap[c.orden])
-                            )).length;
-                            if (doneCount === 0 && Number(r?.comidas_realizadas) > 0) {
-                              doneCount = Math.min(Number(r.comidas_realizadas), totalC);
-                            }
-                            semComidas += doneCount;
+                            semComidas += countCompletedMealsForDay(d, r);
                             semAgua += Number(r?.agua_ml) || 0;
                           });
                           const hasData = semComidas > 0 || semAgua > 0;
@@ -4280,6 +4330,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                   </table>
                 </div>
               </div>
+              </>
             );
           })()}
         </div>

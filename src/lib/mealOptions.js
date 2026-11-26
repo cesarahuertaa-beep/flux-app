@@ -11,7 +11,8 @@ import {
   extractSmaeMapFromMealText,
   embedSmaeMapInMealText,
   extractMealIngredientsFromText,
-} from "./smaeData";
+} from "./smaeData.js";
+import { getCurrentCycleWeekInfo, hasCycleSlotArrived } from "../utils/helpers.js";
 
 /**
  * Parsea las opciones de una comida desde opcion1 y opcion2
@@ -145,4 +146,171 @@ export function formatDiaMetadata({ dayCode, titulo, agua, suplementos, smae }) 
     extra.push(`SMAE:${String(smae).trim()}`);
   }
   return [code, title, ...extra].join("|");
+}
+
+/** Cuenta las comidas completadas de un día nutricional dado su registro de progreso. */
+export function countCompletedMealsForDay(dia, progRec) {
+  const comidas = Array.isArray(dia?.comidas) ? dia.comidas : [];
+  const totalC = comidas.length;
+  const doneMap =
+    progRec && typeof progRec.comidas_done === "object" && progRec.comidas_done !== null
+      ? progRec.comidas_done
+      : {};
+  let doneCount = comidas.filter((c, ci) =>
+    Boolean(
+      (c?.id && doneMap[c.id]) ||
+        doneMap[ci] ||
+        doneMap[String(ci)] ||
+        (c?.orden != null && doneMap[c.orden])
+    )
+  ).length;
+  if (doneCount === 0 && Number(progRec?.comidas_realizadas) > 0) {
+    const rawCount = Number(progRec.comidas_realizadas);
+    doneCount = totalC > 0 ? Math.min(rawCount, totalC) : rawCount;
+  }
+  return doneCount;
+}
+
+/** Resuelve la meta diaria de hidratación (ml) a partir de metadatos del día, registro o peso del paciente. */
+export function resolveNutritionDayWaterGoalMl(dia, progRec, fallbackMl = 2500) {
+  const meta = parseDiaMetadata(dia?.dia || dia?.nombre || "");
+  const parsedLitros = parseFloat(String(meta?.agua || "").replace(",", "."));
+  if (!isNaN(parsedLitros) && parsedLitros > 0) {
+    return Math.round(parsedLitros * 1000);
+  }
+  if (Number(progRec?.meta_agua_ml) > 0) {
+    return Number(progRec.meta_agua_ml);
+  }
+  return fallbackMl;
+}
+
+/**
+ * Calcula KPIs globales del ciclo nutricional para la vista Tracking (sin contar semanas o días futuros sin registro).
+ */
+export function computeCycleNutritionKpis({
+  nutriDias = [],
+  nutriProgreso = {},
+  ciclo = null,
+  refItem = null,
+  clientePeso = null,
+}) {
+  const safeDias = Array.isArray(nutriDias) ? nutriDias : [];
+  let totalWeeks = parseInt(refItem?.semanas, 10) || 0;
+  if (!totalWeeks && ciclo?.nombre?.includes("|")) {
+    totalWeeks = parseInt(ciclo.nombre.split("|")[1], 10) || 4;
+  }
+  if (!totalWeeks) totalWeeks = 4;
+
+  const startRaw =
+    refItem?.fecha_inicio ||
+    ciclo?.fecha_inicio ||
+    ciclo?.created_at ||
+    refItem?.created_at ||
+    null;
+  const weekInfo = startRaw
+    ? getCurrentCycleWeekInfo(startRaw)
+    : { currentCycleWeek: 1, isFuture: false };
+  const maxAllowedWeekIdx = weekInfo.isFuture
+    ? -1
+    : Math.min(totalWeeks - 1, Math.max(0, (weekInfo.currentCycleWeek || 1) - 1));
+  const hasActiveCurrentWeek = !weekInfo.isFuture && (weekInfo.currentCycleWeek || 1) <= totalWeeks;
+
+  const pesoNum = parseFloat(clientePeso);
+  const defaultWaterGoalMl =
+    !isNaN(pesoNum) && pesoNum > 0 ? Math.round((pesoNum * 35) / 50) * 50 : 2500;
+
+  const now = new Date();
+  const todayNoon = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0, 0);
+
+  let expectedMealsToDate = 0;
+  let completedMealsToDate = 0;
+  let expectedDays = 0;
+  let activeDaysCount = 0;
+  let completeDaysCount = 0;
+  let totalWaterMl = 0;
+  let expectedWaterMlToDate = 0;
+  let currentWeekActiveCount = 0;
+  let currentWeekCompleteCount = 0;
+  let currentWeekExpectedDays = 0;
+
+  for (let w = 0; w <= maxAllowedWeekIdx; w++) {
+    const weekNum = w + 1;
+    for (let dIdx = 0; dIdx < safeDias.length; dIdx++) {
+      const d = safeDias[dIdx];
+      const totalC = (d?.comidas || []).length;
+      const rec = nutriProgreso?.[`${d.id}-${weekNum}`];
+      const doneCount = countCompletedMealsForDay(d, rec);
+      const aguaMl = Math.max(0, Number(rec?.agua_ml) || 0);
+      const metaAguaMl = resolveNutritionDayWaterGoalMl(d, rec, defaultWaterGoalMl);
+
+      const dayHasActivity = doneCount > 0 || aguaMl > 0;
+      const isDayComplete = totalC > 0 ? doneCount >= totalC : dayHasActivity;
+
+      const meta = parseDiaMetadata(d?.dia || d?.nombre || "");
+      const dayTag =
+        meta.dayCode && meta.dayCode !== "S/D"
+          ? meta.dayCode
+          : d?.dia_semana || d?.nombre || "";
+
+      const hasArrived = hasCycleSlotArrived({
+        dayTagOrName: dayTag,
+        slotIdx: dIdx,
+        totalSlots: safeDias.length,
+        weekIdx: w,
+        startStr: startRaw,
+        todayNoon,
+      });
+
+      const countsInExpected = hasArrived || dayHasActivity;
+      if (countsInExpected) {
+        expectedDays++;
+        expectedMealsToDate += totalC;
+        expectedWaterMlToDate += metaAguaMl;
+      }
+      if (dayHasActivity) activeDaysCount++;
+      if (isDayComplete) completeDaysCount++;
+
+      completedMealsToDate += doneCount;
+      totalWaterMl += aguaMl;
+
+      if (hasActiveCurrentWeek && w === maxAllowedWeekIdx) {
+        if (countsInExpected) currentWeekExpectedDays++;
+        if (dayHasActivity) currentWeekActiveCount++;
+        if (isDayComplete) currentWeekCompleteCount++;
+      }
+    }
+  }
+
+  const adherenceMealsPct =
+    expectedMealsToDate > 0
+      ? Math.min(100, Math.round((completedMealsToDate / expectedMealsToDate) * 100))
+      : 0;
+  const avgWaterL =
+    expectedDays > 0 ? (totalWaterMl / (expectedDays * 1000)).toFixed(2) : "0.00";
+  const avgWaterGoalL =
+    expectedDays > 0
+      ? (expectedWaterMlToDate / (expectedDays * 1000)).toFixed(2)
+      : (defaultWaterGoalMl / 1000).toFixed(2);
+  const waterPct =
+    expectedWaterMlToDate > 0
+      ? Math.min(100, Math.round((totalWaterMl / expectedWaterMlToDate) * 100))
+      : 0;
+
+  return {
+    expectedMealsToDate,
+    completedMealsToDate,
+    adherenceMealsPct,
+    expectedDays,
+    activeDaysCount,
+    completeDaysCount,
+    totalWaterMl,
+    expectedWaterMlToDate,
+    avgWaterL,
+    avgWaterGoalL,
+    waterPct,
+    hasActiveCurrentWeek,
+    currentWeekActiveCount,
+    currentWeekCompleteCount,
+    currentWeekExpectedDays,
+  };
 }

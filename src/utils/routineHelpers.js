@@ -1,7 +1,7 @@
 // Utilidades compartidas para rutinas híbridas (plano + por serie),
 // etiquetas de serie, superseries, volumen semanal, migración y cálculo histórico 1RM/PR.
 import { GRUPO_LABELS, normalizeMuscleGroup } from "../lib/constants.js";
-import { getCurrentCycleWeekInfo, parseLocalDateNoon } from "./helpers.js";
+import { getCurrentCycleWeekInfo, hasCycleSlotArrived } from "./helpers.js";
 
 const LB_TO_KG = 0.45359237;
 const KG_TO_LB = 2.20462262;
@@ -1114,42 +1114,6 @@ export function buildExerciseChartSeries({
   };
 }
 
-const ROUTINE_WEEKDAY_MAP = {
-  DOM: 0, DOMINGO: 0,
-  LUN: 1, LUNES: 1,
-  MAR: 2, MARTES: 2,
-  MIE: 3, MIÉ: 3, MIERCOLES: 3, MIÉRCOLES: 3,
-  JUE: 4, JUEVES: 4,
-  VIE: 5, VIERNES: 5,
-  SAB: 6, SÁB: 6, SABADO: 6, SÁBADO: 6,
-};
-
-function getRoutineJsWeekday(routine) {
-  const parts = String(routine?.nombre || "").split("|");
-  const rawTag = (parts.length > 1 ? parts[0] : parts[0] || "").trim().toUpperCase();
-  return Object.prototype.hasOwnProperty.call(ROUTINE_WEEKDAY_MAP, rawTag)
-    ? ROUTINE_WEEKDAY_MAP[rawTag]
-    : null;
-}
-
-function hasRoutineSessionArrived({ routine, routineIdx, totalRoutines, weekIdx, startStr, todayNoon }) {
-  if (!startStr) return true;
-  const inicioNoon = parseLocalDateNoon(startStr);
-  const weekStart = new Date(inicioNoon.getFullYear(), inicioNoon.getMonth(), inicioNoon.getDate() + weekIdx * 7, 12, 0, 0, 0);
-  const weekEnd = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 6, 12, 0, 0, 0);
-
-  if (weekEnd.getTime() < todayNoon.getTime()) return true;
-  if (weekStart.getTime() > todayNoon.getTime()) return false;
-
-  const jsWeekday = getRoutineJsWeekday(routine);
-  const offsetDays = jsWeekday !== null
-    ? (jsWeekday - weekStart.getDay() + 7) % 7
-    : (totalRoutines <= 1 ? 0 : Math.floor((routineIdx * 7) / totalRoutines));
-
-  const sessionDate = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + offsetDays, 12, 0, 0, 0);
-  return sessionDate.getTime() <= todayNoon.getTime();
-}
-
 /** Evalúa ejecución real, faltas y estado ('sealed' | 'complete' | 'partial' | 'pending') de una rutina en una semana 0-based. */
 export function evaluateRoutineWeekStatus(routine, weekIdx, progreso = {}, finalizedSessions = {}) {
   const ejs = Array.isArray(routine?.ejercicios) ? routine.ejercicios : [];
@@ -1299,10 +1263,10 @@ export function computeCycleTrainingKpis({
         completedByMuscle[grp] = (completedByMuscle[grp] || 0) + cnt;
       }
 
-      const hasArrived = hasRoutineSessionArrived({
-        routine: r,
-        routineIdx: rIdx,
-        totalRoutines: safeRutinas.length,
+      const hasArrived = hasCycleSlotArrived({
+        dayTagOrName: r?.nombre,
+        slotIdx: rIdx,
+        totalSlots: safeRutinas.length,
         weekIdx: w,
         startStr: rStartRaw,
         todayNoon,

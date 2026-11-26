@@ -123,6 +123,55 @@ export const getVisibleCycleWeeks = (item, ciclo = null) => {
   return all;
 };
 
+const CYCLE_WEEKDAY_MAP = {
+  DOM: 0, DOMINGO: 0,
+  LUN: 1, LUNES: 1,
+  MAR: 2, MARTES: 2,
+  MIE: 3, MIÉ: 3, MIERCOLES: 3, MIÉRCOLES: 3,
+  JUE: 4, JUEVES: 4,
+  VIE: 5, VIERNES: 5,
+  SAB: 6, SÁB: 6, SABADO: 6, SÁBADO: 6,
+};
+
+/** Extrae el día JS (`0..6`) de una etiqueta tipo `LUN|...` / `MIE`, o `null` si no tiene día de semana explícito. */
+export const parseScheduleJsWeekday = (rawLabel) => {
+  const parts = String(rawLabel || "").split("|");
+  const rawTag = (parts.length > 1 ? parts[0] : parts[0] || "").trim().toUpperCase();
+  return Object.prototype.hasOwnProperty.call(CYCLE_WEEKDAY_MAP, rawTag)
+    ? CYCLE_WEEKDAY_MAP[rawTag]
+    : null;
+};
+
+/**
+ * Determina si un slot/sesión (rutina o día nutricional) ya llegó al día calendario actual (`todayNoon`)
+ * dentro de la semana `weekIdx` (0-based) de un ciclo iniciado en `startStr`.
+ */
+export const hasCycleSlotArrived = ({
+  dayTagOrName,
+  slotIdx = 0,
+  totalSlots = 1,
+  weekIdx = 0,
+  startStr,
+  todayNoon,
+}) => {
+  if (!startStr) return true;
+  const inicioNoon = parseLocalDateNoon(startStr);
+  const weekStart = new Date(inicioNoon.getFullYear(), inicioNoon.getMonth(), inicioNoon.getDate() + weekIdx * 7, 12, 0, 0, 0);
+  const weekEnd = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 6, 12, 0, 0, 0);
+
+  if (weekEnd.getTime() < todayNoon.getTime()) return true;
+  if (weekStart.getTime() > todayNoon.getTime()) return false;
+
+  const jsWeekday = parseScheduleJsWeekday(dayTagOrName);
+  const safeTotal = Math.max(1, totalSlots);
+  const offsetDays = jsWeekday !== null
+    ? (jsWeekday - weekStart.getDay() + 7) % 7
+    : (safeTotal <= 1 ? 0 : Math.floor((slotIdx * 7) / safeTotal));
+
+  const sessionDate = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + offsetDays, 12, 0, 0, 0);
+  return sessionDate.getTime() <= todayNoon.getTime();
+};
+
 /**
  * Comprime y redimensiona una imagen antes de subirla para evitar timeouts,
  * optimizar ancho de banda móvil y acelerar la carga en la galería.
