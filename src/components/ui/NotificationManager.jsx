@@ -136,16 +136,23 @@ export default function NotificationManager({ session }) {
     const applyNavigation = (rawLink) => {
       if (!rawLink) return;
       const role = session?.role || localStorage.getItem("flux_role") || "";
+      const isAtletaMode = Boolean(sessionStorage.getItem("flux_atleta_data"));
       let targetTab = rawLink;
 
-      if (role === "cliente") {
+      if (role === "cliente" || isAtletaMode) {
         if (rawLink === "agenda" || rawLink === "citas") targetTab = "citas";
         else if (rawLink === "mi_plan" || rawLink === "nutricion") targetTab = "nutricion";
-        else if (rawLink === "deporte" || rawLink === "rutinas") targetTab = "deporte";
+        else if (rawLink === "deporte" || rawLink === "rutinas" || rawLink === "entrenamiento") targetTab = "deporte";
         else if (rawLink === "progreso") targetTab = "progreso";
+        else if (rawLink === "pasos") targetTab = "pasos";
         sessionStorage.setItem("flux_cliente_tab", targetTab);
       } else {
-        if (rawLink === "citas") targetTab = "agenda";
+        // Roles de Admin / Nutriólogo / Staff / Civil (Atleta Independiente)
+        if (rawLink === "citas" || rawLink === "agenda") targetTab = "agenda";
+        else if (rawLink === "deporte" || rawLink === "rutinas" || rawLink === "entrenamiento") targetTab = "entrenamiento";
+        else if (rawLink === "mi_plan" || rawLink === "nutricion") targetTab = "nutricion";
+        else if (rawLink === "progreso") targetTab = "progreso_atleta";
+        else if (rawLink === "pasos") targetTab = "pasos";
         sessionStorage.setItem("flux_admin_tab", targetTab);
       }
 

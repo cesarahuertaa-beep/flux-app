@@ -549,6 +549,24 @@ public class MainActivity extends BridgeActivity {
         });
     }
 
+    public static void onOverlayAddedSeconds(int secs) {
+        if (activeTimerEndMs > 0) {
+            activeTimerEndMs += secs * 1000L;
+        }
+        MainActivity act = activeInstance != null ? activeInstance.get() : null;
+        if (act == null) return;
+        act.runOnUiThread(() -> {
+            try {
+                if (act.bridge != null && act.bridge.getWebView() != null) {
+                    act.bridge.getWebView().evaluateJavascript(
+                        "window.dispatchEvent(new CustomEvent('flux:overlay-timer-add', { detail: { seconds: " + secs + " } }));",
+                        null
+                    );
+                }
+            } catch (Exception ignored) {}
+        });
+    }
+
     public class FluxTimerBridge {
         @JavascriptInterface
         public boolean canDrawOverlays() {

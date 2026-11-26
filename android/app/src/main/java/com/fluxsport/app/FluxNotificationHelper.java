@@ -102,7 +102,7 @@ public class FluxNotificationHelper {
             openIntent.setFlags(
                 Intent.FLAG_ACTIVITY_NEW_TASK
                     | Intent.FLAG_ACTIVITY_SINGLE_TOP
-                    | Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
             );
             if (linkUrl != null && !linkUrl.isEmpty()) {
                 openIntent.putExtra("flux_notif_link", linkUrl);

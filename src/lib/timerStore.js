@@ -232,6 +232,21 @@ export const timerStore = {
     notify();
   },
 
+  addSeconds: (secs = 30) => {
+    if (state.status === "RUNNING" && state.endTime) {
+      state.endTime += secs * 1000;
+      state.seconds += secs;
+      state.initialSeconds = (state.initialSeconds || 0) + secs;
+      syncNativeBridge();
+      notify();
+    } else if (state.status === "IDLE") {
+      const next = Math.max(5, (state.seconds || 0) + secs);
+      state.seconds = next;
+      state.initialSeconds = next;
+      notify();
+    }
+  },
+
   start: () => {
     if (state.seconds <= 0) return;
     if (state.isProgrammingPreset) {
@@ -342,5 +357,9 @@ if (typeof document !== "undefined") {
 if (typeof window !== "undefined") {
   window.addEventListener("flux:overlay-timer-stopped", () => {
     timerStore.stopAndReset();
+  });
+  window.addEventListener("flux:overlay-timer-add", (e) => {
+    const secs = Number(e?.detail?.seconds) || 30;
+    timerStore.addSeconds(secs);
   });
 }

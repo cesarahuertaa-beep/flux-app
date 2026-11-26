@@ -3526,7 +3526,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       console.error("Error auditando día con IA:", err);
       setMsg(
         <div className="text-amber-600 text-xs">
-          ⚠️ {err.message || "No se pudo auditar el día completo."}
+           {err.message || "No se pudo auditar el día completo."}
         </div>
       );
     } finally {
@@ -3590,7 +3590,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         setMsg(
           <div className="flex items-center gap-1.5 text-amber-700">
             <AlertCircle className="w-4 h-4 text-amber-600" />
-            <span>Macros calculados • ⚠️ Revisa el aviso clínico del platillo</span>
+            <span>Macros calculados •  Revisa el aviso clínico del platillo</span>
           </div>
         );
       } else {
@@ -3604,7 +3604,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       }
     } catch (err) {
       console.error(err);
-      setMsg(<div className="text-amber-600 text-xs">⚠️ {err.message || "No se pudo optimizar la comida"}</div>);
+      setMsg(<div className="text-amber-600 text-xs"> {err.message || "No se pudo optimizar la comida"}</div>);
     } finally {
       setAiOptimizingIndex(null);
     }
@@ -5353,7 +5353,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                               <div className="mt-2.5 p-2.5 rounded-xl bg-emerald-50/50 border border-emerald-200/70 space-y-1.5">
                                 <div className="flex items-center justify-between gap-2 flex-wrap">
                                   <span className="text-[11px] font-bold text-emerald-950 uppercase tracking-wider flex items-center gap-1.5">
-                                    <span>🇲🇽</span>
                                     <span>Meta de Equivalentes SMAE del Ciclo ({smaeTotals.totalEquivalentes} eq/día):</span>
                                   </span>
                                   <span className="text-[10px] font-mono font-semibold text-emerald-800">
@@ -5364,9 +5363,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                   {activeGrps.map((g) => (
                                     <span
                                       key={g.id}
-                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white border border-emerald-200/80 text-[11px] font-semibold text-[#0B1929]"
+                                      className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-white border border-emerald-200/80 text-[11px] font-semibold text-[#0B1929]"
                                     >
-                                      <span>{g.icono}</span>
                                       <span>{g.corto}:</span>
                                       <strong className="text-emerald-700 font-mono">{smaeDist[g.id]} eq</strong>
                                     </span>
@@ -5584,8 +5582,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                         ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                         : "bg-[#F8FAFC] text-[#475569] border-[#E2E8F0]";
                       return (
-                        <span key={g.id} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border text-[11px] font-semibold ${badgeCls}`}>
-                          <span>{g.icono}</span>
+                        <span key={g.id} className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg border text-[11px] font-semibold ${badgeCls}`}>
                           <span>{g.corto}</span>
                           <span className="font-mono font-bold">{avgVal}</span>
                         </span>
@@ -5636,7 +5633,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                   if (smaeTot.totalEquivalentes <= 0) return null;
                                   return (
                                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/70 text-[10px] font-bold">
-                                      <span>🇲🇽 {smaeTot.totalEquivalentes} eq SMAE</span>
+                                      <span>{smaeTot.totalEquivalentes} eq SMAE</span>
                                     </span>
                                   );
                                 })()}
@@ -6539,7 +6536,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                   <span className={`ml-1 text-[11px] font-bold px-2 py-0.5 rounded-lg ${
                     diffKcal === 0 ? 'bg-emerald-100 text-emerald-800' : diffKcal > 0 ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'
                   }`}>
-                    {diffKcal === 0 ? '🎯 Meta exacta' : diffKcal > 0 ? `Faltan ${diffKcal} kcal` : `Excedido +${Math.abs(diffKcal)} kcal`}
+                    {diffKcal === 0 ? 'Meta exacta' : diffKcal > 0 ? `Faltan ${diffKcal} kcal` : `Excedido +${Math.abs(diffKcal)} kcal`}
                   </span>
                 )}
               </div>
@@ -6738,7 +6735,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                 title={g.nombre}
                               >
                                 <span className="flex items-center gap-1.5 truncate">
-                                  <span>{g.icono}</span>
                                   <span className="truncate">{g.corto}</span>
                                 </span>
                                 <div className="flex items-center gap-1 shrink-0 font-mono font-bold">
@@ -6773,7 +6769,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                           onClick={() => setDiaForm(p => ({ ...p, aguaLitros: recWater }))}
                           className="text-[10px] font-bold text-blue-600 hover:text-blue-800 transition-colors"
                         >
-                          💧 Sugerir ({recWater} L)
+                          Sugerir ({recWater} L)
                         </button>
                       )}
                     </div>
@@ -7060,7 +7056,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                         </span>
                                         {c.opcionesPlatilloBase?.[0]?.nombre && (
                                           <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-md bg-[#F8FAFC] text-[#0B1929] border border-[#E2E8F0] flex items-center gap-1">
-                                            <span>🍲</span>
                                             <span>Receta base: {c.opcionesPlatilloBase[0].nombre}</span>
                                           </span>
                                         )}
@@ -7123,7 +7118,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                     : "bg-white text-[#6B7A8D] border-[#E2E8F0] hover:bg-gray-50 hover:text-[#0B1929]"
                                                 }`}
                                               >
-                                                <span>{cat.icono}</span>
+                                                
                                                 <span>{cat.nombre}</span>
                                               </button>
                                             );
@@ -7194,7 +7189,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                         )}
                                                         {evalRes.status === "evitar" && (
                                                           <span className="text-[9px] font-bold text-rose-700 bg-rose-100 px-1.5 py-0.5 rounded" title={evalRes.reason}>
-                                                            🚫 Evitar
+                                                            Evitar
                                                           </span>
                                                         )}
                                                       </div>
@@ -7211,7 +7206,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                         <div className="p-3.5 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0] space-y-2.5 animate-in fade-in">
                                           <div className="flex items-center justify-between gap-2">
                                             <span className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5">
-                                              <span>🥑</span>
                                               <span>Catálogo Oficial de Alimentos Equivalentes SMAE</span>
                                             </span>
                                             <button
@@ -7261,7 +7255,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                     : "bg-white text-[#6B7A8D] border-[#E2E8F0] hover:bg-gray-50 hover:text-[#0B1929]"
                                                 }`}
                                               >
-                                                <span>{cat.icono}</span>
+                                                
                                                 <span>{cat.nombre}</span>
                                               </button>
                                             );
@@ -7377,7 +7371,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                           )}
                                                           {evalRes.status === "evitar" && (
                                                             <span className="text-[9px] px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 font-bold shrink-0" title={evalRes.reason}>
-                                                              🚫 Evitar
+                                                              Evitar
                                                             </span>
                                                           )}
                                                         </div>
@@ -7452,16 +7446,14 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                       onClick={() => setMealOptionMode(i, 0, "ingredientes")}
                                                       className="text-xs font-bold px-4 py-2.5 rounded-xl bg-white text-[#0B1929] border border-[#E2E8F0] hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/5 flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs"
                                                     >
-                                                      <span>🥑</span>
-                                                      <span>Construirlo con equivalentes SMAE</span>
+                                                              <span>Construirlo con equivalentes SMAE</span>
                                                     </button>
                                                     <button
                                                       type="button"
                                                       onClick={() => setMealOptionMode(i, 0, "platillo")}
                                                       className="text-xs font-bold px-4 py-2.5 rounded-xl bg-white text-[#0B1929] border border-[#E2E8F0] hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/5 flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs"
                                                     >
-                                                      <span>🍲</span>
-                                                      <span>Cargar receta prescrita de la Biblioteca</span>
+                                                                <span>Cargar receta prescrita de la Biblioteca</span>
                                                     </button>
                                                   </div>
                                                 </div>
@@ -7481,8 +7473,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                   </div>
                                                   <div className="flex items-center justify-between gap-2 flex-wrap">
                                                       <span className="text-[11px] font-extrabold text-[#0B1929] uppercase tracking-wider flex items-center gap-1.5">
-                                                        <span>🥑</span>
-                                                        <span>Alimentos seleccionados ({liveMainSel.details.length})</span>
+                                                                  <span>Alimentos seleccionados ({liveMainSel.details.length})</span>
                                                       </span>
                                                       <div className="flex items-center gap-2">
                                                         <button
@@ -7636,7 +7627,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                       {liveMainSel.details.length > 0 ? (
                                                         <>
                                                           <p className="font-semibold text-[var(--brand-primary)]">
-                                                            ✨ Al dar clic en «Guardar día», la IA redactará automáticamente la receta para el paciente con estos gramajes exactos.
+                                                            Al dar clic en «Guardar día», la IA redactará automáticamente la receta para el paciente con estos gramajes exactos.
                                                           </p>
                                                           {opcionesList[0] && (
                                                             <p className="text-[11px] text-[#6B7A8D] mt-1 pt-1 border-t border-[#E2E8F0] line-clamp-2 italic">
@@ -7700,8 +7691,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                   </span>
                                                   {c.opcionesPlatilloBase?.[actualIdx]?.nombre && (
                                                     <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-md bg-[#F8FAFC] text-[#0B1929] border border-[#E2E8F0] flex items-center gap-1">
-                                                      <span>🍲</span>
-                                                      <span>Receta base: {c.opcionesPlatilloBase[actualIdx].nombre}</span>
+                                                                <span>Receta base: {c.opcionesPlatilloBase[actualIdx].nombre}</span>
                                                     </span>
                                                   )}
                                                 </div>
@@ -7774,7 +7764,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                             : "bg-white text-[#6B7A8D] border-[#E2E8F0] hover:bg-gray-50 hover:text-[#0B1929]"
                                                         }`}
                                                       >
-                                                        <span>{cat.icono}</span>
+                                                        
                                                         <span>{cat.nombre}</span>
                                                       </button>
                                                     );
@@ -7842,7 +7832,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                                 )}
                                                                 {evalRes.status === "evitar" && (
                                                                   <span className="text-[9px] font-bold text-rose-700 bg-rose-100 px-1.5 py-0.5 rounded" title={evalRes.reason}>
-                                                                    🚫 Evitar
+                                                                    Evitar
                                                                   </span>
                                                                 )}
                                                               </div>
@@ -7859,8 +7849,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                 <div className="p-3.5 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0] space-y-2.5 animate-in fade-in">
                                                   <div className="flex items-center justify-between gap-2">
                                                     <span className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5">
-                                                      <span>🥑</span>
-                                                      <span>Catálogo SMAE (Opción {optionLetter})</span>
+                                                              <span>Catálogo SMAE (Opción {optionLetter})</span>
                                                     </span>
                                                     <button
                                                       type="button"
@@ -7907,7 +7896,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                             : "bg-white text-[#6B7A8D] border-[#E2E8F0] hover:bg-gray-50 hover:text-[#0B1929]"
                                                         }`}
                                                       >
-                                                        <span>{cat.icono}</span>
+                                                        
                                                         <span>{cat.nombre}</span>
                                                       </button>
                                                     );
@@ -8020,7 +8009,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                                   )}
                                                                   {evalRes.status === "evitar" && (
                                                                     <span className="text-[9px] px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 font-bold shrink-0" title={evalRes.reason}>
-                                                                      🚫 Evitar
+                                                                      Evitar
                                                                     </span>
                                                                   )}
                                                                 </div>
@@ -8092,16 +8081,14 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                               onClick={() => setMealOptionMode(i, actualIdx, "ingredientes")}
                                                               className="text-xs font-bold px-3.5 py-2 rounded-xl bg-white text-[#0B1929] border border-[#E2E8F0] hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/5 flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs"
                                                             >
-                                                              <span>🥑</span>
-                                                              <span>Construirlo con equivalentes SMAE</span>
+                                                                              <span>Construirlo con equivalentes SMAE</span>
                                                             </button>
                                                             <button
                                                               type="button"
                                                               onClick={() => setMealOptionMode(i, actualIdx, "platillo")}
                                                               className="text-xs font-bold px-3.5 py-2 rounded-xl bg-white text-[#0B1929] border border-[#E2E8F0] hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/5 flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs"
                                                             >
-                                                              <span>🍲</span>
-                                                              <span>Cargar receta prescrita de la Biblioteca</span>
+                                                                                <span>Cargar receta prescrita de la Biblioteca</span>
                                                             </button>
                                                           </div>
                                                         </div>
@@ -8121,7 +8108,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                           </div>
                                                           <div className="flex items-center justify-between gap-2 flex-wrap">
                                                               <span className="text-[11px] font-extrabold text-[#0B1929] uppercase tracking-wider">
-                                                                🥑 Alimentos Opción {optionLetter} ({liveAltSel.details.length})
+                                                                Alimentos Opción {optionLetter} ({liveAltSel.details.length})
                                                               </span>
                                                               <div className="flex items-center gap-2">
                                                                 <button
@@ -8216,7 +8203,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                           />
                                                         ) : (
                                                           <div className="rounded-lg bg-white border border-[#E2E8F0] p-2 text-xs text-[var(--brand-primary)] font-semibold">
-                                                            ✨ La receta de la Opción {optionLetter} se redactará automáticamente con IA al guardar el día.
+                                                            La receta de la Opción {optionLetter} se redactará automáticamente con IA al guardar el día.
                                                           </div>
                                                         )}
                                                       </div>
@@ -8246,7 +8233,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                   <div className="p-3 rounded-xl bg-white border border-[#E2E8F0] space-y-2.5">
                                     <div className="flex items-center justify-between gap-2 flex-wrap">
                                       <span className="text-xs font-extrabold text-[#0B1929] flex items-center gap-1.5">
-                                        <span>⚖️</span>
+                                        
                                         <span>Aporte Automático SMAE de esta Comida</span>
                                       </span>
                                       {mealSmaeEntries.length > 0 ? (
@@ -8256,7 +8243,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                               key={grp.id}
                                               className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-[var(--brand-primary)]/10 border border-[var(--brand-primary)]/25 text-[10px] font-bold text-[var(--brand-primary)]"
                                             >
-                                              <span>{grp.icono}</span>
                                               <span>{mealSmaeDetected[grp.id]} eq {grp.corto}</span>
                                             </span>
                                           ))}

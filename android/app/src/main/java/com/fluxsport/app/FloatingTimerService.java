@@ -1,5 +1,6 @@
 package com.fluxsport.app;
 
+import android.animation.ValueAnimator;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -27,9 +28,15 @@ import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
+import android.view.animation.DecelerateInterpolator;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+/**
+ * Servicio en primer plano para mostrar la píldora flotante del cronómetro de descanso (estilo DiDi).
+ * Permite arrastre fluido, imantado a las orillas y ocultamiento parcial (side docking)
+ * para no entorpecer otras aplicaciones durante los descansos del entrenamiento.
+ */
 public class FloatingTimerService extends Service {
     public static final String ACTION_SHOW = "com.fluxsport.app.ACTION_SHOW_TIMER_BUBBLE";
     public static final String ACTION_HIDE = "com.fluxsport.app.ACTION_HIDE_TIMER_BUBBLE";
@@ -48,6 +55,9 @@ public class FloatingTimerService extends Service {
     private GradientDrawable dotBg;
     private TextView labelTv;
     private TextView timeTv;
+    private LinearLayout actionsLayout;
+    private TextView add30Btn;
+    private TextView closeBtn;
     private WindowManager.LayoutParams layoutParams;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -56,6 +66,14 @@ public class FloatingTimerService extends Service {
     private boolean alarming = false;
     private int alarmTicks = 0;
     private ToneGenerator toneGen;
+
+    // DiDi Side Docking State
+    private boolean isDocked = false;
+    private boolean isDockedLeft = false;
+    private static final int VISIBLE_DOCK_TAB_DP = 46;
+    private ValueAnimator snapAnimator = null;
+
+    private final Runnable autoDockRunnable = () -> dockToNearestEdge(true);
 
     private final Runnable tickRunnable = new Runnable() {
         @Override
@@ -66,13 +84,20 @@ public class FloatingTimerService extends Service {
                 if (!alarming) {
                     alarming = true;
                     alarmTicks = 0;
+                    if (isDocked) {
+                        expandFromDock(true);
+                    }
                     onTimerFinished();
                 }
                 timeTv.setText("00:00");
                 labelTv.setText("¡TIEMPO!");
                 labelTv.setTextColor(Color.WHITE);
                 bubbleBg.setColor(alarmTicks % 2 == 0 ? Color.parseColor("#EF4444") : Color.parseColor("#B91C1C"));
+                bubbleBg.setStroke(dp(1.5f), Color.parseColor("#FFFFFF"));
                 dotBg.setColor(Color.WHITE);
+                if (actionsLayout != null) {
+                    actionsLayout.setVisibility(View.GONE);
+                }
                 alarmTicks++;
                 if (alarmTicks < 24) {
                     if (alarmTicks % 2 == 1) triggerBeepAndVibrate();
@@ -141,7 +166,11 @@ public class FloatingTimerService extends Service {
     private void startForegroundSafely() {
         try {
             Intent openIntent = new Intent(this, MainActivity.class);
-            openIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            openIntent.setFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK
+                    | Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+            );
             int piFlags = Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
                 ? PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
                 : PendingIntent.FLAG_UPDATE_CURRENT;
@@ -170,6 +199,7 @@ public class FloatingTimerService extends Service {
     private void showOrUpdateOverlay() {
         alarming = false;
         alarmTicks = 0;
+        isDocked = false;
 
         if (bubbleRoot == null) {
             buildBubbleView();
@@ -182,11 +212,12 @@ public class FloatingTimerService extends Service {
                 WindowManager.LayoutParams.WRAP_CONTENT,
                 overlayType,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-                    | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                    | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+                    | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
                 PixelFormat.TRANSLUCENT
             );
             layoutParams.gravity = Gravity.TOP | Gravity.START;
-            layoutParams.x = dp(16);
+            layoutParams.x = dp(14);
             layoutParams.y = dp(140);
 
             try {
@@ -198,6 +229,14 @@ public class FloatingTimerService extends Service {
             }
         }
 
+        applyBrandTheme();
+
+        handler.removeCallbacks(tickRunnable);
+        handler.post(tickRunnable);
+        scheduleAutoDock();
+    }
+
+    private void applyBrandTheme() {
         int parsedBrand = Color.parseColor("#00B4D8");
         try {
             if (brandColorHex != null && brandColorHex.startsWith("#")) {
@@ -205,14 +244,25 @@ public class FloatingTimerService extends Service {
             }
         } catch (Exception ignored) {}
 
-        bubbleBg.setColor(Color.parseColor("#F20B1929"));
-        bubbleBg.setStroke(dp(1), Color.parseColor("#33FFFFFF"));
+        bubbleBg.setColor(Color.parseColor("#F40B1929"));
+        bubbleBg.setStroke(dp(1.2f), Color.argb(85, Color.red(parsedBrand), Color.green(parsedBrand), Color.blue(parsedBrand)));
         dotBg.setColor(parsedBrand);
         labelTv.setText("DESCANSO");
         labelTv.setTextColor(Color.parseColor("#94A3B8"));
+        timeTv.setTextColor(Color.WHITE);
 
-        handler.removeCallbacks(tickRunnable);
-        handler.post(tickRunnable);
+        if (add30Btn != null) {
+            GradientDrawable addBg = new GradientDrawable();
+            addBg.setCornerRadius(dp(999));
+            addBg.setColor(Color.argb(35, Color.red(parsedBrand), Color.green(parsedBrand), Color.blue(parsedBrand)));
+            addBg.setStroke(dp(1f), Color.argb(60, Color.red(parsedBrand), Color.green(parsedBrand), Color.blue(parsedBrand)));
+            add30Btn.setBackground(addBg);
+            add30Btn.setTextColor(parsedBrand);
+        }
+
+        if (actionsLayout != null) {
+            actionsLayout.setVisibility(View.VISIBLE);
+        }
     }
 
     private void buildBubbleView() {
@@ -222,17 +272,17 @@ public class FloatingTimerService extends Service {
         bubbleRoot.setPadding(dp(14), dp(8), dp(10), dp(8));
 
         bubbleBg = new GradientDrawable();
-        bubbleBg.setColor(Color.parseColor("#F20B1929"));
+        bubbleBg.setColor(Color.parseColor("#F40B1929"));
         bubbleBg.setCornerRadius(dp(999));
-        bubbleBg.setStroke(dp(1), Color.parseColor("#33FFFFFF"));
+        bubbleBg.setStroke(dp(1.2f), Color.parseColor("#4D00B4D8"));
         bubbleRoot.setBackground(bubbleBg);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            bubbleRoot.setElevation(dp(10));
+            bubbleRoot.setElevation(dp(12));
         }
 
         // Left status dot
         dotView = new View(this);
-        LinearLayout.LayoutParams dotLp = new LinearLayout.LayoutParams(dp(9), dp(9));
+        LinearLayout.LayoutParams dotLp = new LinearLayout.LayoutParams(dp(8.5f), dp(8.5f));
         dotLp.setMarginEnd(dp(9));
         dotView.setLayoutParams(dotLp);
         dotBg = new GradientDrawable();
@@ -248,7 +298,7 @@ public class FloatingTimerService extends Service {
             LinearLayout.LayoutParams.WRAP_CONTENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
         );
-        textColLp.setMarginEnd(dp(10));
+        textColLp.setMarginEnd(dp(8));
         textCol.setLayoutParams(textColLp);
 
         labelTv = new TextView(this);
@@ -267,8 +317,37 @@ public class FloatingTimerService extends Service {
 
         bubbleRoot.addView(textCol);
 
-        // Close button (X)
-        TextView closeBtn = new TextView(this);
+        // Actions container (+30s chip & Close button)
+        actionsLayout = new LinearLayout(this);
+        actionsLayout.setOrientation(LinearLayout.HORIZONTAL);
+        actionsLayout.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams actionsLp = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        actionsLayout.setLayoutParams(actionsLp);
+
+        // Quick "+30s" button chip
+        add30Btn = new TextView(this);
+        add30Btn.setText("+30s");
+        add30Btn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10.5f);
+        add30Btn.setTypeface(Typeface.DEFAULT_BOLD);
+        add30Btn.setGravity(Gravity.CENTER);
+        add30Btn.setPadding(dp(7), dp(2.5f), dp(7), dp(2.5f));
+        LinearLayout.LayoutParams add30Lp = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        add30Lp.setMarginEnd(dp(6));
+        add30Btn.setLayoutParams(add30Lp);
+        add30Btn.setOnClickListener(v -> {
+            addSeconds(30);
+            scheduleAutoDock();
+        });
+        actionsLayout.addView(add30Btn);
+
+        // Close button (✕)
+        closeBtn = new TextView(this);
         closeBtn.setText("✕");
         closeBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f);
         closeBtn.setTypeface(Typeface.DEFAULT_BOLD);
@@ -281,9 +360,11 @@ public class FloatingTimerService extends Service {
         LinearLayout.LayoutParams closeLp = new LinearLayout.LayoutParams(dp(24), dp(24));
         closeBtn.setLayoutParams(closeLp);
         closeBtn.setOnClickListener(v -> stopSelfCleanup(true));
-        bubbleRoot.addView(closeBtn);
+        actionsLayout.addView(closeBtn);
 
-        // Drag & Tap listener on the bubble
+        bubbleRoot.addView(actionsLayout);
+
+        // Touch & Drag listener for DiDi-style physics
         bubbleRoot.setOnTouchListener(new View.OnTouchListener() {
             private int initialX;
             private int initialY;
@@ -296,6 +377,10 @@ public class FloatingTimerService extends Service {
                 if (layoutParams == null || windowManager == null) return false;
                 switch (event.getActionMasked()) {
                     case MotionEvent.ACTION_DOWN:
+                        cancelAutoDock();
+                        if (snapAnimator != null && snapAnimator.isRunning()) {
+                            snapAnimator.cancel();
+                        }
                         initialX = layoutParams.x;
                         initialY = layoutParams.y;
                         initialTouchX = event.getRawX();
@@ -306,8 +391,14 @@ public class FloatingTimerService extends Service {
                     case MotionEvent.ACTION_MOVE:
                         int dx = (int) (event.getRawX() - initialTouchX);
                         int dy = (int) (event.getRawY() - initialTouchY);
-                        if (Math.abs(dx) > dp(5) || Math.abs(dy) > dp(5)) {
+                        if (Math.abs(dx) > dp(4) || Math.abs(dy) > dp(4)) {
                             moved = true;
+                            if (isDocked) {
+                                isDocked = false;
+                                if (actionsLayout != null && !alarming) {
+                                    actionsLayout.setVisibility(View.VISIBLE);
+                                }
+                            }
                         }
                         layoutParams.x = initialX + dx;
                         layoutParams.y = initialY + dy;
@@ -319,9 +410,13 @@ public class FloatingTimerService extends Service {
                     case MotionEvent.ACTION_UP:
                     case MotionEvent.ACTION_CANCEL:
                         if (!moved) {
-                            openMainActivity();
+                            if (isDocked) {
+                                expandFromDock(true);
+                            } else {
+                                openMainActivity();
+                            }
                         } else {
-                            snapToNearestEdge();
+                            handleDragRelease();
                         }
                         return true;
                 }
@@ -330,17 +425,137 @@ public class FloatingTimerService extends Service {
         });
     }
 
-    private void snapToNearestEdge() {
+    private void addSeconds(int secs) {
+        if (endTimeMs <= System.currentTimeMillis()) {
+            endTimeMs = System.currentTimeMillis() + (secs * 1000L);
+        } else {
+            endTimeMs += (secs * 1000L);
+        }
+        alarming = false;
+        applyBrandTheme();
+        MainActivity.onOverlayAddedSeconds(secs);
+    }
+
+    private void handleDragRelease() {
+        if (bubbleRoot == null || layoutParams == null) return;
+        DisplayMetrics dm = getResources().getDisplayMetrics();
+        int screenW = dm.widthPixels;
+        int bubbleW = bubbleRoot.getWidth() > 0 ? bubbleRoot.getWidth() : dp(180);
+
+        // If the user dragged into the margin or off-screen, dock directly to edge (DiDi style)
+        if (layoutParams.x <= dp(16) || layoutParams.x >= screenW - bubbleW - dp(16)) {
+            dockToNearestEdge(true);
+        } else {
+            snapToNearestMargin(true);
+            scheduleAutoDock();
+        }
+    }
+
+    private void snapToNearestMargin(boolean animate) {
         try {
             DisplayMetrics dm = getResources().getDisplayMetrics();
             int screenW = dm.widthPixels;
-            int bubbleW = bubbleRoot != null ? bubbleRoot.getWidth() : dp(135);
+            int bubbleW = bubbleRoot != null && bubbleRoot.getWidth() > 0 ? bubbleRoot.getWidth() : dp(180);
             int mid = screenW / 2;
-            layoutParams.x = (layoutParams.x + bubbleW / 2 < mid)
+            int targetX = (layoutParams.x + bubbleW / 2 < mid)
                 ? dp(12)
                 : Math.max(dp(12), screenW - bubbleW - dp(12));
-            windowManager.updateViewLayout(bubbleRoot, layoutParams);
+
+            isDockedLeft = (targetX < mid);
+
+            if (animate) {
+                animatePillX(targetX, 220);
+            } else {
+                layoutParams.x = targetX;
+                windowManager.updateViewLayout(bubbleRoot, layoutParams);
+            }
         } catch (Exception ignored) {}
+    }
+
+    private void dockToNearestEdge(boolean animate) {
+        if (alarming || bubbleRoot == null || layoutParams == null) return;
+        try {
+            DisplayMetrics dm = getResources().getDisplayMetrics();
+            int screenW = dm.widthPixels;
+            int bubbleW = bubbleRoot.getWidth() > 0 ? bubbleRoot.getWidth() : dp(180);
+            int mid = screenW / 2;
+
+            isDockedLeft = (layoutParams.x + bubbleW / 2 < mid);
+            int targetX;
+
+            if (isDockedLeft) {
+                // Docked to the left edge: leaving ~46dp visible tab
+                targetX = - (bubbleW - dp(VISIBLE_DOCK_TAB_DP));
+            } else {
+                // Docked to the right edge: leaving ~46dp visible tab
+                targetX = screenW - dp(VISIBLE_DOCK_TAB_DP);
+            }
+
+            isDocked = true;
+            if (actionsLayout != null) {
+                actionsLayout.setVisibility(View.GONE);
+            }
+
+            if (animate) {
+                animatePillX(targetX, 240);
+            } else {
+                layoutParams.x = targetX;
+                windowManager.updateViewLayout(bubbleRoot, layoutParams);
+            }
+        } catch (Exception ignored) {}
+    }
+
+    private void expandFromDock(boolean animate) {
+        if (bubbleRoot == null || layoutParams == null) return;
+        try {
+            DisplayMetrics dm = getResources().getDisplayMetrics();
+            int screenW = dm.widthPixels;
+            int bubbleW = bubbleRoot.getWidth() > 0 ? bubbleRoot.getWidth() : dp(180);
+
+            int targetX = isDockedLeft ? dp(12) : Math.max(dp(12), screenW - bubbleW - dp(12));
+            isDocked = false;
+
+            if (actionsLayout != null && !alarming) {
+                actionsLayout.setVisibility(View.VISIBLE);
+            }
+
+            if (animate) {
+                animatePillX(targetX, 240);
+            } else {
+                layoutParams.x = targetX;
+                windowManager.updateViewLayout(bubbleRoot, layoutParams);
+            }
+            scheduleAutoDock();
+        } catch (Exception ignored) {}
+    }
+
+    private void animatePillX(int targetX, int durationMs) {
+        if (snapAnimator != null && snapAnimator.isRunning()) {
+            snapAnimator.cancel();
+        }
+        final int startX = layoutParams.x;
+        snapAnimator = ValueAnimator.ofInt(startX, targetX);
+        snapAnimator.setDuration(durationMs);
+        snapAnimator.setInterpolator(new DecelerateInterpolator());
+        snapAnimator.addUpdateListener(animation -> {
+            if (layoutParams == null || bubbleRoot == null || windowManager == null) return;
+            layoutParams.x = (int) animation.getAnimatedValue();
+            try {
+                windowManager.updateViewLayout(bubbleRoot, layoutParams);
+            } catch (Exception ignored) {}
+        });
+        snapAnimator.start();
+    }
+
+    private void scheduleAutoDock() {
+        cancelAutoDock();
+        if (!alarming && !isDocked) {
+            handler.postDelayed(autoDockRunnable, 4500);
+        }
+    }
+
+    private void cancelAutoDock() {
+        handler.removeCallbacks(autoDockRunnable);
     }
 
     private void openMainActivity() {
@@ -388,6 +603,10 @@ public class FloatingTimerService extends Service {
     }
 
     private void stopSelfCleanup(boolean stoppedByUserOrFinished) {
+        cancelAutoDock();
+        if (snapAnimator != null && snapAnimator.isRunning()) {
+            snapAnimator.cancel();
+        }
         handler.removeCallbacks(tickRunnable);
         if (bubbleRoot != null && windowManager != null) {
             try {
@@ -410,6 +629,10 @@ public class FloatingTimerService extends Service {
 
     @Override
     public void onDestroy() {
+        cancelAutoDock();
+        if (snapAnimator != null && snapAnimator.isRunning()) {
+            snapAnimator.cancel();
+        }
         handler.removeCallbacks(tickRunnable);
         if (bubbleRoot != null && windowManager != null) {
             try {
@@ -440,7 +663,7 @@ public class FloatingTimerService extends Service {
         }
     }
 
-    private int dp(int val) {
+    private int dp(float val) {
         return Math.round(
             TypedValue.applyDimension(
                 TypedValue.COMPLEX_UNIT_DIP,
