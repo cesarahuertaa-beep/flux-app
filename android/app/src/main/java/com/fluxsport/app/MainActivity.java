@@ -173,9 +173,13 @@ public class MainActivity extends BridgeActivity {
         // Programar sincronización periódica nativa con WorkManager (incluso con la app cerrada)
         scheduleNativeSync(false);
 
-        // Reanudar el contador de pasos si el permiso ya fue concedido
+        // Reanudar el contador de pasos si el permiso ya fue concedido y tomar lectura al abrir la app
         if (FluxStepsHelper.isSupported(this) && FluxStepsHelper.hasPermission(this)) {
             scheduleStepsWorker();
+            new Thread(() -> {
+                FluxStepsHelper.snapshot(getApplicationContext());
+                emitStepsWebEvent("flux:steps-updated", null);
+            }).start();
         }
 
         // Inicializar Google Play In-App Update oficial
@@ -256,6 +260,10 @@ public class MainActivity extends BridgeActivity {
         // Si el cronómetro de descanso está corriendo y el usuario sale de la app, mostrar burbuja estilo DiDi
         if (isTimerRunning && activeTimerEndMs > System.currentTimeMillis()) {
             showFloatingTimerOverlay();
+        }
+        // Guardar lectura de pasos al salir de la app
+        if (FluxStepsHelper.isSupported(this) && FluxStepsHelper.hasPermission(this)) {
+            new Thread(() -> FluxStepsHelper.snapshot(getApplicationContext())).start();
         }
         // Cuando el usuario sale de la app, disparar sincronización inmediata SOLO si hay cambios hechos offline pendientes de subir
         try {
@@ -437,6 +445,7 @@ public class MainActivity extends BridgeActivity {
                 File file = new File(getApplicationContext().getFilesDir(), FluxSyncWorker.CACHE_FILENAME);
                 if (file.exists()) file.delete();
                 WorkManager.getInstance(getApplicationContext()).cancelUniqueWork("FluxImmediateSync");
+                FluxStepsHelper.pauseForLogout(getApplicationContext());
             } catch (Exception ignored) {}
         }
 
@@ -818,18 +827,7 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void scheduleStepsWorker() {
-        try {
-            PeriodicWorkRequest req = new PeriodicWorkRequest.Builder(
-                FluxStepsWorker.class, 15, TimeUnit.MINUTES
-            ).build();
-            WorkManager.getInstance(getApplicationContext()).enqueueUniquePeriodicWork(
-                FluxStepsWorker.UNIQUE_NAME,
-                ExistingPeriodicWorkPolicy.KEEP,
-                req
-            );
-        } catch (Exception e) {
-            Log.w(TAG, "Error programando worker de pasos: " + e.getMessage());
-        }
+        FluxStepsHelper.scheduleBackgroundTracking(getApplicationContext());
     }
 
     private void emitStepsWebEvent(final String eventName, final String detailJson) {
@@ -847,18 +845,24 @@ public class MainActivity extends BridgeActivity {
 
     private void syncStepsStateOnResume() {
         try {
-            boolean supported = FluxStepsHelper.isSupported(getApplicationContext());
-            boolean granted = FluxStepsHelper.hasPermission(getApplicationContext());
+            Context appCtx = getApplicationContext();
+            boolean supported = FluxStepsHelper.isSupported(appCtx);
+            boolean granted = FluxStepsHelper.hasPermission(appCtx);
             if (granted) {
-                FluxStepsHelper.setPermissionBlocked(getApplicationContext(), false);
+                FluxStepsHelper.setPermissionBlocked(appCtx, false);
                 if (supported) {
                     scheduleStepsWorker();
+                    new Thread(() -> {
+                        FluxStepsHelper.snapshot(appCtx);
+                        emitStepsWebEvent("flux:steps-updated", null);
+                    }).start();
                 }
             }
             JSONObject detail = new JSONObject();
             detail.put("supported", supported);
             detail.put("granted", granted);
-            detail.put("blocked", FluxStepsHelper.isPermissionBlocked(getApplicationContext()));
+            detail.put("blocked", FluxStepsHelper.isPermissionBlocked(appCtx));
+            detail.put("batteryUnrestricted", FluxStepsHelper.isIgnoringBatteryOptimizations(appCtx));
             emitStepsWebEvent("flux:steps-permission-sync", detail.toString());
         } catch (Exception ignored) {}
     }
@@ -881,6 +885,34 @@ public class MainActivity extends BridgeActivity {
         @JavascriptInterface
         public boolean isPermissionBlocked() {
             return FluxStepsHelper.isPermissionBlocked(getApplicationContext());
+        }
+
+        @JavascriptInterface
+        public boolean isIgnoringBatteryOptimizations() {
+            return FluxStepsHelper.isIgnoringBatteryOptimizations(getApplicationContext());
+        }
+
+        @JavascriptInterface
+        public void requestIgnoreBatteryOptimizations() {
+            runOnUiThread(() -> {
+                try {
+                    Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+                    intent.setData(Uri.parse("package:" + getPackageName()));
+                    startActivity(intent);
+                } catch (Exception e) {
+                    try {
+                        Intent fallback = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
+                        intentFallback(fallback);
+                    } catch (Exception ignored) {}
+                }
+            });
+        }
+
+        private void intentFallback(Intent fallback) {
+            try {
+                fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(fallback);
+            } catch (Exception ignored) {}
         }
 
         @JavascriptInterface
@@ -910,11 +942,32 @@ public class MainActivity extends BridgeActivity {
             }
         }
 
-        /** Programa el worker periódico y toma una lectura inmediata (en segundo plano). */
+        @JavascriptInterface
+        public void setOwnerClient(String clientId) {
+            if (clientId == null || clientId.isEmpty()) return;
+            Context appCtx = getApplicationContext();
+            FluxStepsHelper.setOwner(appCtx, clientId);
+            try {
+                SharedPreferences prefs = appCtx.getSharedPreferences(FluxSyncWorker.PREFS_NAME, Context.MODE_PRIVATE);
+                if (prefs.getString("client_id", "").isEmpty()) {
+                    prefs.edit().putString("client_id", clientId).apply();
+                }
+            } catch (Exception ignored) {}
+            FluxStepsHelper.scheduleBackgroundTracking(appCtx);
+        }
+
+        @JavascriptInterface
+        public void mergeCloudHistory(String clientId, String cloudJson) {
+            if (clientId == null || clientId.isEmpty() || cloudJson == null || cloudJson.isEmpty()) return;
+            try {
+                FluxStepsHelper.mergeCloudHistory(getApplicationContext(), clientId, new JSONObject(cloudJson));
+            } catch (Exception ignored) {}
+        }
+
+        /** Programa el worker periódico y la alarma nocturna de cierre de día. */
         @JavascriptInterface
         public void start() {
             scheduleStepsWorker();
-            refresh();
         }
 
         /**
@@ -937,6 +990,11 @@ public class MainActivity extends BridgeActivity {
         @JavascriptInterface
         public String getHistoryJson() {
             return FluxStepsHelper.getHistoryJson(getApplicationContext());
+        }
+
+        @JavascriptInterface
+        public String getEstimatedDaysJson() {
+            return FluxStepsHelper.getEstimatedDaysJson(getApplicationContext());
         }
     }
 

@@ -3,7 +3,7 @@
 // PWA/navegador: sin acceso a sensores en segundo plano → solo muestra datos sincronizados desde la app móvil.
 
 import { Capacitor } from "@capacitor/core";
-import { dbGet, dbUpsert } from "./supabase";
+import { dbGet, dbGetFresh, dbUpsert } from "./supabase";
 import { ACTIVITY_FACTORS } from "./bodyComposition";
 
 export const DEFAULT_STEP_GOAL = 8000;
@@ -33,11 +33,34 @@ const safe = (fn, fallback) => {
 export const nativeStepsSupported = () => safe(() => nativeBridge().isSupported(), false);
 export const nativeStepsPermission = () => safe(() => nativeBridge().hasPermission(), false);
 export const nativeStepsPermissionBlocked = () => safe(() => nativeBridge().isPermissionBlocked(), false);
+export const nativeStepsBatteryUnrestricted = () =>
+  safe(() => nativeBridge().isIgnoringBatteryOptimizations?.() ?? true, true);
+export const requestNativeBatteryUnrestricted = () =>
+  safe(() => nativeBridge().requestIgnoreBatteryOptimizations?.(), null);
 export const openNativeAppSettings = () => safe(() => nativeBridge().openAppSettings(), null);
 export const requestNativeStepsPermission = () => safe(() => nativeBridge().requestPermission(), null);
 export const startNativeSteps = () => safe(() => nativeBridge().start(), null);
 /** Solicita una lectura al sensor (asíncrona); al terminar la app emite el evento 'flux:steps-updated'. */
 export const refreshNativeSteps = () => safe(() => nativeBridge().refresh(), null);
+
+/**
+ * Declara en el puente nativo a qué cliente pertenecen los pasos (paciente, civil o perfil atleta
+ * personal del profesional) para aislar historiales entre cuentas y habilitar el sync pasivo.
+ */
+export const setNativeStepsOwner = (clienteId) => {
+  if (!clienteId) return null;
+  return safe(() => nativeBridge()?.setOwnerClient?.(String(clienteId)), null);
+};
+
+/**
+ * Sincroniza el historial de Supabase hacia el almacenamiento nativo como piso mínimo, evitando
+ * que una reinstalación o cambio de teléfono sobrescriba con un número menor lo ya guardado en la nube.
+ */
+export const mergeNativeCloudHistory = (clienteId, cloudHistory) => {
+  if (!clienteId || !cloudHistory || typeof cloudHistory !== "object") return null;
+  if (Object.keys(cloudHistory).length === 0) return null;
+  return safe(() => nativeBridge()?.mergeCloudHistory?.(String(clienteId), JSON.stringify(cloudHistory)), null);
+};
 
 export function getNativeHistory() {
   const raw = safe(() => nativeBridge().getHistoryJson(), "{}");
@@ -46,6 +69,20 @@ export function getNativeHistory() {
     const out = {};
     Object.entries(obj || {}).forEach(([k, v]) => {
       out[k] = Math.max(0, Math.round(Number(v) || 0));
+    });
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+export function getNativeEstimatedDays() {
+  const raw = safe(() => nativeBridge()?.getEstimatedDaysJson?.() || "{}", "{}");
+  try {
+    const obj = JSON.parse(raw);
+    const out = {};
+    Object.entries(obj || {}).forEach(([k, v]) => {
+      if (v) out[k] = true;
     });
     return out;
   } catch {
@@ -70,6 +107,7 @@ export const addDays = (d, n) => {
 // ── Meta personal (pacientes autogestionados) ──
 const goalKey = (id) => `flux_steps_goal_${id}`;
 export const getLocalStepGoal = (clienteId) => {
+  if (!clienteId) return null;
   try {
     const v = Number(localStorage.getItem(goalKey(clienteId)));
     return v > 0 ? v : null;
@@ -78,50 +116,85 @@ export const getLocalStepGoal = (clienteId) => {
   }
 };
 export const setLocalStepGoal = (clienteId, goal) => {
+  if (!clienteId) return;
   try {
-    localStorage.setItem(goalKey(clienteId), String(Math.round(goal)));
-  } catch {}
+    const clean = Math.max(1000, Math.min(50000, Math.round(Number(goal) || DEFAULT_STEP_GOAL)));
+    localStorage.setItem(goalKey(clienteId), String(clean));
+  } catch {
+    // Ignore storage quota errors
+  }
 };
 
 // ── Sincronización con la nube (tabla pasos_diarios) ──
 const syncedKey = (id) => `flux_steps_synced_${id}`;
 
-export async function syncStepsToCloud(clienteId, history) {
-  if (!clienteId || !history) return;
+export async function syncStepsToCloud(clienteId, nativeHistory, cloudHistory = {}) {
+  if (!clienteId || !nativeHistory) return;
   let synced = {};
   try {
     synced = JSON.parse(localStorage.getItem(syncedKey(clienteId)) || "{}");
-  } catch {}
-  const rows = Object.entries(history)
-    .filter(([fecha, pasos]) => pasos > 0 && synced[fecha] !== pasos)
+  } catch {
+    synced = {};
+  }
+
+  const merged = mergeStepHistories(cloudHistory, nativeHistory);
+  const rows = Object.entries(merged)
+    .filter(([fecha, pasos]) => {
+      if (pasos <= 0) return false;
+      const cloudVal = Number(cloudHistory?.[fecha]) || 0;
+      // Si la nube ya tiene el mismo o mayor valor, no enviar una escritura redundante o destructiva
+      if (cloudVal >= pasos && synced[fecha] === pasos) return false;
+      if (cloudVal > pasos) return false;
+      if (cloudVal === pasos) {
+        synced[fecha] = pasos;
+        return false;
+      }
+      return synced[fecha] !== pasos;
+    })
     .map(([fecha, pasos]) => ({
       cliente_id: clienteId,
       fecha,
       pasos,
       updated_at: new Date().toISOString(),
     }));
-  if (rows.length === 0) return;
+
+  if (rows.length === 0) {
+    try {
+      localStorage.setItem(syncedKey(clienteId), JSON.stringify(synced));
+    } catch {
+      // Ignore storage errors
+    }
+    return;
+  }
+
   try {
     await dbUpsert("pasos_diarios?on_conflict=cliente_id,fecha", rows, {
       headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
     });
-    rows.forEach((r) => {
-      synced[r.fecha] = r.pasos;
-    });
-    localStorage.setItem(syncedKey(clienteId), JSON.stringify(synced));
+    const isOnline = typeof navigator === "undefined" || navigator.onLine !== false;
+    if (isOnline) {
+      rows.forEach((r) => {
+        synced[r.fecha] = r.pasos;
+      });
+      try {
+        localStorage.setItem(syncedKey(clienteId), JSON.stringify(synced));
+      } catch {
+        // Ignore storage errors
+      }
+    }
   } catch (e) {
     // La tabla puede no existir aún o no haber conexión: el dato queda en el dispositivo y se reintenta luego.
     console.warn("No se pudo sincronizar pasos:", e?.message || e);
   }
 }
 
-export async function fetchCloudSteps(clienteId, days = 35) {
+export async function fetchCloudSteps(clienteId, days = 35, { force = false } = {}) {
   if (!clienteId) return {};
   try {
     const from = toDateKey(addDays(new Date(), -(days - 1)));
-    const rows = await dbGet(
-      `pasos_diarios?cliente_id=eq.${clienteId}&fecha=gte.${from}&order=fecha.desc&limit=${days + 5}`
-    );
+    const path = `pasos_diarios?cliente_id=eq.${clienteId}&fecha=gte.${from}&order=fecha.desc&limit=${days + 5}`;
+    const isOnline = typeof navigator === "undefined" || navigator.onLine !== false;
+    const rows = force && isOnline ? await dbGetFresh(path) : await dbGet(path);
     const out = {};
     (Array.isArray(rows) ? rows : []).forEach((r) => {
       out[String(r.fecha).split("T")[0]] = Math.max(0, Number(r.pasos) || 0);

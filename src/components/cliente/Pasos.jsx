@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { Footprints, Flame, MapPin, Clock, Target, Trophy, Smartphone, Check, Lock, Activity, TrendingUp } from "lucide-react";
+import { Footprints, Flame, MapPin, Clock, Target, Trophy, Smartphone, Check, Lock, Activity, TrendingUp, Zap } from "lucide-react";
 import { normalizeSexo } from "../../lib/bodyComposition";
 import {
   DEFAULT_STEP_GOAL,
@@ -10,11 +10,18 @@ import {
   nativeStepsSupported,
   nativeStepsPermission,
   nativeStepsPermissionBlocked,
+  nativeStepsBatteryUnrestricted,
+  requestNativeBatteryUnrestricted,
   openNativeAppSettings,
   requestNativeStepsPermission,
   startNativeSteps,
   refreshNativeSteps,
+  setNativeStepsOwner,
+  mergeNativeCloudHistory,
   getNativeHistory,
+  getNativeEstimatedDays,
+  getLocalStepGoal,
+  setLocalStepGoal,
   fetchCloudSteps,
   syncStepsToCloud,
   mergeStepHistories,
@@ -27,6 +34,7 @@ import {
 } from "../../lib/steps";
 
 const DAY_LABELS = ["DOM", "LUN", "MAR", "MIE", "JUE", "VIE", "SAB"];
+const GOAL_PRESETS = [6000, 8000, 10000, 12000];
 const fmt = (n) => Math.round(Number(n) || 0).toLocaleString("es-MX");
 
 function StepRing({ steps, goal }) {
@@ -89,36 +97,71 @@ export default function Pasos({ cliente, isActive = true, ultimoPeso = null, met
   const supported = useMemo(() => (native ? nativeStepsSupported() : false), [native]);
   const [permission, setPermission] = useState(() => (native ? nativeStepsPermission() : false));
   const [permissionBlocked, setPermissionBlocked] = useState(() => (native ? nativeStepsPermissionBlocked() : false));
+  const [batteryUnrestricted, setBatteryUnrestricted] = useState(() =>
+    native ? nativeStepsBatteryUnrestricted() : true
+  );
   const [permissionDenied, setPermissionDenied] = useState(false);
-  const [nativeHistory, setNativeHistory] = useState(() => (native ? getNativeHistory() : {}));
+  const [nativeHistory, setNativeHistory] = useState(() => {
+    if (!native) return {};
+    if (clienteId) setNativeStepsOwner(clienteId);
+    return getNativeHistory();
+  });
+  const [estimatedDays, setEstimatedDays] = useState(() => (native ? getNativeEstimatedDays() : {}));
   const [cloudHistory, setCloudHistory] = useState({});
+  const [localGoal, setLocalGoal] = useState(() => getLocalStepGoal(clienteId));
   const [requesting, setRequesting] = useState(false);
   const pollRef = useRef(null);
 
   const hasSpecialist = Boolean(cliente?.nutriologo_id);
-  const goal = Number(metaPasos) > 0 ? Number(metaPasos) : DEFAULT_STEP_GOAL;
+  const specialistGoal = Number(metaPasos) > 0 ? Number(metaPasos) : null;
+  const goal = specialistGoal || (Number(localGoal) > 0 ? Number(localGoal) : DEFAULT_STEP_GOAL);
+
+  const handleSelectLocalGoal = useCallback(
+    (nextGoal) => {
+      const clean = Math.max(1000, Math.min(50000, Math.round(Number(nextGoal) || DEFAULT_STEP_GOAL)));
+      setLocalGoal(clean);
+      if (clienteId) setLocalStepGoal(clienteId, clean);
+    },
+    [clienteId]
+  );
 
   const history = useMemo(() => mergeStepHistories(cloudHistory, nativeHistory), [cloudHistory, nativeHistory]);
 
-  // Historial en la nube (PWA: datos sincronizados desde el teléfono; nativo: respaldo)
+  // Asegurar que el puente nativo tenga asignado el cliente activo (paciente, civil o perfil atleta de especialista)
+  useEffect(() => {
+    if (!native || !clienteId) return;
+    setNativeStepsOwner(clienteId);
+  }, [native, clienteId]);
+
+  // Historial en la nube (PWA: datos sincronizados desde el teléfono; nativo: respaldo y piso mínimo)
   useEffect(() => {
     let active = true;
     if (!clienteId) return undefined;
-    fetchCloudSteps(clienteId, 42).then((h) => {
-      if (active) setCloudHistory(h);
+    fetchCloudSteps(clienteId, 42, { force: isActive }).then((h) => {
+      if (!active) return;
+      setCloudHistory(h);
+      const savedGoal = getLocalStepGoal(clienteId);
+      if (savedGoal) setLocalGoal(savedGoal);
+      if (native && h && Object.keys(h).length > 0) {
+        mergeNativeCloudHistory(clienteId, h);
+        setNativeHistory(getNativeHistory());
+        setEstimatedDays(getNativeEstimatedDays());
+      }
     });
     return () => {
       active = false;
     };
-  }, [clienteId, isActive]);
+  }, [clienteId, isActive, native]);
 
-  // Contador nativo: iniciar worker, escuchar actualizaciones y refrescar mientras la pestaña está visible
+  // Contador nativo: programar worker + alarma nocturna y escuchar actualizaciones del sensor
   useEffect(() => {
     if (!native || !supported || !permission) return undefined;
     startNativeSteps();
-    const onUpdated = () => setNativeHistory(getNativeHistory());
+    const onUpdated = () => {
+      setNativeHistory(getNativeHistory());
+      setEstimatedDays(getNativeEstimatedDays());
+    };
     window.addEventListener("flux:steps-updated", onUpdated);
-    setNativeHistory(getNativeHistory());
     return () => window.removeEventListener("flux:steps-updated", onUpdated);
   }, [native, supported, permission]);
 
@@ -131,12 +174,12 @@ export default function Pasos({ cliente, isActive = true, ultimoPeso = null, met
     return () => clearInterval(t);
   }, [native, supported, permission, isActive]);
 
-  // Respaldar en la nube lo registrado por el sensor
+  // Respaldar en la nube lo registrado por el sensor sin sobrescribir conteos mayores de la nube
   useEffect(() => {
     if (!native || !permission || !clienteId || Object.keys(nativeHistory).length === 0) return undefined;
-    const t = setTimeout(() => syncStepsToCloud(clienteId, nativeHistory), 1500);
+    const t = setTimeout(() => syncStepsToCloud(clienteId, nativeHistory, cloudHistory), 1500);
     return () => clearTimeout(t);
-  }, [native, permission, clienteId, nativeHistory]);
+  }, [native, permission, clienteId, nativeHistory, cloudHistory]);
 
   useEffect(() => () => pollRef.current && clearInterval(pollRef.current), []);
 
@@ -154,16 +197,23 @@ export default function Pasos({ cliente, isActive = true, ultimoPeso = null, met
       setPermission(granted);
       setPermissionBlocked(!granted && permanentlyDenied);
       setPermissionDenied(!granted && !permanentlyDenied);
+      setBatteryUnrestricted(nativeStepsBatteryUnrestricted());
     };
     const onPermSync = (e) => {
       const granted = Boolean(e?.detail?.granted);
       const blocked = Boolean(e?.detail?.blocked);
+      if (typeof e?.detail?.batteryUnrestricted === "boolean") {
+        setBatteryUnrestricted(e.detail.batteryUnrestricted);
+      } else {
+        setBatteryUnrestricted(nativeStepsBatteryUnrestricted());
+      }
+      setRequesting(false);
       setPermission(granted);
       setPermissionBlocked(!granted && blocked);
       if (granted) {
-        setRequesting(false);
         setPermissionDenied(false);
         setNativeHistory(getNativeHistory());
+        setEstimatedDays(getNativeEstimatedDays());
       }
     };
     window.addEventListener("flux:steps-permission-result", onPermResult);
@@ -214,19 +264,35 @@ export default function Pasos({ cliente, isActive = true, ultimoPeso = null, met
 
   const week = useMemo(() => {
     const out = [];
+    const baseDate = new Date();
     for (let i = 6; i >= 0; i--) {
-      const d = addDays(new Date(), -i);
-      out.push({ key: toDateKey(d), label: DAY_LABELS[d.getDay()], steps: history[toDateKey(d)] || 0, isToday: i === 0 });
+      const d = addDays(baseDate, -i);
+      const key = toDateKey(d);
+      out.push({
+        key,
+        label: DAY_LABELS[d.getDay()],
+        steps: history[key] || 0,
+        isToday: key === todayKey,
+        isEstimated: Boolean(estimatedDays[key]),
+      });
     }
     return out;
-  }, [history]);
+  }, [history, todayKey, estimatedDays]);
 
+  const hasEstimatedInWeek = week.some((d) => d.isEstimated && d.steps > 0);
   const weekMax = Math.max(goal, ...week.map((d) => d.steps), 1);
-  const { avg: avg7, daysWithData } = averageSteps(history, 7, false);
+
+  // Si aún no hay días previos cerrados pero hoy ya registró pasos, incluir hoy para no mostrar "Sin datos" el día 1
+  const closedStats = averageSteps(history, 7, false);
+  const { avg: avg7, daysWithData } =
+    closedStats.daysWithData > 0 ? closedStats : averageSteps(history, 7, true);
   const avgLevel = classifySteps(avg7);
   const streak = computeStreak(history, goal);
   const daysHitGoal = week.filter((d) => d.steps >= goal).length;
-  const bestDay = Object.entries(history).reduce((best, [k, v]) => (v > best.steps ? { key: k, steps: v } : best), { key: null, steps: 0 });
+  const bestDay = Object.entries(history).reduce(
+    (best, [k, v]) => (v > best.steps ? { key: k, steps: v } : best),
+    { key: null, steps: 0 }
+  );
 
   const calendar = useMemo(() => {
     const today = new Date();
@@ -236,7 +302,13 @@ export default function Pasos({ cliente, isActive = true, ultimoPeso = null, met
     for (let i = 0; i < 42; i++) {
       const d = addDays(start, i);
       const key = toDateKey(d);
-      cells.push({ key, day: d.getDate(), future: d > today, steps: history[key] || 0, isToday: key === todayKey });
+      cells.push({
+        key,
+        day: d.getDate(),
+        future: key > todayKey,
+        steps: history[key] || 0,
+        isToday: key === todayKey,
+      });
     }
     return cells;
   }, [history, todayKey]);
@@ -265,7 +337,7 @@ export default function Pasos({ cliente, isActive = true, ultimoPeso = null, met
               Pasos y Actividad
             </h1>
             <p className="hidden md:block text-sm text-[#6B7A8D] mt-1">
-              {hasSpecialist
+              {hasSpecialist && specialistGoal
                 ? `Meta diaria sugerida por tu especialista: ${fmt(goal)} pasos · Cualquier paso extra sigue sumando`
                 : `Meta diaria sugerida: ${fmt(goal)} pasos · Tu movimiento cotidiano suma a tu gasto energético`}
             </p>
@@ -368,6 +440,32 @@ export default function Pasos({ cliente, isActive = true, ultimoPeso = null, met
           </div>
         )}
 
+        {/* Aviso de batería sin restricciones para conteo pasivo 24/7 sin abrir la app */}
+        {showTracking && !batteryUnrestricted && (
+          <div className="bg-amber-50/80 rounded-none md:rounded-2xl border-b md:border border-amber-200/80 px-4 py-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-start gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
+                <Zap className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-[#0B1929]">
+                  Conteo pasivo sin interrupciones
+                </p>
+                <p className="text-[11px] text-[#6B7A8D] mt-0.5 leading-relaxed">
+                  Para que Android registre y cierre tus pasos a medianoche incluso los días que no abras FLUX, permite la ejecución en segundo plano sin ahorro de batería.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => requestNativeBatteryUnrestricted()}
+              className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition-colors cursor-pointer shrink-0"
+            >
+              Permitir en segundo plano
+            </button>
+          </div>
+        )}
+
         {/* Anillo + métricas del día */}
         {(showTracking || hasAnyData) && (
           <div className="bg-white rounded-none md:rounded-2xl border-b md:border border-[#E2E8F0] px-4 py-4 sm:p-6 shadow-none md:shadow-sm">
@@ -384,13 +482,33 @@ export default function Pasos({ cliente, isActive = true, ultimoPeso = null, met
                   <StatTile icon={<Flame className="w-3 h-3" />} label="Activas" value={fmt(metrics.kcal)} unit="kcal" />
                   <StatTile icon={<Clock className="w-3 h-3" />} label="Tiempo" value={metrics.minutes} unit="min activos" />
                 </div>
-                <div className="pt-2 border-t border-[#F0F4FA] flex items-center justify-center sm:justify-start gap-1.5 text-[11px] font-semibold text-[#6B7A8D]">
-                  <Target className="w-3.5 h-3.5 text-[var(--brand-primary)] shrink-0" />
-                  <span>
-                    {hasSpecialist
-                      ? `Meta diaria sugerida por tu especialista: ${fmt(goal)} pasos`
-                      : `Meta diaria sugerida: ${fmt(goal)} pasos`}
-                  </span>
+                <div className="pt-2 border-t border-[#F0F4FA] flex flex-wrap items-center justify-center sm:justify-between gap-2 text-[11px] font-semibold text-[#6B7A8D]">
+                  <div className="flex items-center gap-1.5">
+                    <Target className="w-3.5 h-3.5 text-[var(--brand-primary)] shrink-0" />
+                    <span>
+                      {hasSpecialist && specialistGoal
+                        ? `Meta diaria sugerida por tu especialista: ${fmt(goal)} pasos`
+                        : `Meta diaria personal: ${fmt(goal)} pasos`}
+                    </span>
+                  </div>
+                  {!specialistGoal && (
+                    <div className="flex items-center gap-1">
+                      {GOAL_PRESETS.map((preset) => (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => handleSelectLocalGoal(preset)}
+                          className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-colors cursor-pointer ${
+                            goal === preset
+                              ? "bg-[var(--brand-primary)] text-white"
+                              : "bg-[#F0F4FA] text-[#6B7A8D] hover:text-[#0B1929]"
+                          }`}
+                        >
+                          {preset / 1000}k
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -400,7 +518,7 @@ export default function Pasos({ cliente, isActive = true, ultimoPeso = null, met
         {/* Gráfica semanal */}
         {(showTracking || hasAnyData) && (
           <div className="bg-white rounded-none md:rounded-2xl border-b md:border border-[#E2E8F0] px-4 py-4 sm:p-5 shadow-none md:shadow-sm">
-            <div className="flex items-center justify-between gap-2 flex-wrap mb-4">
+            <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
               <h3 className="text-xs font-bold text-[#0B1929] uppercase tracking-wider flex items-center gap-1.5">
                 <TrendingUp className="w-3.5 h-3.5 text-[var(--brand-primary)]" /> Últimos 7 días
               </h3>
@@ -408,20 +526,32 @@ export default function Pasos({ cliente, isActive = true, ultimoPeso = null, met
                 {daysHitGoal}/7 días con meta cumplida
               </span>
             </div>
-            <div className="relative h-36">
+
+            {/* Fila superior: etiquetas de conteo separadas del área proporcional de barras */}
+            <div className="flex justify-between gap-2 mb-1 h-4 items-end">
+              {week.map((d) => (
+                <div key={d.key} className="flex-1 text-center text-[9px] font-bold text-[#6B7A8D] truncate">
+                  {d.steps > 0 ? `${d.isEstimated ? "~" : ""}${fmt(d.steps)}` : ""}
+                </div>
+              ))}
+            </div>
+
+            {/* Área proporcional 0..weekMax donde barra 100% coincide exacto con la línea de Meta */}
+            <div className="relative h-32">
               <div
-                className="absolute left-0 right-0 border-t border-dashed border-emerald-400/70"
-                style={{ bottom: `${(goal / weekMax) * 100}%` }}
+                className="absolute left-0 right-0 border-t border-dashed border-emerald-400/70 z-10 pointer-events-none"
+                style={{ bottom: `${Math.min(100, (goal / weekMax) * 100)}%` }}
               >
-                <span className="absolute -top-4 right-0 text-[9px] font-bold text-emerald-600 bg-white px-1">Meta {fmt(goal)}</span>
+                <span className="absolute -top-3.5 right-0 text-[9px] font-bold text-emerald-600 bg-white/90 px-1 rounded">
+                  Meta {fmt(goal)}
+                </span>
               </div>
               <div className="absolute inset-0 flex items-end justify-between gap-2">
                 {week.map((d) => {
-                  const h = Math.max(d.steps > 0 ? 4 : 0, (d.steps / weekMax) * 100);
+                  const h = Math.min(100, Math.max(d.steps > 0 ? 4 : 0, (d.steps / weekMax) * 100));
                   const hit = d.steps >= goal;
                   return (
-                    <div key={d.key} className="flex-1 h-full flex flex-col justify-end items-center gap-1 min-w-0">
-                      <span className="text-[9px] font-bold text-[#6B7A8D]">{d.steps > 0 ? fmt(d.steps) : ""}</span>
+                    <div key={d.key} className="flex-1 h-full flex items-end justify-center min-w-0">
                       <div
                         className="w-full max-w-[34px] rounded-t-lg transition-all"
                         style={{
@@ -435,6 +565,7 @@ export default function Pasos({ cliente, isActive = true, ultimoPeso = null, met
                 })}
               </div>
             </div>
+
             <div className="flex justify-between gap-2 mt-1.5">
               {week.map((d) => (
                 <div
@@ -445,6 +576,12 @@ export default function Pasos({ cliente, isActive = true, ultimoPeso = null, met
                 </div>
               ))}
             </div>
+
+            {hasEstimatedInWeek && (
+              <p className="text-[10px] text-[#6B7A8D] mt-2">
+                ~ Días con reparto nocturno estimado cuando el teléfono estuvo en ahorro profundo de batería.
+              </p>
+            )}
           </div>
         )}
 

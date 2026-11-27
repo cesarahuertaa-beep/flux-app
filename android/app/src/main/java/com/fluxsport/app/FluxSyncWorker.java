@@ -81,10 +81,31 @@ public class FluxSyncWorker extends Worker {
             accessToken = prefs.getString("access_token", accessToken);
 
             // 2.5. SINCRONIZACIÓN SILENCIOSA DE PASOS (NEAT) HACIA SUPABASE EN SEGUNDO PLANO
-            if (!clientId.isEmpty() && FluxStepsHelper.isSupported(ctx) && FluxStepsHelper.hasPermission(ctx)) {
+            String stepsClientId = !clientId.isEmpty() ? clientId : FluxStepsHelper.getOwnerClient(ctx);
+            if (!stepsClientId.isEmpty() && FluxStepsHelper.isSupported(ctx) && FluxStepsHelper.hasPermission(ctx) && !FluxStepsHelper.isPaused(ctx)) {
                 try {
                     FluxStepsHelper.snapshot(ctx);
-                    JSONArray stepRows = FluxStepsHelper.buildUnsyncedCloudRows(ctx, clientId);
+                    FluxStepsHelper.scheduleNightSnapshot(ctx);
+
+                    // Consultar primero los pasos recientes en la nube para nunca sobrescribir un conteo mayor
+                    JSONArray cloudArr = fetchJsonArray(
+                        supaUrl, supaKey, accessToken,
+                        "pasos_diarios?cliente_id=eq." + stepsClientId + "&order=fecha.desc&limit=45&select=fecha,pasos"
+                    );
+                    if (cloudArr != null && cloudArr.length() > 0) {
+                        JSONObject cloudDays = new JSONObject();
+                        for (int i = 0; i < cloudArr.length(); i++) {
+                            JSONObject row = cloudArr.optJSONObject(i);
+                            if (row == null) continue;
+                            String f = row.optString("fecha", "");
+                            if (f.contains("T")) f = f.split("T")[0];
+                            long p = row.optLong("pasos", 0L);
+                            if (!f.isEmpty() && p > 0L) cloudDays.put(f, p);
+                        }
+                        FluxStepsHelper.mergeCloudHistory(ctx, stepsClientId, cloudDays);
+                    }
+
+                    JSONArray stepRows = FluxStepsHelper.buildUnsyncedCloudRows(ctx, stepsClientId);
                     if (stepRows.length() > 0) {
                         int st = sendMutationRequest(
                             supaUrl, supaKey, accessToken,
@@ -103,7 +124,7 @@ public class FluxSyncWorker extends Worker {
                             }
                         }
                         if (st >= 200 && st < 300) {
-                            FluxStepsHelper.markCloudSynced(ctx, clientId, stepRows);
+                            FluxStepsHelper.markCloudSynced(ctx, stepsClientId, stepRows);
                         }
                     }
                 } catch (Exception e) {
@@ -378,6 +399,29 @@ public class FluxSyncWorker extends Worker {
         } finally {
             if (conn != null) conn.disconnect();
         }
+    }
+
+    private JSONArray fetchJsonArray(String supaUrl, String supaKey, String token, String path) {
+        HttpURLConnection conn = null;
+        try {
+            URL url = new URL(supaUrl + "/rest/v1/" + path);
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setConnectTimeout(8000);
+            conn.setReadTimeout(10000);
+            conn.setRequestMethod("GET");
+            conn.setRequestProperty("apikey", supaKey);
+            conn.setRequestProperty("Authorization", "Bearer " + token);
+            conn.setRequestProperty("Accept", "application/json");
+            int code = conn.getResponseCode();
+            if (code >= 200 && code < 300) {
+                String body = readStream(conn.getInputStream()).trim();
+                if (body.startsWith("[")) return new JSONArray(body);
+            }
+        } catch (Exception ignored) {
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
+        return null;
     }
 
     private JSONArray fetchAndStore(JSONObject cacheMap, String supaUrl, String supaKey,

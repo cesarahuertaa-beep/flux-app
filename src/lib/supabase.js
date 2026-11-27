@@ -291,7 +291,7 @@ const reapplyPendingMutations = async (filterTable = null) => {
       if (filterTable && m.table !== filterTable) continue;
       if (m.method === "PATCH" || m.method === "DELETE") {
         applyOptimistic(m.method, m.path, m.body);
-      } else if (m.method === "POST" && (m.table === "progreso" || m.table === "nutricion_progreso")) {
+      } else if (m.method === "POST" && (m.table === "progreso" || m.table === "nutricion_progreso" || m.table === "pasos_diarios")) {
         try {
           const b = JSON.parse(m.body);
           applyOptimisticUpsert(m.path, Array.isArray(b) ? b : [b]);
@@ -669,7 +669,7 @@ if (typeof window !== "undefined") {
 const isOfflineNow = () => typeof navigator !== "undefined" && navigator.onLine === false;
 
 // Tablas cuyo POST es seguro de encolar offline
-const QUEUEABLE_POST = ["progreso", "nutricion_progreso", "citas_ratings", "notificaciones", "metricas_progreso", "solicitudes_entrenamiento", "solicitudes_profesionales"];
+const QUEUEABLE_POST = ["progreso", "nutricion_progreso", "pasos_diarios", "citas_ratings", "notificaciones", "metricas_progreso", "solicitudes_entrenamiento", "solicitudes_profesionales"];
 
 const isQueueable = (method, table) => {
   if (table.startsWith("rpc/")) return false;

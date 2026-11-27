@@ -13,6 +13,8 @@
 -keep class com.fluxsport.app.FloatingTimerService { *; }
 -keep class com.fluxsport.app.FluxSyncWorker { *; }
 -keep class com.fluxsport.app.FluxStepsWorker { *; }
+-keep class com.fluxsport.app.FluxStepsReceiver { *; }
+-keep class com.fluxsport.app.FluxStepsHelper { *; }
 -keep class * extends androidx.work.ListenableWorker {
     public <init>(android.content.Context, android.work.WorkerParameters);
 }

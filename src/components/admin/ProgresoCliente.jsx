@@ -891,7 +891,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
       setPatientStepsHistory({});
       return;
     }
-    fetchCloudSteps(selected.id, 14).then((hist) => {
+    fetchCloudSteps(selected.id, 14, { force: true }).then((hist) => {
       if (alive) setPatientStepsHistory(hist || {});
     });
     return () => { alive = false; };

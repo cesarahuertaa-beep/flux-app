@@ -244,6 +244,15 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
   const personalAthleteClient = isCivil ? (civilClientState || clienteData) : myShadowClient;
   const personalAthleteId = personalAthleteClient?.id || null;
 
+  useEffect(() => {
+    if (!personalAthleteId || typeof window === "undefined") return;
+    try {
+      window.FluxStepsNative?.setOwnerClient?.(String(personalAthleteId));
+    } catch {
+      // Ignore bridge errors
+    }
+  }, [personalAthleteId]);
+
   const [personalActiveCycle, setPersonalActiveCycle] = useState(() => {
     if (!personalAthleteId) return null;
     const list = dbPeek(`ciclos?cliente_id=eq.${personalAthleteId}&order=created_at.desc`);
