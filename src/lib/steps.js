@@ -11,7 +11,19 @@ export const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com
 
 export function getStepsPlatform() {
   try {
-    return Capacitor.getPlatform();
+    const p = Capacitor.getPlatform();
+    if (p && p !== "web") return p;
+    if (
+      typeof window !== "undefined" &&
+      (window.FluxStepsNative ||
+        window.FluxPlayUpdate ||
+        window.FluxAndroidBars ||
+        window.FluxNativeSync ||
+        Capacitor.isNativePlatform?.())
+    ) {
+      return "android";
+    }
+    return p || "web";
   } catch {
     return "web";
   }
@@ -19,7 +31,8 @@ export function getStepsPlatform() {
 
 const nativeBridge = () => (typeof window !== "undefined" ? window.FluxStepsNative || null : null);
 
-export const isNativeStepsAvailable = () => Boolean(nativeBridge());
+export const isNativeStepsAvailable = () =>
+  Boolean(nativeBridge()) || getStepsPlatform() === "android";
 
 const safe = (fn, fallback) => {
   try {
@@ -30,7 +43,12 @@ const safe = (fn, fallback) => {
   }
 };
 
-export const nativeStepsSupported = () => safe(() => nativeBridge().isSupported(), false);
+export const nativeStepsSupported = () =>
+  safe(() => {
+    const b = nativeBridge();
+    if (b && typeof b.isSupported === "function") return b.isSupported();
+    return getStepsPlatform() === "android";
+  }, getStepsPlatform() === "android");
 export const nativeStepsPermission = () => safe(() => nativeBridge().hasPermission(), false);
 export const nativeStepsPermissionBlocked = () => safe(() => nativeBridge().isPermissionBlocked(), false);
 export const nativeStepsBatteryUnrestricted = () =>

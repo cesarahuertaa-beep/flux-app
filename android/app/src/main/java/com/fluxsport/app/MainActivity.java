@@ -69,6 +69,7 @@ public class MainActivity extends BridgeActivity {
     private static WeakReference<MainActivity> activeInstance;
     private AppUpdateManager appUpdateManager;
     private WebView activePdfWebView;
+    private boolean jsInterfacesRegistered = false;
 
     private static volatile long activeTimerEndMs = 0L;
     private static volatile String activeTimerColor = "#00B4D8";
@@ -136,20 +137,7 @@ public class MainActivity extends BridgeActivity {
         FluxNotificationHelper.ensureChannels(this);
 
         if (this.bridge != null && this.bridge.getWebView() != null) {
-            try {
-                WebSettings ws = this.bridge.getWebView().getSettings();
-                ws.setTextZoom(100);
-            } catch (Exception ignored) {}
-            this.bridge.getWebView().setVerticalScrollBarEnabled(false);
-            this.bridge.getWebView().setHorizontalScrollBarEnabled(false);
-            this.bridge.getWebView().setOverScrollMode(View.OVER_SCROLL_NEVER);
-            this.bridge.getWebView().addJavascriptInterface(new SystemBarBridge(), "FluxAndroidBars");
-            this.bridge.getWebView().addJavascriptInterface(new PlayUpdateBridge(), "FluxPlayUpdate");
-            this.bridge.getWebView().addJavascriptInterface(new FluxNativeSyncBridge(), "FluxNativeSync");
-            this.bridge.getWebView().addJavascriptInterface(new FluxTimerBridge(), "FluxTimerNative");
-            this.bridge.getWebView().addJavascriptInterface(new FluxPdfBridge(), "FluxPdfNative");
-            this.bridge.getWebView().addJavascriptInterface(new FluxNotificationBridge(), "FluxNotificationsNative");
-            this.bridge.getWebView().addJavascriptInterface(new FluxStepsBridge(), "FluxStepsNative");
+            configureAndRegisterWebView(this.bridge.getWebView());
         }
 
         // Solicitar permiso de notificaciones en barra de estado en Android 13+ (API 33+)
@@ -188,6 +176,43 @@ public class MainActivity extends BridgeActivity {
             checkForPlayUpdate();
         } catch (Exception e) {
             Log.w(TAG, "Error initializing AppUpdateManager: " + e.getMessage());
+        }
+    }
+
+    @Override
+    protected void load() {
+        // Registrar los JavascriptInterfaces ANTES de que Bridge.create() invoque webView.loadUrl(),
+        // garantizando que window.FluxStepsNative y demás puentes existan desde la primera carga.
+        try {
+            WebView earlyWebView = findViewById(com.getcapacitor.android.R.id.webview);
+            if (earlyWebView != null) {
+                configureAndRegisterWebView(earlyWebView);
+            }
+        } catch (Exception ignored) {}
+        super.load();
+        if (this.bridge != null && this.bridge.getWebView() != null) {
+            configureAndRegisterWebView(this.bridge.getWebView());
+        }
+    }
+
+    private void configureAndRegisterWebView(WebView wv) {
+        if (wv == null) return;
+        try {
+            WebSettings ws = wv.getSettings();
+            ws.setTextZoom(100);
+        } catch (Exception ignored) {}
+        wv.setVerticalScrollBarEnabled(false);
+        wv.setHorizontalScrollBarEnabled(false);
+        wv.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        if (!jsInterfacesRegistered) {
+            jsInterfacesRegistered = true;
+            wv.addJavascriptInterface(new SystemBarBridge(), "FluxAndroidBars");
+            wv.addJavascriptInterface(new PlayUpdateBridge(), "FluxPlayUpdate");
+            wv.addJavascriptInterface(new FluxNativeSyncBridge(), "FluxNativeSync");
+            wv.addJavascriptInterface(new FluxTimerBridge(), "FluxTimerNative");
+            wv.addJavascriptInterface(new FluxPdfBridge(), "FluxPdfNative");
+            wv.addJavascriptInterface(new FluxNotificationBridge(), "FluxNotificationsNative");
+            wv.addJavascriptInterface(new FluxStepsBridge(), "FluxStepsNative");
         }
     }
 

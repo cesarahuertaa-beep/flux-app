@@ -94,7 +94,7 @@ export default function Pasos({ cliente, isActive = true, ultimoPeso = null, met
   const clienteId = cliente?.id;
   const platform = useMemo(() => getStepsPlatform(), []);
   const native = isNativeStepsAvailable();
-  const supported = useMemo(() => (native ? nativeStepsSupported() : false), [native]);
+  const [supported, setSupported] = useState(() => (native ? nativeStepsSupported() : false));
   const [permission, setPermission] = useState(() => (native ? nativeStepsPermission() : false));
   const [permissionBlocked, setPermissionBlocked] = useState(() => (native ? nativeStepsPermissionBlocked() : false));
   const [batteryUnrestricted, setBatteryUnrestricted] = useState(() =>
@@ -202,6 +202,11 @@ export default function Pasos({ cliente, isActive = true, ultimoPeso = null, met
     const onPermSync = (e) => {
       const granted = Boolean(e?.detail?.granted);
       const blocked = Boolean(e?.detail?.blocked);
+      if (typeof e?.detail?.supported === "boolean") {
+        setSupported(e.detail.supported);
+      } else {
+        setSupported(nativeStepsSupported());
+      }
       if (typeof e?.detail?.batteryUnrestricted === "boolean") {
         setBatteryUnrestricted(e.detail.batteryUnrestricted);
       } else {
@@ -361,8 +366,8 @@ export default function Pasos({ cliente, isActive = true, ultimoPeso = null, met
 
       {/* ── Contenido Principal (Sin huecos ni bordes dobles en móvil, tarjetas espaciadas en escritorio) ── */}
       <div className="px-0 md:px-8 py-0 md:py-6 pb-28 md:pb-8 max-w-5xl w-full mx-auto space-y-0 md:space-y-4">
-        {/* Aviso PWA / navegador o iOS sin puente nativo */}
-        {!native && (
+        {/* Aviso PWA / navegador o iOS sin puente nativo (jamás se muestra en la app Android de Play Store) */}
+        {!native && platform !== "android" && (
           <div className="bg-white rounded-none md:rounded-2xl border-b md:border border-[#E2E8F0] md:border-[var(--brand-primary)]/25 px-4 py-4 sm:p-5 shadow-none md:shadow-sm">
             <div className="flex items-start gap-3">
               <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] flex items-center justify-center shrink-0">
