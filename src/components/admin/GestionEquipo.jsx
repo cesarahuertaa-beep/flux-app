@@ -1359,11 +1359,11 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
   // VISTA PRINCIPAL: LISTA DE COLABORADORES O GENERADOR DE ROLES
   // ═══════════════════════════════════════════════════════════════════════════
   return (
-    <div className="pb-28 md:pb-8">
+    <div className="w-full max-w-full min-w-0 overflow-x-hidden pb-28 md:pb-8">
       {/* Top action bar: Fijo en móvil sin scroll lateral, botón colapsado */}
-      <div className="flex items-center justify-between sm:justify-start gap-2 mb-3 md:mb-5 px-4 pt-1 md:px-0 md:pt-0">
+      <div className="flex items-center justify-between sm:justify-start gap-2 mb-3 md:mb-5 px-4 pt-1 md:px-0 md:pt-0 max-w-full min-w-0">
         {isSuperadmin ? (
-          <div className="flex gap-1 bg-[#F0F4FA] p-1 rounded-xl shrink-0 overflow-x-auto scroll-hide">
+          <div className="flex gap-1 bg-[#F0F4FA] p-1 rounded-xl min-w-0 flex-1 sm:flex-initial overflow-x-auto scroll-hide">
             {[
               ["colaboradores", `Colaboradores (${equipo.length})`],
               ["roles", `Roles y Permisos (${allStaffRoles.length})`],
@@ -1373,7 +1373,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
                 key={k}
                 type="button"
                 onClick={() => setActiveSubTab(k)}
-                className={`px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                className={`px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                   activeSubTab === k
                     ? "bg-white text-[var(--brand-primary)] shadow-sm font-bold"
                     : "text-[#6B7A8D] hover:text-[#0B1929]"
@@ -1412,7 +1412,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
 
       {/* ─── Subpestaña 1: NÓMINAS Y PAGOS (Superadmin) ─── */}
       {isSuperadmin && activeSubTab === "nominas" ? (
-        <div className="space-y-4 px-4 md:px-0">
+        <div className="space-y-4 px-4 md:px-0 min-w-0 max-w-full">
           {/* Barra de Filtros de Nómina: Mes, Buscador y Estado */}
           <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 md:p-5 shadow-2xs space-y-3.5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -1440,7 +1440,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
             </div>
 
             {/* Buscador + Pills de Filtro de Estado de Nómina */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-gray-100">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-gray-100 min-w-0 max-w-full">
               <div className="relative flex-1 max-w-md">
                 <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9BA5B0]" />
                 <input
@@ -1460,7 +1460,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
                 )}
               </div>
 
-              <div className="flex items-center gap-1.5 overflow-x-auto scroll-hide">
+              <div className="flex items-center gap-1.5 overflow-x-auto scroll-hide min-w-0 max-w-full">
                 {[
                   { key: "todos", label: `Todos (${kpisNomina.totalVisibles})` },
                   { key: "pendiente", label: `Pendientes (${kpisNomina.pendientes})` },
@@ -1651,7 +1651,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
                       </div>
 
                       {/* Botones de Acción */}
-                      <div className="flex items-center gap-2 self-end md:self-auto shrink-0">
+                      <div className="flex items-center gap-2 self-end md:self-auto shrink-0 flex-wrap">
                         <button
                           type="button"
                           onClick={() => openEdit(colab)}
@@ -1694,7 +1694,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
           )}
         </div>
       ) : isSuperadmin && activeSubTab === "roles" ? (
-        <div className="space-y-4 px-4 md:px-0">
+        <div className="space-y-4 px-4 md:px-0 min-w-0 max-w-full">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {allStaffRoles.map(r => {
               const colaboradoresEnRol = equipo.filter(c => (c.especialidad || 'staff_general') === r.id);
@@ -1764,8 +1764,8 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
         /* Subpestaña: LISTA DE COLABORADORES */
         <>
           {/* Barra de filtros horizontales por rol (homologado con Agenda) */}
-          <div className="mb-4">
-            <div className="flex gap-2 overflow-x-auto scroll-hide pb-1 px-4 md:px-0">
+          <div className="mb-4 min-w-0 max-w-full overflow-hidden">
+            <div className="flex gap-2 overflow-x-auto scroll-hide pb-1 px-4 md:px-0 min-w-0 max-w-full">
               {roleFilters.map(([k, lb]) => (
                 <button
                   key={k}

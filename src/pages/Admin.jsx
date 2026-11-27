@@ -62,20 +62,20 @@ const sanitizeWhatsAppPhone = (phone) => {
 };
 
 const SubComponentWrapper = ({ children, title, subtitle, eyebrow = "Panel de Administración", action }) => (
-  <div className="flex-1 flex flex-col w-full text-[#0B1929] bg-white md:bg-[#F7F9FC]">
+  <div className="flex-1 flex flex-col w-full min-w-0 max-w-full text-[#0B1929] bg-white md:bg-[#F7F9FC]">
     {title && (
-      <div className="px-4 md:px-8 py-3 md:pt-8 md:pb-6 bg-white border-b-0 md:border-b border-[#E2E8F0] flex items-center justify-between gap-2 md:gap-4 shrink-0">
-        <div>
+      <div className="px-4 md:px-8 py-3 md:pt-8 md:pb-6 bg-white border-b-0 md:border-b border-[#E2E8F0] flex items-center justify-between gap-2 md:gap-4 shrink-0 min-w-0 max-w-full">
+        <div className="min-w-0">
           <p className="hidden md:block text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
             {eyebrow}
           </p>
-          <h1 className="text-lg md:text-2xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>{title}</h1>
+          <h1 className="text-lg md:text-2xl font-bold text-[#0B1929] truncate" style={{ fontFamily: "DM Sans" }}>{title}</h1>
           {subtitle && <p className="hidden md:block text-sm text-[#6B7A8D] mt-1">{subtitle}</p>}
         </div>
         {action}
       </div>
     )}
-    <div className="flex-1 w-full relative p-0 md:p-8 flex flex-col">
+    <div className="flex-1 w-full min-w-0 max-w-full relative p-0 md:p-8 flex flex-col">
       <Suspense fallback={<ListSkeleton rows={4} />}>
         {children}
       </Suspense>
@@ -1763,16 +1763,14 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       )}
 
       {!isCivil && role !== "administrativo" && (role !== "staff" || staffModules.includes("plantillas") || staffModules.includes("clientes")) && (tab === "plantillas" || visitedTabs.has("plantillas")) && (
-        <div className={tab === "plantillas" ? "flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
-          <div className="w-full max-w-7xl mx-auto md:p-6 flex-1 flex flex-col">
-            <Suspense fallback={<div className="p-6 md:p-8 max-w-5xl w-full mx-auto"><ListSkeleton rows={4} /></div>}>
-              <MisPlantillas
-                biblioteca={biblioteca}
-                profileId={myId}
-                setMsg={setMsg}
-              />
-            </Suspense>
-          </div>
+        <div className={tab === "plantillas" ? "flex-1 flex flex-col w-full min-w-0 max-w-full bg-white md:bg-[#F7F9FC]" : "hidden"}>
+          <Suspense fallback={<div className="p-6 md:p-8 max-w-5xl w-full mx-auto"><ListSkeleton rows={4} /></div>}>
+            <MisPlantillas
+              biblioteca={biblioteca}
+              profileId={myId}
+              setMsg={setMsg}
+            />
+          </Suspense>
         </div>
       )}
       
@@ -1832,7 +1830,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       )}
 
       {!isCivil && role !== "administrativo" && (role !== "staff" || staffModules.includes("equipo")) && (tab === "equipo" || visitedTabs.has("equipo")) && (
-        <div className={tab === "equipo" ? "flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
+        <div className={tab === "equipo" ? "flex-1 flex flex-col w-full min-w-0 max-w-full bg-[#F7F9FC]" : "hidden"}>
           <SubComponentWrapper title={isSuperadmin ? "Staff Corporativo" : "Mi Equipo"} subtitle="Administra los accesos de tus colaboradores">
             <GestionEquipo setMsg={setMsg} profileId={myId} isSuperadmin={isSuperadmin} role={role}/>
           </SubComponentWrapper>
