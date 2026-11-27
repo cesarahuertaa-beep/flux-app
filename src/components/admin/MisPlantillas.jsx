@@ -354,17 +354,13 @@ export function MisPlantillas({ biblioteca, profileId, setMsg }) {
               const summary = summarizeTemplate(tpl, activeType);
               const isCustom = tpl?.isDefault !== true && !String(tpl?.id || "").startsWith("base_");
               const dateLabel = formatShortDate(tpl.updated_at || tpl.updatedAt || tpl.created_at || tpl.createdAt);
-              const accentColor = activeType === "nutri" ? "bg-emerald-500" : "bg-sky-500";
 
               return (
                 <div
                   key={tpl.id}
                   onClick={() => handleOpenOrEdit(tpl)}
-                  className="group bg-white rounded-none md:rounded-2xl border-b first:border-t md:first:border-t-0 md:border border-[#E2E8F0] hover:border-[var(--brand-primary)] hover:shadow-md transition-all flex flex-col justify-between shadow-none md:shadow-2xs cursor-pointer relative overflow-hidden"
+                  className="group bg-white rounded-none md:rounded-2xl border-b md:border border-[#E2E8F0] hover:border-[var(--brand-primary)]/40 hover:shadow-sm transition-all flex flex-col justify-between shadow-none md:shadow-xs cursor-pointer relative overflow-hidden"
                 >
-                  {/* Barra superior de acento (homólogo a Pacientes y Agenda) */}
-                  <div className={`h-1.5 w-full ${accentColor}`} />
-
                   <div className="p-4 md:p-5 flex-1 flex flex-col justify-between gap-3">
                     <div className="space-y-2">
                       <div className="flex items-start justify-between gap-2">

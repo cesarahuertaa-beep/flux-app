@@ -1488,13 +1488,6 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-0 md:gap-4">
                 {filteredClientes.map((c) => {
                   const ret = getPatientRetention(c);
-                  const barColor = !c.activo 
-                    ? 'bg-slate-300' 
-                    : ret.isVenciendo 
-                    ? 'bg-amber-400' 
-                    : ret.isInactivo 
-                    ? 'bg-rose-500' 
-                    : 'bg-[var(--brand-primary)]';
 
                   const clinRec = peekClinicalRecord(c.id);
                   const edad = calcEdadFromBirthdate(c.fecha_nacimiento || clinRec?.anamnesis?.fecha_nacimiento, null);
@@ -1511,11 +1504,8 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
                   return (
                     <div 
                       key={c.id} 
-                      className="bg-white rounded-none md:rounded-2xl border-b md:border border-[#E2E8F0] hover:border-[var(--brand-primary)] hover:shadow-md transition-all flex flex-col shadow-none md:shadow-xs overflow-hidden"
+                      className="bg-white rounded-none md:rounded-2xl border-b md:border border-[#E2E8F0] hover:border-[var(--brand-primary)]/40 hover:shadow-sm transition-all flex flex-col shadow-none md:shadow-xs overflow-hidden"
                     >
-                      {/* Barra superior de acento según estado */}
-                      <div className={`h-1.5 w-full ${barColor}`} />
-
                       <div className="p-4 flex-1 flex flex-col justify-between">
                         <div>
                           {/* Cabecera con Avatar e Información Principal */}

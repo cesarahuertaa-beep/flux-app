@@ -1817,14 +1817,11 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
                   <div 
                     key={p.id} 
                     onClick={() => openEdit(p)}
-                    className="animate-in bg-white rounded-none md:rounded-2xl border-b first:border-t md:first:border-t-0 md:border border-[#E2E8F0] p-4 md:p-5 flex items-center justify-between gap-3 relative overflow-hidden shadow-none md:shadow-2xs hover:shadow-md hover:border-[#CBD5E1] transition-all cursor-pointer group"
+                    className="animate-in bg-white rounded-none md:rounded-2xl border-b md:border border-[#E2E8F0] p-4 md:p-5 flex items-center justify-between gap-3 relative overflow-hidden shadow-none md:shadow-xs hover:shadow-sm hover:border-[var(--brand-primary)]/40 transition-all cursor-pointer group"
                     style={{ animationDelay: `${i * 0.04}s` }}
                   >
-                    {/* Barra lateral de estado */}
-                    <div className={`absolute left-0 top-[15%] bottom-[15%] w-1 rounded-r-md ${p.activo !== false ? 'bg-[var(--brand-primary)]' : 'bg-[#EF4444]'}`} />
-
                     {/* Información Principal del Empleado */}
-                    <div className="pl-3.5 flex items-center gap-3.5 flex-1 min-w-0">
+                    <div className="flex items-center gap-3.5 flex-1 min-w-0">
                       {/* Avatar Inicial */}
                       <div className="w-10 h-10 rounded-xl bg-[#F0F4FA] group-hover:bg-[#E2E8F0] border border-[#E2E8F0] flex items-center justify-center font-bold text-sm text-[var(--brand-primary)] shrink-0 transition-colors">
                         {(p.nombre || "C").charAt(0).toUpperCase()}

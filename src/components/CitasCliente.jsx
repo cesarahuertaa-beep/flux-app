@@ -386,12 +386,8 @@ export function CitasCliente({ cliente }) {
                   {citasProximas.map(cita => {
                     const estado = ESTADOS[cita.estado] || ESTADOS.pendiente;
                     const { dia, hora } = fmtFechaHora(cita.fecha_hora);
-                    const barColor = cita.estado === "confirmada" ? "bg-emerald-500" : cita.estado === "pendiente" ? "bg-amber-400" : "bg-red-500";
                     return (
-                      <div key={cita.id} className="bg-white rounded-none md:rounded-xl border-b md:border border-[#E2E8F0] shadow-none md:shadow-sm overflow-hidden flex relative">
-                        {/* Status color bar */}
-                        <div className={`w-1.5 flex-shrink-0 ${barColor}`} />
-                        
+                      <div key={cita.id} className="bg-white rounded-none md:rounded-2xl border-b md:border border-[#E2E8F0] shadow-none md:shadow-xs overflow-hidden flex relative">
                         <div className="p-5 flex-1 min-w-0">
                           <div className="flex flex-wrap items-center justify-between gap-4 mb-3">
                             <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-semibold ${estado.bg} ${estado.border} ${estado.text}`}>

@@ -4466,9 +4466,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
               {/* Left Column: Protocol & Anthropometric Fields */}
               <div className="lg:col-span-8 flex flex-col gap-0 md:gap-5">
                 {/* Paso 1: Check-in de Seguimiento */}
-                <div className="bg-white rounded-none md:rounded-2xl border-b border-[#CBD5E1] md:border md:border-blue-100 p-4 sm:p-6 shadow-none md:shadow-sm relative overflow-hidden space-y-4 sm:space-y-5">
-                  <div className="hidden md:block absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[var(--brand-primary)] to-blue-400" />
-                  
+                <div className="bg-white rounded-none md:rounded-2xl border-b border-[#E2E8F0] md:border p-4 sm:p-6 shadow-none md:shadow-xs relative overflow-hidden space-y-4 sm:space-y-5">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3">
                     <div className="flex items-start sm:items-center gap-3 min-w-0">
                       <div className="hidden sm:flex w-10 h-10 rounded-xl bg-blue-50 text-[var(--brand-primary)] items-center justify-center shrink-0">
@@ -5996,9 +5994,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                 </div>
 
                 {/* Prescripción de Macros: Matemático, Sugerido IA o Manual */}
-                <div className="bg-white rounded-none md:rounded-2xl border-b border-[#CBD5E1] md:border md:border-indigo-100 p-4 sm:p-5 shadow-none md:shadow-sm relative space-y-3.5">
-                  <div className="hidden md:block absolute top-0 left-0 right-0 h-1 md:rounded-t-2xl bg-gradient-to-r from-[var(--brand-primary)] via-indigo-500 to-emerald-500" />
-                  
+                <div className="bg-white rounded-none md:rounded-2xl border-b border-[#E2E8F0] md:border p-4 sm:p-5 shadow-none md:shadow-xs relative space-y-3.5">
                   {/* Cabecera */}
                   <div className="flex items-center justify-between gap-2 pb-0 md:pb-2 border-b-0 md:border-b md:border-[#F0F4FA]">
                     <div className="flex items-center gap-1.5 min-w-0">

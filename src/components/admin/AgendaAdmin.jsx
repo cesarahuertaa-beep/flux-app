@@ -857,11 +857,8 @@ export function AgendaAdmin({ setMsg, profileId, clientes: clientesProp }) {
                 const StateIcon = estado.Icon;
                 const tel = clienteTelefono(cita.cliente_id);
                 return (
-                  <div key={cita.id} className="animate-in bg-white rounded-none md:rounded-xl border-b first:border-t md:first:border-t-0 md:border border-[#E2E8F0] p-4 relative overflow-hidden shadow-none md:shadow-sm hover:shadow-md transition-shadow" style={{ animationDelay: `${i * 0.04}s` }}>
-                    {/* Barra lateral estado */}
-                    <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${estado.bar}`} />
-
-                    <div className="pl-3 flex justify-between items-start flex-wrap gap-4">
+                  <div key={cita.id} className="animate-in bg-white rounded-none md:rounded-2xl border-b md:border border-[#E2E8F0] p-4 relative overflow-hidden shadow-none md:shadow-xs hover:border-[var(--brand-primary)]/40 hover:shadow-sm transition-all" style={{ animationDelay: `${i * 0.04}s` }}>
+                    <div className="flex justify-between items-start flex-wrap gap-4">
                       {/* Info izquierda */}
                       <div>
                         <div className="font-bold text-[15px] text-[#0B1929] mb-1">
